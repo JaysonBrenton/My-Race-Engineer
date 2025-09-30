@@ -256,4 +256,9 @@ Use **semantic colour tokens** instead of hard-coding hex in components.
 ---
 
 ## License
-TBD (e.g., MIT). Add `LICENSE` at the repo root.
+The Pace Tracer is released under the [MIT License](LICENSE).
+
+You may use, copy, modify, merge, publish, distribute, sublicense, and sell
+copies of the software, provided that the copyright notice and permission
+notice from the LICENSE are included in all copies or substantial portions of
+the software.
