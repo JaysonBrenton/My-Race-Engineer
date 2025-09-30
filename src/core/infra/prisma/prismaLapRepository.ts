@@ -1,9 +1,11 @@
 import type { Lap } from '@core/domain';
 import type { LapRepository } from '@core/app';
-import { prisma } from './prismaClient';
+import { getPrismaClient } from './prismaClient';
 
 export class PrismaLapRepository implements LapRepository {
   async listByDriver(driverName: string): Promise<Lap[]> {
+    const prisma = getPrismaClient();
+
     const laps = await prisma.lap.findMany({
       where: { driverName },
       orderBy: { lapNumber: 'asc' },
