@@ -1,0 +1,35 @@
+:root {
+  --color-bg: #0b0e14;
+  --color-fg: #e6e6e6;
+  --color-fg-muted: #b9b9b9;
+  --color-accent: #6ee7b7;
+  --color-border: #2a2f3a;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+main {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 1.5rem;
+  gap: 2rem;
+}

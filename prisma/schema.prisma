@@ -1,0 +1,19 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Lap {
+  id         String   @id @default(cuid())
+  driverName String
+  lapNumber  Int
+  lapTimeMs  Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([driverName, lapNumber])
+}
