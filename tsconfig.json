@@ -21,7 +21,10 @@
       "@/*": ["src/*"],
       "@core/domain/*": ["src/core/domain/*"],
       "@core/app/*": ["src/core/app/*"],
-      "@core/infra/*": ["src/core/infra/*"]
+      "@core/infra/*": ["src/core/infra/*"],
+      "@core/app": ["src/core/app/index.ts"],
+      "@core/domain": ["src/core/domain/index.ts"],
+      "@core/infra": ["src/core/infra/index.ts"]
     },
     "types": ["node"]
   },
