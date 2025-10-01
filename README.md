@@ -25,12 +25,21 @@ Next.js (App Router) + TypeScript + Prisma/PostgreSQL with clean layering, stric
 ---
 
 ## What is this?
-A clean-slate skeleton for race telemetry and lap analysis that favours:
-- **Feature-per-branch** workflow and **small, reviewable diffs**
-- **Strict TypeScript** and **predictable lint/format**
-- **Framework-agnostic domain** with **UI/import guardrails**
-- **Structured error handling** with **request correlation**
-- **Operational endpoints** (to implement): `/api/health`, `/api/ready`, `/api/version`
+The Pace Tracing Engineer (TPTE) is a lightweight pace and consistency analysis platform for **1/8 and 1/10 off-road RC racers**, their crews, and team managers. The MVP focuses on helping drivers turn race timing data into actionable setup and driving decisions through:
+
+- **Dashboard sign-in landing** that surfaces recent events, sessions, and key pace stats (best lap, median, standard deviation, outliers).
+- **LiveRC ingestion** (by event, session, or driver) with storage in a normalised format for quick comparison lookups.
+- **Competitor comparisons** showing per-lap times and deltas against a selected baseline.
+- **Tokenised, accessible visualisations** (ApexCharts or similar) highlighting trends, anomalies, outlaps/inlaps, penalties, and consistency bands.
+- **Filters** to toggle outlaps/inlaps, isolate stints, and spotlight where time was lost.
+
+All product work should preserve the repo guardrails already in place:
+
+- **Feature-per-branch** workflow and **small, reviewable diffs**.
+- **Strict TypeScript** and **predictable lint/format**.
+- **Framework-agnostic domain** with **UI/import guardrails**.
+- **Structured error handling** with **request correlation**.
+- **Operational endpoints** (to implement): `/api/health`, `/api/ready`, `/api/version`.
 
 ---
 
