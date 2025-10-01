@@ -1,5 +1,5 @@
 import type { Lap } from '@core/domain';
 
 export interface LapRepository {
-  listByDriver(driverName: string): Promise<Lap[]>;
+  listByEntrant(entrantId: string): Promise<Lap[]>;
 }

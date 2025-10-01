@@ -6,7 +6,7 @@ export function LapSummaryCard({ summary }: { summary: LapSummary }) {
   return (
     <article className={styles.card}>
       <header className={styles.cardHeader}>
-        <h2 className={styles.cardTitle}>{summary.driverName}</h2>
+        <h2 className={styles.cardTitle}>{summary.entrantDisplayName}</h2>
         <p className={styles.cardSubtitle}>Lap overview</p>
       </header>
       <dl className={styles.statsGrid}>

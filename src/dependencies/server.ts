@@ -1,5 +1,37 @@
 import { LapSummaryService } from '@core/app';
-import { PrismaLapRepository, isPrismaClientInitializationError } from '@core/infra';
+import {
+  PrismaEntrantRepository,
+  PrismaLapRepository,
+  isPrismaClientInitializationError,
+} from '@core/infra';
+import type { Entrant } from '@core/domain';
+
+const DEFAULT_EVENT_ID = 'baseline-event';
+const DEFAULT_RACE_CLASS_ID = 'baseline-race-class';
+const DEFAULT_SESSION_ID = 'baseline-session';
+const DEFAULT_ENTRANT_ID = 'baseline-entrant';
+const DEFAULT_EVENT_SOURCE_ID = 'liverc-event-baseline';
+const DEFAULT_EVENT_URL = 'https://liverc.com/events/baseline';
+const DEFAULT_CLASS_CODE = 'PRO-LITE';
+const DEFAULT_CLASS_URL = 'https://liverc.com/events/baseline/classes/pro-lite';
+const DEFAULT_SESSION_SOURCE_ID = 'liverc-session-baseline';
+const DEFAULT_SESSION_URL = 'https://liverc.com/events/baseline/classes/pro-lite/heat-1';
+const DEFAULT_ENTRANT_SOURCE_ID = 'liverc-entrant-baseline';
+
+const createMockEntrant = (): Entrant => ({
+  id: DEFAULT_ENTRANT_ID,
+  eventId: DEFAULT_EVENT_ID,
+  raceClassId: DEFAULT_RACE_CLASS_ID,
+  sessionId: DEFAULT_SESSION_ID,
+  displayName: 'Baseline Driver',
+  carNumber: '7',
+  source: {
+    entrantId: DEFAULT_ENTRANT_SOURCE_ID,
+    transponderId: 'TX-BASELINE-7',
+  },
+  createdAt: new Date(),
+  updatedAt: new Date(),
+});
 
 type MockLapSeed = {
   id: string;
@@ -17,28 +49,34 @@ const FALLBACK_LAPS: ReadonlyArray<MockLapSeed> = [
 ];
 
 class MockLapRepository extends PrismaLapRepository {
-  override async listByDriver(driverName: string) {
+  override async listByEntrant(entrantId: string) {
     if (!process.env.DATABASE_URL) {
-      return this.buildLapsFromSeed(driverName, MOCK_LAPS);
+      return this.buildLapsFromSeed(MOCK_LAPS);
     }
 
     try {
-      return await super.listByDriver(driverName);
+      const laps = await super.listByEntrant(entrantId);
+      if (laps.length > 0) {
+        return laps;
+      }
+
+      return this.buildLapsFromSeed(MOCK_LAPS);
     } catch (error) {
       if (isPrismaClientInitializationError(error)) {
         console.warn('Prisma client unavailable. Falling back to mock lap data.', error);
-        return this.buildLapsFromSeed(driverName, MOCK_LAPS);
+        return this.buildLapsFromSeed(MOCK_LAPS);
       }
 
       console.warn('Falling back to mock lap data after unexpected error.', error);
-      return this.buildLapsFromSeed(driverName, FALLBACK_LAPS);
+      return this.buildLapsFromSeed(FALLBACK_LAPS);
     }
   }
 
-  private buildLapsFromSeed(driverName: string, seed: ReadonlyArray<MockLapSeed>) {
+  private buildLapsFromSeed(seed: ReadonlyArray<MockLapSeed>) {
     return seed.map((lap) => ({
       id: lap.id,
-      driverName,
+      entrantId: DEFAULT_ENTRANT_ID,
+      sessionId: DEFAULT_SESSION_ID,
       lapNumber: lap.lapNumber,
       lapTime: { milliseconds: lap.lapTimeMs },
       createdAt: new Date(),
@@ -47,6 +85,99 @@ class MockLapRepository extends PrismaLapRepository {
   }
 }
 
-const lapRepository = new MockLapRepository();
+class MockEntrantRepository extends PrismaEntrantRepository {
+  override async getById(id: string) {
+    if (!process.env.DATABASE_URL) {
+      return id === DEFAULT_ENTRANT_ID ? createMockEntrant() : null;
+    }
 
-export const lapSummaryService = new LapSummaryService(lapRepository);
+    try {
+      const entrant = await super.getById(id);
+      if (entrant) {
+        return entrant;
+      }
+    } catch (error) {
+      if (isPrismaClientInitializationError(error)) {
+        console.warn('Prisma client unavailable. Falling back to mock entrant data.', error);
+        return id === DEFAULT_ENTRANT_ID ? createMockEntrant() : null;
+      }
+
+      console.warn('Falling back to mock entrant data after unexpected error.', error);
+      return id === DEFAULT_ENTRANT_ID ? createMockEntrant() : null;
+    }
+
+    return id === DEFAULT_ENTRANT_ID ? createMockEntrant() : null;
+  }
+
+  override async findBySourceEntrantId(sourceEntrantId: string) {
+    if (!process.env.DATABASE_URL && sourceEntrantId === DEFAULT_ENTRANT_SOURCE_ID) {
+      return createMockEntrant();
+    }
+
+    try {
+      const entrant = await super.findBySourceEntrantId(sourceEntrantId);
+      if (entrant) {
+        return entrant;
+      }
+    } catch (error) {
+      if (isPrismaClientInitializationError(error)) {
+        console.warn('Prisma client unavailable. Falling back to mock entrant data.', error);
+        return sourceEntrantId === DEFAULT_ENTRANT_SOURCE_ID ? createMockEntrant() : null;
+      }
+
+      console.warn('Falling back to mock entrant data after unexpected error.', error);
+      return sourceEntrantId === DEFAULT_ENTRANT_SOURCE_ID ? createMockEntrant() : null;
+    }
+
+    return sourceEntrantId === DEFAULT_ENTRANT_SOURCE_ID ? createMockEntrant() : null;
+  }
+
+  override async listBySession(sessionId: string) {
+    if (!process.env.DATABASE_URL && sessionId === DEFAULT_SESSION_ID) {
+      return [createMockEntrant()];
+    }
+
+    try {
+      const entrants = await super.listBySession(sessionId);
+      if (entrants.length > 0) {
+        return entrants;
+      }
+    } catch (error) {
+      if (isPrismaClientInitializationError(error)) {
+        console.warn('Prisma client unavailable. Falling back to mock entrant data.', error);
+        return sessionId === DEFAULT_SESSION_ID ? [createMockEntrant()] : [];
+      }
+
+      console.warn('Falling back to mock entrant data after unexpected error.', error);
+      return sessionId === DEFAULT_SESSION_ID ? [createMockEntrant()] : [];
+    }
+
+    return sessionId === DEFAULT_SESSION_ID ? [createMockEntrant()] : [];
+  }
+}
+
+const lapRepository = new MockLapRepository();
+const entrantRepository = new MockEntrantRepository();
+
+export const lapSummaryService = new LapSummaryService(lapRepository, entrantRepository);
+export const defaultEntrantContext = {
+  event: {
+    id: DEFAULT_EVENT_ID,
+    sourceEventId: DEFAULT_EVENT_SOURCE_ID,
+    url: DEFAULT_EVENT_URL,
+  },
+  raceClass: {
+    id: DEFAULT_RACE_CLASS_ID,
+    classCode: DEFAULT_CLASS_CODE,
+    url: DEFAULT_CLASS_URL,
+  },
+  session: {
+    id: DEFAULT_SESSION_ID,
+    sourceSessionId: DEFAULT_SESSION_SOURCE_ID,
+    url: DEFAULT_SESSION_URL,
+  },
+  entrant: {
+    id: DEFAULT_ENTRANT_ID,
+    sourceEntrantId: DEFAULT_ENTRANT_SOURCE_ID,
+  },
+};

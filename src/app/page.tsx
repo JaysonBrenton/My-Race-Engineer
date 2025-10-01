@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Script from 'next/script';
 
-import { lapSummaryService } from '@/dependencies/server';
+import { defaultEntrantContext, lapSummaryService } from '@/dependencies/server';
 import {
   absUrl,
   buildOrganizationJsonLd,
@@ -18,7 +18,7 @@ const PAGE_DESCRIPTION =
   'Baseline lap telemetry dashboards for racing teams, powered by a clean architecture Next.js foundation.';
 
 async function loadLapSummary() {
-  return lapSummaryService.getSummaryForDriver('Baseline Driver');
+  return lapSummaryService.getSummaryForEntrant(defaultEntrantContext.entrant.id);
 }
 
 export function generateMetadata(): Metadata {
