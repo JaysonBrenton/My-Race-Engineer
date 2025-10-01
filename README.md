@@ -246,9 +246,10 @@ Use **semantic colour tokens** instead of hard-coding hex in components.
 ## Docs & ADRs
 - Keep `/.env.example` authoritative and in sync with the Codex Environment.
 - Author **ADRs** under `docs/adr/ADR-YYYYMMDD-title.md` when a choice is **cross-cutting**, **breaking**, **costly to reverse**, or **security/ops-critical** (include context, options, decision, consequences, follow-ups).
+- Keep the LiveRC ingestion contract at [`docs/integrations/liverc-data-model.md`](docs/integrations/liverc-data-model.md) up to date whenever schema or connector rules change.
 - Forthcoming docs (placeholders for now):
-  - `docs/design-principles.md` — layering exceptions, server/client rules, ADR policy  
-  - `docs/ux-principles.md` — layout, spacing, accessibility, token map  
+  - `docs/design-principles.md` — layering exceptions, server/client rules, ADR policy
+  - `docs/ux-principles.md` — layout, spacing, accessibility, token map
   - `docs/domain-model.md` — entities/relations/invariants  
   - `docs/agents/**` — policies, prompts, checklists (auth-ux, auth-security, accessibility, telemetry)  
   - `docs/roles/**` — responsibilities & handoffs

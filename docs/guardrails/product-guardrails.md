@@ -24,6 +24,7 @@ Success is measured by the time it takes a driver to understand: *How fast am I?
    - Connector must import by **event**, **session**, or **driver**.
    - Data is stored in a normalised internal format optimised for lap-wise comparisons and deltas.
    - Handle re-imports idempotently (no duplicate laps/sessions).
+   - Follow the shared contract in [`docs/integrations/liverc-data-model.md`](../integrations/liverc-data-model.md) for endpoint coverage, field mapping, and filtering rules.
 3. **Competitor comparisons**
    - Allow selection of any number of competitors from the same event/session so that a comparison can be made between the logged in driver and their competitors.
    - Visualise per-lap times and deltas relative to a chosen baseline (e.g., fastest driver, selected competitor, or self).
