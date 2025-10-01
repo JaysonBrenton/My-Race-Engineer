@@ -1,0 +1,49 @@
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2.5rem;
+  width: min(100%, var(--layout-max-width));
+  margin-inline: auto;
+}
+
+.heroHeader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  text-align: center;
+  max-width: 40rem;
+}
+
+.heroTitle {
+  margin: 0;
+  font-size: clamp(2.5rem, 5vw, 3.5rem);
+  letter-spacing: -0.02em;
+}
+
+.heroDescription {
+  margin: 0;
+  color: var(--color-fg-muted);
+  font-size: 1.125rem;
+}
+
+.cards {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+@media (max-width: 48rem) {
+  .hero {
+    gap: 2rem;
+  }
+
+  .heroTitle {
+    font-size: clamp(2rem, 6vw, 3rem);
+  }
+
+  .heroDescription {
+    font-size: 1rem;
+  }
+}

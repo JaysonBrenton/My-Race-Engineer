@@ -1,4 +1,5 @@
 import { calculateLapSummary } from '@core/domain';
+
 import type { LapRepository } from '../ports/lapRepository';
 
 export class LapSummaryService {

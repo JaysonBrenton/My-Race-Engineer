@@ -1,3 +1,5 @@
+require('@rushstack/eslint-patch/modern-module-resolution');
+
 module.exports = {
   root: true,
   parser: '@typescript-eslint/parser',
@@ -35,13 +37,6 @@ module.exports = {
         varsIgnorePattern: '^_'
       }
     ],
-    'import/order': [
-      'error',
-      {
-        groups: [['builtin', 'external'], ['internal'], ['parent', 'sibling', 'index']],
-        alphabetize: { order: 'asc', caseInsensitive: true },
-        'newlines-between': 'always'
-      }
-    ]
+    'import/order': 'off'
   }
 };

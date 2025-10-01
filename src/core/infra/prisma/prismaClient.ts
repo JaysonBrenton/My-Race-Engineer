@@ -50,10 +50,7 @@ const createPrismaClient = (): PrismaClient => {
 
     return client;
   } catch (error) {
-    throw new PrismaClientInitializationError(
-      'Failed to create PrismaClient instance.',
-      error,
-    );
+    throw new PrismaClientInitializationError('Failed to create PrismaClient instance.', error);
   }
 };
 
