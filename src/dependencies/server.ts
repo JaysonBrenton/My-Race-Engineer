@@ -1,8 +1,5 @@
 import { LapSummaryService } from '@core/app';
-import {
-  PrismaLapRepository,
-  isPrismaClientInitializationError,
-} from '@core/infra';
+import { PrismaLapRepository, isPrismaClientInitializationError } from '@core/infra';
 
 type MockLapSeed = {
   id: string;
@@ -29,10 +26,7 @@ class MockLapRepository extends PrismaLapRepository {
       return await super.listByDriver(driverName);
     } catch (error) {
       if (isPrismaClientInitializationError(error)) {
-        console.warn(
-          'Prisma client unavailable. Falling back to mock lap data.',
-          error,
-        );
+        console.warn('Prisma client unavailable. Falling back to mock lap data.', error);
         return this.buildLapsFromSeed(driverName, MOCK_LAPS);
       }
 
@@ -41,10 +35,7 @@ class MockLapRepository extends PrismaLapRepository {
     }
   }
 
-  private buildLapsFromSeed(
-    driverName: string,
-    seed: ReadonlyArray<MockLapSeed>,
-  ) {
+  private buildLapsFromSeed(driverName: string, seed: ReadonlyArray<MockLapSeed>) {
     return seed.map((lap) => ({
       id: lap.id,
       driverName,

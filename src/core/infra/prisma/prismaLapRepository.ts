@@ -1,5 +1,6 @@
-import type { Lap } from '@core/domain';
 import type { LapRepository } from '@core/app';
+import type { Lap } from '@core/domain';
+
 import { getPrismaClient } from './prismaClient';
 
 export class PrismaLapRepository implements LapRepository {
