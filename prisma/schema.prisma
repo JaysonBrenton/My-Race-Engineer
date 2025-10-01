@@ -7,13 +7,91 @@ generator client {
   provider = "prisma-client-js"
 }
 
+model Event {
+  id            String       @id @default(cuid())
+  name          String
+  sourceEventId String       @unique
+  sourceUrl     String       @unique
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  raceClasses   RaceClass[]
+  sessions      Session[]
+  entrants      Entrant[]
+
+  @@index([name])
+}
+
+model RaceClass {
+  id        String    @id @default(cuid())
+  eventId   String
+  name      String
+  classCode String
+  sourceUrl String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  event     Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  sessions  Session[]
+  entrants  Entrant[]
+
+  @@unique([eventId, classCode])
+  @@index([classCode])
+}
+
+model Session {
+  id              String    @id @default(cuid())
+  eventId         String
+  raceClassId     String
+  name            String
+  sourceSessionId String    @unique
+  sourceUrl       String    @unique
+  scheduledStart  DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  event     Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  raceClass RaceClass @relation(fields: [raceClassId], references: [id], onDelete: Cascade)
+  laps      Lap[]
+  entrants  Entrant[]
+
+  @@index([eventId])
+  @@index([raceClassId])
+}
+
+model Entrant {
+  id                  String    @id @default(cuid())
+  eventId             String
+  raceClassId         String
+  sessionId           String
+  displayName         String
+  carNumber           String?
+  sourceEntrantId     String?
+  sourceTransponderId String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  event     Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  raceClass RaceClass @relation(fields: [raceClassId], references: [id], onDelete: Cascade)
+  session   Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  laps      Lap[]
+
+  @@unique([sessionId, displayName])
+  @@index([sourceEntrantId])
+}
+
 model Lap {
   id         String   @id @default(cuid())
-  driverName String
+  entrantId  String
+  sessionId  String
   lapNumber  Int
   lapTimeMs  Int
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  @@unique([driverName, lapNumber])
+  entrant Entrant @relation(fields: [entrantId], references: [id], onDelete: Cascade)
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([entrantId, lapNumber])
+  @@index([sessionId, lapNumber])
 }
