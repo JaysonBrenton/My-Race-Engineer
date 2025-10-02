@@ -2,7 +2,7 @@
 
 This package coordinates domain logic with infra adapters. The LiveRC ingestion
 service (to be implemented) will follow the pipeline below so all connectors stay
-consistent with the [`LiveRC → TPTE Data Contract`](../../../docs/integrations/liverc-data-model.md).
+consistent with the [`LiveRC → My Race Engineer (MRE) Data Contract`](../../../docs/integrations/liverc-data-model.md).
 
 ## Ingestion workflow
 

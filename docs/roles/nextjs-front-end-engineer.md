@@ -1,7 +1,7 @@
 # Next.js Front-End Engineer
 
 ## Mission
-Own the App Router user interface for The Pace Tracer, delivering resilient and accessible experiences while enforcing layered architecture contracts (UI → core/app), design token usage, and documented error boundaries.
+Own the App Router user interface for My Race Engineer (MRE), delivering resilient and accessible experiences while enforcing layered architecture contracts (UI → core/app), design token usage, and documented error boundaries.
 
 ## Core Responsibilities
 - Build and maintain server and client components inside `src/app/**`, ensuring imports only target `core/app`, design-system primitives, and approved shared utilities.

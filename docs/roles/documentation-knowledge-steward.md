@@ -1,7 +1,7 @@
 # Documentation & Knowledge Steward
 
 ## Mission
-Keep The Pace Tracer's institutional knowledge accurate, accessible, and actionable by curating documentation, decision records, and learning resources across the organisation.
+Keep My Race Engineer (MRE)'s institutional knowledge accurate, accessible, and actionable by curating documentation, decision records, and learning resources across the organisation.
 
 ## Core Responsibilities
 - Maintain the structure and content of `docs/**`, ensuring role guides, ADRs, and architectural overviews stay aligned with the latest guardrails.

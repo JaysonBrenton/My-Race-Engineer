@@ -42,7 +42,7 @@ export default function OpengraphImage() {
               textTransform: 'uppercase',
             }}
           >
-            The Pace Tracer
+            My Race Engineer
           </span>
           <h1
             style={{

@@ -1,4 +1,4 @@
-# The Pace Tracer
+# My Race Engineer (MRE)
 **The one-stop lap logic shop.**  
 Next.js (App Router) + TypeScript + Prisma/PostgreSQL with clean layering, strict linting, structured error handling, and CI-friendly conventions.
 
@@ -25,7 +25,7 @@ Next.js (App Router) + TypeScript + Prisma/PostgreSQL with clean layering, stric
 ---
 
 ## What is this?
-The Pace Tracing Engineer (TPTE) is a lightweight pace and consistency analysis platform for **1/8 and 1/10 off-road RC racers**, their crews, and team managers. The MVP focuses on helping drivers turn race timing data into actionable setup and driving decisions through:
+My Race Engineer (MRE) is a lightweight pace and consistency analysis platform for **1/8 and 1/10 off-road RC racers**, their crews, and team managers. The MVP focuses on helping drivers turn race timing data into actionable setup and driving decisions through:
 
 - **Dashboard sign-in landing** that surfaces recent events, sessions, and key pace stats (best lap, median, standard deviation, outliers).
 - **LiveRC ingestion** (by event, session, or driver) with storage in a normalised format for quick comparison lookups.
@@ -266,7 +266,7 @@ Use **semantic colour tokens** instead of hard-coding hex in components.
 ---
 
 ## License
-The Pace Tracer is released under the [MIT License](LICENSE).
+My Race Engineer (MRE) is released under the [MIT License](LICENSE).
 
 You may use, copy, modify, merge, publish, distribute, sublicense, and sell
 copies of the software, provided that the copyright notice and permission
