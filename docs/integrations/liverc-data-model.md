@@ -8,14 +8,15 @@ new adapters and tests stay aligned.
 
 | Layer | Shape |
 | --- | --- |
-| Prisma | `Lap { id: String @id, driverName: String, lapNumber: Int, lapTimeMs: Int, createdAt: DateTime, updatedAt: DateTime, @@unique([driverName, lapNumber]) }` |
-| Domain | `Lap { id: string; driverName: string; lapNumber: number; lapTime: { milliseconds: number }; createdAt: Date; updatedAt: Date; }` |
+| Prisma | `Lap { id: String @id, entrantId: String, sessionId: String, lapNumber: Int, lapTimeMs: Int, createdAt: DateTime, updatedAt: DateTime, @@unique([entrantId, lapNumber]) }` |
+| Domain | `Lap { id: string; entrantId: string; sessionId: string; lapNumber: number; lapTime: { milliseconds: number }; createdAt: Date; updatedAt: Date; }` |
 
 > **Identifiers**
 > - The canonical lap identifier is `sha256(eventId + sessionId + raceId +
 >   driverId + lapNumber)` stored in Prisma `Lap.id`.
-> - `driverName` is the LiveRC display name normalised to NFC, trimmed, and
->   collapsed internal whitespace.
+> - Driver metadata (`displayName`, car number, transponder) is normalised and
+>   persisted on the associated `Entrant` record. Each lap references that
+>   entrant via `entrantId`.
 > - `lapNumber` is 1-based as delivered by LiveRC.
 > - `lapTimeMs` is the lap duration converted into milliseconds (rounded to the
 >   nearest whole number).
@@ -43,7 +44,7 @@ remote timestamps.
 | LiveRC field | Example | Mapping |
 | --- | --- | --- |
 | `entry_id` | `"1738295"` | Stable identifier used in hash key. Store as `driverId`. |
-| `display_name` | `"Ryan Maifield"` | Normalised and persisted as `driverName`. |
+| `display_name` | `"Ryan Maifield"` | Normalised and persisted as `Entrant.displayName`. |
 | `car_number` | `"5"` | Stored in ingestion metadata only; not part of `Lap`. |
 | `class_id` | `"45932"` | Used to scope downstream requests; stored in ingestion cache. |
 
@@ -120,7 +121,7 @@ remote timestamps.
 | --- | --- | --- |
 | `race_id` | `"793015"` | Combined with other IDs to hash `Lap.id`. |
 | `entry_id` | `"1738295"` | Driver identifier (from entry list). |
-| `driver_name` | `"Ryan Maifield"` | Normalised → `driverName`. |
+| `driver_name` | `"Ryan Maifield"` | Normalised → `Entrant.displayName` (and referenced by `Lap.entrantId`). |
 | `laps` | Array of lap objects | Each lap transformed to Prisma `Lap`. |
 | `laps[].lap` | `1` | → `lapNumber`. |
 | `laps[].lap_time` | `32.745` seconds | Multiply by `1000` → `lapTimeMs`. |
@@ -134,7 +135,7 @@ remote timestamps.
 3. Convert `lap_time` seconds → integer milliseconds (`Math.round(seconds * 1000)`).
 4. Generate deterministic `Lap.id` hash from `eventId`, `classId`, `raceId`,
    `entryId`, and `lapNumber`.
-5. Upsert into Prisma using the `(driverName, lapNumber)` unique constraint to
+5. Upsert into Prisma using the `(entrantId, lapNumber)` unique constraint to
    deduplicate re-ingests.
 
 **Filtering rules**
