@@ -1,3 +1,4 @@
+// File: src/dependencies/server.ts
 import { LapSummaryService } from '@core/app';
 import {
   PrismaEntrantRepository,
@@ -49,20 +50,31 @@ const FALLBACK_LAPS: ReadonlyArray<MockLapSeed> = [
   { id: 'fallback-1', lapNumber: 1, lapTimeMs: 95000 },
 ];
 
-class MockLapRepository extends PrismaLapRepository {
+export class MockLapRepository extends PrismaLapRepository {
   private readonly memoryLapStore = new Map<string, LapUpsertInput[]>();
 
   override async listByEntrant(entrantId: string) {
-    if (!process.env.DATABASE_URL) {
+    const isBaselineEntrant = entrantId === DEFAULT_ENTRANT_ID;
+
+    const buildMockLaps = () =>
+      this.buildLapsFromSeed(MOCK_LAPS, entrantId, DEFAULT_SESSION_ID);
+    const buildFallbackLaps = () =>
+      this.buildLapsFromSeed(FALLBACK_LAPS, entrantId, DEFAULT_SESSION_ID);
+
+    const buildStoredLaps = () => {
       const stored = this.memoryLapStore.get(entrantId);
-      if (stored && stored.length > 0) {
-        return stored
-          .slice()
-          .sort((a, b) => a.lapNumber - b.lapNumber)
-          .map((lap) => this.buildLapFromUpsert(lap));
+      if (!stored || stored.length === 0) {
+        return null;
       }
 
-      return this.buildLapsFromSeed(MOCK_LAPS);
+      return stored
+        .slice()
+        .sort((a, b) => a.lapNumber - b.lapNumber)
+        .map((lap) => this.buildLapFromUpsert(lap));
+    };
+
+    if (!process.env.DATABASE_URL) {
+      return buildStoredLaps() ?? (isBaselineEntrant ? buildMockLaps() : []);
     }
 
     try {
@@ -71,32 +83,32 @@ class MockLapRepository extends PrismaLapRepository {
         return laps;
       }
 
-      const stored = this.memoryLapStore.get(entrantId);
-      if (stored && stored.length > 0) {
-        return stored
-          .slice()
-          .sort((a, b) => a.lapNumber - b.lapNumber)
-          .map((lap) => this.buildLapFromUpsert(lap));
-      }
-
-      return this.buildLapsFromSeed(MOCK_LAPS);
+      return buildStoredLaps() ?? [];
     } catch (error) {
       if (isPrismaClientInitializationError(error)) {
         console.warn('Prisma client unavailable. Falling back to mock lap data.', error);
-        const stored = this.memoryLapStore.get(entrantId);
-        if (stored && stored.length > 0) {
-          return stored
-            .slice()
-            .sort((a, b) => a.lapNumber - b.lapNumber)
-            .map((lap) => this.buildLapFromUpsert(lap));
-        }
-
-        return this.buildLapsFromSeed(MOCK_LAPS);
+        return buildStoredLaps() ?? (isBaselineEntrant ? buildMockLaps() : []);
       }
 
       console.warn('Falling back to mock lap data after unexpected error.', error);
-      return this.buildLapsFromSeed(FALLBACK_LAPS);
+      return buildStoredLaps() ?? (isBaselineEntrant ? buildFallbackLaps() : []);
     }
+  }
+
+  private buildLapsFromSeed(
+    seed: ReadonlyArray<MockLapSeed>,
+    entrantId: string,
+    sessionId: string,
+  ) {
+    return seed.map((lap) => ({
+      id: lap.id,
+      entrantId,
+      sessionId,
+      lapNumber: lap.lapNumber,
+      lapTime: { milliseconds: lap.lapTimeMs },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }));
   }
 
   override async replaceForEntrant(
@@ -104,44 +116,29 @@ class MockLapRepository extends PrismaLapRepository {
     sessionId: string,
     laps: ReadonlyArray<LapUpsertInput>,
   ): Promise<void> {
-    if (!process.env.DATABASE_URL) {
+    const storeLaps = () =>
       this.memoryLapStore.set(
         entrantId,
         laps.map((lap) => ({ ...lap })),
       );
+
+    if (!process.env.DATABASE_URL) {
+      storeLaps();
       return;
     }
 
     try {
       await super.replaceForEntrant(entrantId, sessionId, laps);
-      this.memoryLapStore.set(
-        entrantId,
-        laps.map((lap) => ({ ...lap })),
-      );
+      storeLaps();
     } catch (error) {
       if (isPrismaClientInitializationError(error)) {
         console.warn('Prisma client unavailable during lap replace. Storing in memory.', error);
-        this.memoryLapStore.set(
-          entrantId,
-          laps.map((lap) => ({ ...lap })),
-        );
+        storeLaps();
         return;
       }
 
       throw error;
     }
-  }
-
-  private buildLapsFromSeed(seed: ReadonlyArray<MockLapSeed>) {
-    return seed.map((lap) => ({
-      id: lap.id,
-      entrantId: DEFAULT_ENTRANT_ID,
-      sessionId: DEFAULT_SESSION_ID,
-      lapNumber: lap.lapNumber,
-      lapTime: { milliseconds: lap.lapTimeMs },
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    }));
   }
 
   private buildLapFromUpsert(lap: LapUpsertInput) {
