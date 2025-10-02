@@ -5,6 +5,7 @@ import {
   isPrismaClientInitializationError,
 } from '@core/infra';
 import type { Entrant } from '@core/domain';
+import type { LapUpsertInput } from '@core/app';
 
 const DEFAULT_EVENT_ID = 'baseline-event';
 const DEFAULT_RACE_CLASS_ID = 'baseline-race-class';
@@ -49,6 +50,8 @@ const FALLBACK_LAPS: ReadonlyArray<MockLapSeed> = [
 ];
 
 export class MockLapRepository extends PrismaLapRepository {
+  private readonly memoryLapStore = new Map<string, LapUpsertInput[]>();
+
   override async listByEntrant(entrantId: string) {
     const isBaselineEntrant = entrantId === DEFAULT_ENTRANT_ID;
 
@@ -56,21 +59,37 @@ export class MockLapRepository extends PrismaLapRepository {
     const buildFallbackLaps = () =>
       this.buildLapsFromSeed(FALLBACK_LAPS, entrantId, DEFAULT_SESSION_ID);
 
+    const buildStoredLaps = () => {
+      const stored = this.memoryLapStore.get(entrantId);
+      if (!stored || stored.length === 0) {
+        return null;
+      }
+
+      return stored
+        .slice()
+        .sort((a, b) => a.lapNumber - b.lapNumber)
+        .map((lap) => this.buildLapFromUpsert(lap));
+    };
+
     if (!process.env.DATABASE_URL) {
-      return isBaselineEntrant ? buildMockLaps() : [];
+      return buildStoredLaps() ?? (isBaselineEntrant ? buildMockLaps() : []);
     }
 
     try {
       const laps = await super.listByEntrant(entrantId);
-      return laps.length > 0 ? laps : [];
+      if (laps.length > 0) {
+        return laps;
+      }
+
+      return buildStoredLaps() ?? [];
     } catch (error) {
       if (isPrismaClientInitializationError(error)) {
         console.warn('Prisma client unavailable. Falling back to mock lap data.', error);
-        return isBaselineEntrant ? buildMockLaps() : [];
+        return buildStoredLaps() ?? (isBaselineEntrant ? buildMockLaps() : []);
       }
 
       console.warn('Falling back to mock lap data after unexpected error.', error);
-      return isBaselineEntrant ? buildFallbackLaps() : [];
+      return buildStoredLaps() ?? (isBaselineEntrant ? buildFallbackLaps() : []);
     }
   }
 
@@ -88,6 +107,48 @@ export class MockLapRepository extends PrismaLapRepository {
       createdAt: new Date(),
       updatedAt: new Date(),
     }));
+  }
+
+  override async replaceForEntrant(
+    entrantId: string,
+    sessionId: string,
+    laps: ReadonlyArray<LapUpsertInput>,
+  ): Promise<void> {
+    const storeLaps = () =>
+      this.memoryLapStore.set(
+        entrantId,
+        laps.map((lap) => ({ ...lap })),
+      );
+
+    if (!process.env.DATABASE_URL) {
+      storeLaps();
+      return;
+    }
+
+    try {
+      await super.replaceForEntrant(entrantId, sessionId, laps);
+      storeLaps();
+    } catch (error) {
+      if (isPrismaClientInitializationError(error)) {
+        console.warn('Prisma client unavailable during lap replace. Storing in memory.', error);
+        storeLaps();
+        return;
+      }
+
+      throw error;
+    }
+  }
+
+  private buildLapFromUpsert(lap: LapUpsertInput) {
+    return {
+      id: lap.id,
+      entrantId: lap.entrantId,
+      sessionId: lap.sessionId,
+      lapNumber: lap.lapNumber,
+      lapTime: { milliseconds: lap.lapTimeMs },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
   }
 }
 
