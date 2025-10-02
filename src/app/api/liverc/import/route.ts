@@ -86,6 +86,7 @@ export async function POST(request: Request) {
       entrantsProcessed: result.entrantsProcessed,
       lapsImported: result.lapsImported,
       skippedLapCount: result.skippedLapCount,
+      skippedEntrantCount: result.skippedEntrantCount,
       skippedOutlapCount: result.skippedOutlapCount,
     });
 

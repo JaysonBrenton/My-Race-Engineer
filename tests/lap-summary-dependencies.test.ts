@@ -20,6 +20,10 @@ class InMemoryEntrantRepository implements EntrantRepository {
   async listBySession(sessionId: string) {
     return Array.from(this.entrants.values()).filter((entrant) => entrant.sessionId === sessionId);
   }
+
+  async upsertBySource(): Promise<Entrant> {
+    throw new Error('InMemoryEntrantRepository.upsertBySource is not implemented for this test');
+  }
 }
 
 const withDatabaseUrl = async (value: string | undefined, fn: () => Promise<void>) => {

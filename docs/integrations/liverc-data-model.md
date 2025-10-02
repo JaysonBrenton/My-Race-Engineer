@@ -170,7 +170,9 @@ outside the Prisma schema until we widen storage.
 - Fixture-based contract tests must assert that the same LiveRC payload hashed
   twice produces identical `Lap.id` values.
 - Race results without a matching entry list row must be rejected (avoid orphan
-  laps).
+  laps). The import service skips those laps, increments the `skippedEntrantCount`
+  metric in its summary payload, and logs a warning so operators can reconcile
+  feed gaps with LiveRC.
 - Duplicate laps (same driver + lap number) must update the existing row rather
   than insert a second copy.
 

@@ -102,6 +102,7 @@ export type LiveRcImportSummary = {
   entrantsProcessed: number;
   lapsImported: number;
   skippedLapCount: number;
+  skippedEntrantCount: number;
   skippedOutlapCount: number;
   sourceUrl: string;
   includeOutlaps: boolean;
@@ -186,6 +187,7 @@ export class LiveRcImportService {
     let entrantsProcessed = 0;
     let lapsImported = 0;
     let skippedLapCount = 0;
+    let skippedEntrantCount = 0;
     let skippedOutlapCount = 0;
 
     const groupedLaps = this.groupLapsByEntry(raceResult, includeOutlaps);
@@ -194,7 +196,19 @@ export class LiveRcImportService {
 
     for (const [entryId, laps] of groupedLaps.lapsByEntry.entries()) {
       const entry = entryMap.get(entryId);
-      if (entry?.withdrawn) {
+      if (!entry) {
+        skippedEntrantCount += 1;
+        skippedLapCount += laps.length;
+        console.warn(
+          '[LiveRcImportService] Skipping laps with no matching entry list row',
+          {
+            entryId,
+            lapsSkipped: laps.length,
+          },
+        );
+        continue;
+      }
+      if (entry.withdrawn) {
         continue;
       }
 
@@ -241,6 +255,7 @@ export class LiveRcImportService {
       entrantsProcessed,
       lapsImported,
       skippedLapCount,
+      skippedEntrantCount,
       skippedOutlapCount,
       sourceUrl: url,
       includeOutlaps,
