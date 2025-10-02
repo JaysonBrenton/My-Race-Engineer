@@ -145,6 +145,9 @@ remote timestamps.
   segments; keep them otherwise for auditing.
 - When ingestion is scoped by driver, fetch only the race result blocks for the
   target `entry_id`.
+- `startTimeUtc` values **must** include an explicit UTC offset (e.g., trailing
+  `Z` or `+/-HH:MM`). Strings without a timezone are treated as `null` when we
+  persist `Session.scheduledStart` to avoid offset drift across environments.
 
 ## Derived metadata
 
