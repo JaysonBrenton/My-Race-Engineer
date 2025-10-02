@@ -1,4 +1,4 @@
-import type { LapRepository } from '@core/app';
+import type { LapRepository, LapUpsertInput } from '@core/app';
 import type { Lap } from '@core/domain';
 import type { Lap as PrismaLap } from '@prisma/client';
 
@@ -24,5 +24,32 @@ export class PrismaLapRepository implements LapRepository {
     });
 
     return laps.map(toDomain);
+  }
+
+  async replaceForEntrant(
+    entrantId: string,
+    sessionId: string,
+    laps: ReadonlyArray<LapUpsertInput>,
+  ): Promise<void> {
+    const prisma = getPrismaClient();
+
+    await prisma.$transaction(async (tx) => {
+      await tx.lap.deleteMany({ where: { entrantId, sessionId } });
+
+      if (laps.length === 0) {
+        return;
+      }
+
+      await tx.lap.createMany({
+        data: laps.map((lap) => ({
+          id: lap.id,
+          entrantId: lap.entrantId,
+          sessionId: lap.sessionId,
+          lapNumber: lap.lapNumber,
+          lapTimeMs: lap.lapTimeMs,
+        })),
+        skipDuplicates: true,
+      });
+    });
   }
 }

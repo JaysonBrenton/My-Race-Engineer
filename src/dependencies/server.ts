@@ -1,3 +1,4 @@
+// File: src/dependencies/server.ts
 import { LapSummaryService } from '@core/app';
 import {
   PrismaEntrantRepository,
@@ -55,7 +56,8 @@ export class MockLapRepository extends PrismaLapRepository {
   override async listByEntrant(entrantId: string) {
     const isBaselineEntrant = entrantId === DEFAULT_ENTRANT_ID;
 
-    const buildMockLaps = () => this.buildLapsFromSeed(MOCK_LAPS, entrantId, DEFAULT_SESSION_ID);
+    const buildMockLaps = () =>
+      this.buildLapsFromSeed(MOCK_LAPS, entrantId, DEFAULT_SESSION_ID);
     const buildFallbackLaps = () =>
       this.buildLapsFromSeed(FALLBACK_LAPS, entrantId, DEFAULT_SESSION_ID);
 

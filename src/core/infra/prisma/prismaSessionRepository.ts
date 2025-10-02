@@ -1,4 +1,4 @@
-import type { SessionRepository } from '@core/app';
+import type { SessionRepository, SessionUpsertInput } from '@core/app';
 import type { Session } from '@core/domain';
 import type { Session as PrismaSession } from '@prisma/client';
 
@@ -58,5 +58,30 @@ export class PrismaSessionRepository implements SessionRepository {
     });
 
     return sessions.map(toDomain);
+  }
+
+  async upsertBySource(input: SessionUpsertInput): Promise<Session> {
+    const prisma = getPrismaClient();
+
+    const session = await prisma.session.upsert({
+      where: { sourceSessionId: input.sourceSessionId },
+      update: {
+        eventId: input.eventId,
+        raceClassId: input.raceClassId,
+        name: input.name,
+        sourceUrl: input.sourceUrl,
+        scheduledStart: input.scheduledStart ?? null,
+      },
+      create: {
+        eventId: input.eventId,
+        raceClassId: input.raceClassId,
+        name: input.name,
+        sourceSessionId: input.sourceSessionId,
+        sourceUrl: input.sourceUrl,
+        scheduledStart: input.scheduledStart ?? null,
+      },
+    });
+
+    return toDomain(session);
   }
 }
