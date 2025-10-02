@@ -111,3 +111,10 @@ If at risk, call out in PR with a mitigation plan.
 Every PR must state: **what/why**, design/UX compliance, checks (`typecheck`/`lint`/`build`/tests), perf note (if any), migrations/config and rollout steps, telemetry added, and risk & rollback.
 
 ---
+
+## 13) Role playbooks (`docs/roles/*`)
+- Treat each role document as **authoritative guidance** for collaborators filling that hat.
+- If you update process, tooling, or expectations for a role, edit the matching markdown file (one per role) and keep examples current.
+- When adding a new role doc, mirror the existing naming convention (`kebab-case-role.md`) and link it from any relevant onboarding or README sections.
+- Current roles covered: DevOps Platform Engineer, Documentation Knowledge Steward, Next.js Front-end Engineer, Observability & Incident Response Lead, Prisma/PostgreSQL Backend Engineer, Quality Automation Engineer, and TypeScript Domain Engineer.
+- Keep these files focused on responsibilities, key workflows, and references—avoid project-specific chatter that will rot quickly.
