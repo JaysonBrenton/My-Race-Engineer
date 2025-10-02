@@ -9,24 +9,112 @@ type WebVitalsPayload = {
   timestamp: number;
 };
 
+type ValidationResult =
+  | { ok: true; payload: WebVitalsPayload }
+  | { ok: false; errors: string[] };
+
+const baseHeaders = {
+  'X-Robots-Tag': 'noindex, nofollow',
+  'Cache-Control': 'no-store',
+} as const;
+
+function validatePayload(data: unknown): ValidationResult {
+  if (typeof data !== 'object' || data === null) {
+    return {
+      ok: false,
+      errors: ['Request body must be a JSON object.'],
+    };
+  }
+
+  const errors: string[] = [];
+
+  const { id, name, label, value, page, timestamp } = data as Record<string, unknown>;
+
+  const isNonEmptyString = (input: unknown, field: string) => {
+    if (typeof input !== 'string' || input.trim().length === 0) {
+      errors.push(`${field} must be a non-empty string.`);
+      return undefined;
+    }
+
+    return input.trim();
+  };
+
+  const isFiniteNumber = (input: unknown, field: string) => {
+    if (typeof input !== 'number' || !Number.isFinite(input)) {
+      errors.push(`${field} must be a finite number.`);
+      return undefined;
+    }
+
+    return input;
+  };
+
+  const sanitizedId = isNonEmptyString(id, 'id');
+  const sanitizedName = isNonEmptyString(name, 'name');
+  const sanitizedLabel = isNonEmptyString(label, 'label');
+  const sanitizedPage = isNonEmptyString(page, 'page');
+  const sanitizedValue = isFiniteNumber(value, 'value');
+  const sanitizedTimestamp = isFiniteNumber(timestamp, 'timestamp');
+
+  if (typeof sanitizedTimestamp === 'number' && sanitizedTimestamp <= 0) {
+    errors.push('timestamp must be greater than zero.');
+  }
+
+  if (errors.length > 0) {
+    return { ok: false, errors };
+  }
+
+  return {
+    ok: true,
+    payload: {
+      id: sanitizedId!,
+      name: sanitizedName!,
+      label: sanitizedLabel!,
+      page: sanitizedPage!,
+      value: sanitizedValue!,
+      timestamp: sanitizedTimestamp!,
+    },
+  };
+}
+
 export async function POST(request: Request) {
-  const payload = (await request.json()) as WebVitalsPayload;
+  let data: unknown;
+
+  try {
+    data = await request.json();
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Invalid JSON body.' },
+      {
+        status: 400,
+        headers: baseHeaders,
+      },
+    );
+  }
+
+  const validation = validatePayload(data);
+
+  if (!validation.ok) {
+    return NextResponse.json(
+      { error: 'Invalid payload.', details: validation.errors },
+      {
+        status: 422,
+        headers: baseHeaders,
+      },
+    );
+  }
 
   console.info('web-vitals', {
-    id: payload.id,
-    name: payload.name,
-    value: payload.value,
-    page: payload.page,
-    label: payload.label,
-    timestamp: payload.timestamp,
+    id: validation.payload.id,
+    name: validation.payload.name,
+    value: validation.payload.value,
+    page: validation.payload.page,
+    label: validation.payload.label,
+    timestamp: validation.payload.timestamp,
   });
 
   return new NextResponse(null, {
     status: 204,
-    headers: {
-      'X-Robots-Tag': 'noindex, nofollow',
-      'Cache-Control': 'no-store',
-    },
+    headers: baseHeaders,
   });
 }
 
@@ -34,8 +122,8 @@ export function GET() {
   return new NextResponse(null, {
     status: 405,
     headers: {
+      ...baseHeaders,
       Allow: 'POST',
-      'X-Robots-Tag': 'noindex, nofollow',
     },
   });
 }
