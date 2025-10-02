@@ -118,3 +118,7 @@ Every PR must state: **what/why**, design/UX compliance, checks (`typecheck`/`li
 - When adding a new role doc, mirror the existing naming convention (`kebab-case-role.md`) and link it from any relevant onboarding or README sections.
 - Current roles covered: DevOps Platform Engineer, Documentation Knowledge Steward, Next.js Front-end Engineer, Observability & Incident Response Lead, Prisma/PostgreSQL Backend Engineer, Quality Automation Engineer, and TypeScript Domain Engineer.
 - Keep these files focused on responsibilities, key workflows, and references—avoid project-specific chatter that will rot quickly.
+
+## 14) Deep review archives (`docs/reviews/*`)
+- Before touching critical flows, check the relevant deep review in `docs/reviews/` for historical context and known pitfalls.
+- The LiveRC ingestion pipeline has an in-depth audit at [`docs/reviews/2024-10-07-deep-code-review.md`](docs/reviews/2024-10-07-deep-code-review.md); consult it alongside this guide when working on those areas.

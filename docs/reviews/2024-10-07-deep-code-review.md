@@ -18,3 +18,7 @@
 - Teach the API route to detect `LiveRcHttpError` and respond with its status/code payload.
 - Harden `LiveRcImportService` to fail fast when an entry list row is missing for a lap entry; logging the upstream identifiers will help debugging LiveRC quirks.
 - Replace `new Date(...)` parsing with a safe parser (e.g. `DateTime.fromSQL` via `luxon`) or discard timestamps that lack timezone context.
+
+---
+
+_Maintenance note:_ This review is treated as a living reference for the LiveRC ingestion stack. Keep it in sync with major architecture changes and cross-link updates back in [`AGENTS.md`](../../AGENTS.md) so future reviewers can discover the latest context quickly.
