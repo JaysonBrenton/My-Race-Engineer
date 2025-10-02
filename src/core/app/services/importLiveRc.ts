@@ -28,12 +28,39 @@ const toTitleFromSlug = (slug: string) =>
       .join(' '),
   );
 
+const hasExplicitTimezone = (value: string) =>
+  /(Z|[+-]\d{2}:?\d{2})$/i.test(value.replace(/\s+/g, ''));
+
+const normaliseIsoTimezone = (value: string) => {
+  let normalised = value;
+
+  if (!normalised.includes('T') && normalised.includes(' ')) {
+    normalised = normalised.replace(' ', 'T');
+  }
+
+  const offsetMatch = normalised.match(/([+-])(\d{2})(\d{2})$/);
+  if (offsetMatch) {
+    const [, sign, hours, minutes] = offsetMatch;
+    normalised = `${normalised.slice(0, -offsetMatch[0].length)}${sign}${hours}:${minutes}`;
+  }
+
+  return normalised;
+};
+
 const parseDateOrNull = (value: string | undefined): Date | null => {
   if (!value) {
     return null;
   }
 
-  const parsed = new Date(value);
+  const trimmed = value.trim();
+
+  if (!trimmed || !hasExplicitTimezone(trimmed)) {
+    return null;
+  }
+
+  const normalised = normaliseIsoTimezone(trimmed);
+  const parsed = new Date(normalised);
+
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
