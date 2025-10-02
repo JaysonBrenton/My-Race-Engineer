@@ -35,7 +35,7 @@ consistent with the [`LiveRC → My Race Engineer (MRE) Data Contract`](../../..
 
 4. **Deduplication and persistence**
    - Upsert every lap through the Prisma `Lap` model using the composite
-     constraint `(driverName, lapNumber)` to guarantee idempotency.
+     constraint `(entrantId, lapNumber)` to guarantee idempotency.
    - If a new payload reports fewer laps than currently stored for the same
      driver/race, delete the superseded rows so re-scored results stay accurate.
    - Persist import metadata (source URL, fetched at, checksum) alongside the lap
