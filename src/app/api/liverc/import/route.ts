@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { LiveRcImportError } from '@core/app';
+import { LiveRcHttpError } from '@core/infra/http/liveRcClient';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
@@ -25,6 +26,13 @@ const jsonResponse = (status: number, payload: unknown, requestId: string) =>
     },
   });
 
+/**
+ * POST /api/liverc/import
+ *
+ * Triggers a LiveRC import job. When the upstream LiveRC APIs return an HTTP error,
+ * we surface the same status code, error code, and details from the `LiveRcHttpError`
+ * instance so API consumers can react to the precise upstream failure.
+ */
 export async function POST(request: Request) {
   const requestId = request.headers.get('x-request-id') ?? randomUUID();
   let rawBody: unknown;
@@ -90,6 +98,28 @@ export async function POST(request: Request) {
       requestId,
     );
   } catch (error) {
+    if (error instanceof LiveRcHttpError) {
+      console.warn('liverc.import.upstream_error', {
+        requestId,
+        status: error.status,
+        code: error.code,
+        details: error.details,
+      });
+
+      return jsonResponse(
+        error.status,
+        {
+          error: {
+            code: error.code,
+            message: error.message,
+            details: error.details,
+          },
+          requestId,
+        },
+        requestId,
+      );
+    }
+
     if (error instanceof LiveRcImportError) {
       console.warn('liverc.import.failure', {
         requestId,
