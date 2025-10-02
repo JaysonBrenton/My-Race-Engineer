@@ -5,6 +5,7 @@ import {
   isPrismaClientInitializationError,
 } from '@core/infra';
 import type { Entrant } from '@core/domain';
+import type { LapUpsertInput } from '@core/app';
 
 const DEFAULT_EVENT_ID = 'baseline-event';
 const DEFAULT_RACE_CLASS_ID = 'baseline-race-class';
@@ -49,8 +50,18 @@ const FALLBACK_LAPS: ReadonlyArray<MockLapSeed> = [
 ];
 
 class MockLapRepository extends PrismaLapRepository {
+  private readonly memoryLapStore = new Map<string, LapUpsertInput[]>();
+
   override async listByEntrant(entrantId: string) {
     if (!process.env.DATABASE_URL) {
+      const stored = this.memoryLapStore.get(entrantId);
+      if (stored && stored.length > 0) {
+        return stored
+          .slice()
+          .sort((a, b) => a.lapNumber - b.lapNumber)
+          .map((lap) => this.buildLapFromUpsert(lap));
+      }
+
       return this.buildLapsFromSeed(MOCK_LAPS);
     }
 
@@ -60,15 +71,64 @@ class MockLapRepository extends PrismaLapRepository {
         return laps;
       }
 
+      const stored = this.memoryLapStore.get(entrantId);
+      if (stored && stored.length > 0) {
+        return stored
+          .slice()
+          .sort((a, b) => a.lapNumber - b.lapNumber)
+          .map((lap) => this.buildLapFromUpsert(lap));
+      }
+
       return this.buildLapsFromSeed(MOCK_LAPS);
     } catch (error) {
       if (isPrismaClientInitializationError(error)) {
         console.warn('Prisma client unavailable. Falling back to mock lap data.', error);
+        const stored = this.memoryLapStore.get(entrantId);
+        if (stored && stored.length > 0) {
+          return stored
+            .slice()
+            .sort((a, b) => a.lapNumber - b.lapNumber)
+            .map((lap) => this.buildLapFromUpsert(lap));
+        }
+
         return this.buildLapsFromSeed(MOCK_LAPS);
       }
 
       console.warn('Falling back to mock lap data after unexpected error.', error);
       return this.buildLapsFromSeed(FALLBACK_LAPS);
+    }
+  }
+
+  override async replaceForEntrant(
+    entrantId: string,
+    sessionId: string,
+    laps: ReadonlyArray<LapUpsertInput>,
+  ): Promise<void> {
+    if (!process.env.DATABASE_URL) {
+      this.memoryLapStore.set(
+        entrantId,
+        laps.map((lap) => ({ ...lap })),
+      );
+      return;
+    }
+
+    try {
+      await super.replaceForEntrant(entrantId, sessionId, laps);
+      this.memoryLapStore.set(
+        entrantId,
+        laps.map((lap) => ({ ...lap })),
+      );
+    } catch (error) {
+      if (isPrismaClientInitializationError(error)) {
+        console.warn('Prisma client unavailable during lap replace. Storing in memory.', error);
+        this.memoryLapStore.set(
+          entrantId,
+          laps.map((lap) => ({ ...lap })),
+        );
+        return;
+      }
+
+      throw error;
     }
   }
 
@@ -82,6 +142,18 @@ class MockLapRepository extends PrismaLapRepository {
       createdAt: new Date(),
       updatedAt: new Date(),
     }));
+  }
+
+  private buildLapFromUpsert(lap: LapUpsertInput) {
+    return {
+      id: lap.id,
+      entrantId: lap.entrantId,
+      sessionId: lap.sessionId,
+      lapNumber: lap.lapNumber,
+      lapTime: { milliseconds: lap.lapTimeMs },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
   }
 }
 

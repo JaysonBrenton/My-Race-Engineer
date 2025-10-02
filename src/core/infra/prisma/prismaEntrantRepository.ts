@@ -1,4 +1,4 @@
-import type { EntrantRepository } from '@core/app';
+import type { EntrantRepository, EntrantUpsertInput } from '@core/app';
 import type { Entrant } from '@core/domain';
 import type { Entrant as PrismaEntrant } from '@prisma/client';
 
@@ -42,5 +42,49 @@ export class PrismaEntrantRepository implements EntrantRepository {
     });
 
     return entrants.map(toDomain);
+  }
+
+  async upsertBySource(input: EntrantUpsertInput): Promise<Entrant> {
+    const prisma = getPrismaClient();
+
+    const existing = input.sourceEntrantId
+      ? await prisma.entrant.findFirst({ where: { sourceEntrantId: input.sourceEntrantId } })
+      : await prisma.entrant.findFirst({
+          where: {
+            sessionId: input.sessionId,
+            displayName: input.displayName,
+          },
+        });
+
+    if (existing) {
+      const updated = await prisma.entrant.update({
+        where: { id: existing.id },
+        data: {
+          eventId: input.eventId,
+          raceClassId: input.raceClassId,
+          sessionId: input.sessionId,
+          displayName: input.displayName,
+          carNumber: input.carNumber ?? null,
+          sourceEntrantId: input.sourceEntrantId ?? null,
+          sourceTransponderId: input.sourceTransponderId ?? null,
+        },
+      });
+
+      return toDomain(updated);
+    }
+
+    const created = await prisma.entrant.create({
+      data: {
+        eventId: input.eventId,
+        raceClassId: input.raceClassId,
+        sessionId: input.sessionId,
+        displayName: input.displayName,
+        carNumber: input.carNumber ?? null,
+        sourceEntrantId: input.sourceEntrantId ?? null,
+        sourceTransponderId: input.sourceTransponderId ?? null,
+      },
+    });
+
+    return toDomain(created);
   }
 }

@@ -1,4 +1,4 @@
-import type { EventRepository } from '@core/app';
+import type { EventRepository, EventUpsertInput } from '@core/app';
 import type { Event } from '@core/domain';
 import type { Event as PrismaEvent } from '@prisma/client';
 
@@ -35,5 +35,24 @@ export class PrismaEventRepository implements EventRepository {
     const event = await prisma.event.findUnique({ where: { sourceUrl } });
 
     return event ? toDomain(event) : null;
+  }
+
+  async upsertBySource(input: EventUpsertInput): Promise<Event> {
+    const prisma = getPrismaClient();
+
+    const event = await prisma.event.upsert({
+      where: { sourceEventId: input.sourceEventId },
+      update: {
+        name: input.name,
+        sourceUrl: input.sourceUrl,
+      },
+      create: {
+        name: input.name,
+        sourceEventId: input.sourceEventId,
+        sourceUrl: input.sourceUrl,
+      },
+    });
+
+    return toDomain(event);
   }
 }
