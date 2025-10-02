@@ -1,7 +1,7 @@
 # Observability & Incident Response Lead
 
 ## Mission
-Ensure The Pace Tracer remains transparent and recoverable by defining telemetry standards, incident playbooks, and alerting thresholds that keep teams informed and responsive.
+Ensure My Race Engineer (MRE) remains transparent and recoverable by defining telemetry standards, incident playbooks, and alerting thresholds that keep teams informed and responsive.
 
 ## Core Responsibilities
 - Establish structured logging, metrics, and tracing conventions across UI, domain, and infrastructure components, emphasising correlation IDs and PII safeguards.

@@ -1,6 +1,6 @@
-# TPTE MVP Product Guardrails
+# My Race Engineer (MRE) MVP Product Guardrails
 
-> Source: The Pace Tracing Engineer (TPTE) MVP brief.
+> Source: My Race Engineer (MRE) MVP brief.
 
 These guardrails translate the MVP narrative into actionable scope boundaries for all contributors. Treat them as non-functional requirements: every story and technical task should trace back to one or more of these guardrails.
 

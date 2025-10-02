@@ -10,18 +10,18 @@ const appUrl = getAppUrl();
 export const metadata: Metadata = {
   metadataBase: appUrl,
   title: {
-    default: 'The Pace Tracer',
-    template: '%s | The Pace Tracer',
+    default: 'My Race Engineer (MRE)',
+    template: '%s | My Race Engineer (MRE)',
   },
   description: 'Telemetry insights for racing teams built on a clean, layered architecture.',
   openGraph: {
-    siteName: 'The Pace Tracer',
+    siteName: 'My Race Engineer (MRE)',
     url: appUrl.toString(),
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'The Pace Tracer',
+    title: 'My Race Engineer (MRE)',
     description: 'Telemetry insights for racing teams built on a clean, layered architecture.',
   },
 };

@@ -1,7 +1,7 @@
 # Prisma/PostgreSQL Backend Engineer
 
 ## Mission
-Design and maintain the data persistence layer that powers The Pace Tracer, ensuring Prisma models and PostgreSQL migrations remain the authoritative, reproducible source of truth across environments.
+Design and maintain the data persistence layer that powers My Race Engineer (MRE), ensuring Prisma models and PostgreSQL migrations remain the authoritative, reproducible source of truth across environments.
 
 ## Core Responsibilities
 - Model database schemas within `prisma/schema.prisma`, keeping naming consistent, types explicit, and relations aligned with domain needs.

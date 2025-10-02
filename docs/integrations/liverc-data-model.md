@@ -1,6 +1,6 @@
-# LiveRC → TPTE Data Contract
+# LiveRC → My Race Engineer (MRE) Data Contract
 
-This note captures the mapping between LiveRC timing endpoints and the Pace Tracer
+This note captures the mapping between LiveRC timing endpoints and the My Race Engineer (MRE)
 Prisma/domain schema. Use it as the contract for every ingestion change so that
 new adapters and tests stay aligned.
 

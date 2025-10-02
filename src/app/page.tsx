@@ -13,7 +13,7 @@ import {
 import { LapSummaryCard } from './components/LapSummaryCard';
 import styles from './page.module.css';
 
-const PAGE_TITLE = 'Pace Tracer telemetry insights';
+const PAGE_TITLE = 'My Race Engineer (MRE) telemetry insights';
 const PAGE_DESCRIPTION =
   'Baseline lap telemetry dashboards for racing teams, powered by a clean architecture Next.js foundation.';
 
@@ -41,7 +41,7 @@ export function generateMetadata(): Metadata {
           url: ogImageUrl,
           width: 1200,
           height: 630,
-          alt: 'Telemetry interface preview for The Pace Tracer.',
+          alt: 'Telemetry interface preview for My Race Engineer (MRE).',
         },
       ],
     },
@@ -60,11 +60,11 @@ export default async function Home() {
 
   const structuredData = [
     buildOrganizationJsonLd({
-      name: 'The Pace Tracer',
+      name: 'My Race Engineer (MRE)',
       url: canonical,
     }),
     buildWebsiteJsonLd({
-      name: 'The Pace Tracer',
+      name: 'My Race Engineer (MRE)',
       url: canonical,
     }),
     ...buildSiteNavigationJsonLd([
@@ -84,7 +84,7 @@ export default async function Home() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
       <header className={styles.heroHeader}>
-        <h1 className={styles.heroTitle}>The Pace Tracer</h1>
+        <h1 className={styles.heroTitle}>My Race Engineer (MRE)</h1>
         <p className={styles.heroDescription}>{PAGE_DESCRIPTION}</p>
       </header>
       <div className={styles.cards}>

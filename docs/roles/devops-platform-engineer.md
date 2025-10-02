@@ -1,7 +1,7 @@
 # DevOps & Platform Engineer
 
 ## Mission
-Provide resilient infrastructure, deployment automation, and runtime observability so The Pace Tracer ships predictably and recovers quickly across environments.
+Provide resilient infrastructure, deployment automation, and runtime observability so My Race Engineer (MRE) ships predictably and recovers quickly across environments.
 
 ## Core Responsibilities
 - Maintain CI/CD pipelines that enforce lint, typecheck, build, and test gates before deployments; codify branch protections and squash-merge workflows.

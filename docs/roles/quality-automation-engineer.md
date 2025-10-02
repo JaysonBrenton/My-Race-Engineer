@@ -1,7 +1,7 @@
 # Quality & Automation Engineer
 
 ## Mission
-Safeguard code quality by maintaining reliable automated checks, fast feedback loops, and pragmatic testing strategies that keep The Pace Tracer shippable at all times.
+Safeguard code quality by maintaining reliable automated checks, fast feedback loops, and pragmatic testing strategies that keep My Race Engineer (MRE) shippable at all times.
 
 ## Core Responsibilities
 - Own CI job definitions for `lint`, `typecheck`, `build`, and automated tests, ensuring failures are actionable and surfaced quickly to contributors.
