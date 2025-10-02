@@ -48,35 +48,41 @@ const FALLBACK_LAPS: ReadonlyArray<MockLapSeed> = [
   { id: 'fallback-1', lapNumber: 1, lapTimeMs: 95000 },
 ];
 
-class MockLapRepository extends PrismaLapRepository {
+export class MockLapRepository extends PrismaLapRepository {
   override async listByEntrant(entrantId: string) {
+    const isBaselineEntrant = entrantId === DEFAULT_ENTRANT_ID;
+
+    const buildMockLaps = () => this.buildLapsFromSeed(MOCK_LAPS, entrantId, DEFAULT_SESSION_ID);
+    const buildFallbackLaps = () =>
+      this.buildLapsFromSeed(FALLBACK_LAPS, entrantId, DEFAULT_SESSION_ID);
+
     if (!process.env.DATABASE_URL) {
-      return this.buildLapsFromSeed(MOCK_LAPS);
+      return isBaselineEntrant ? buildMockLaps() : [];
     }
 
     try {
       const laps = await super.listByEntrant(entrantId);
-      if (laps.length > 0) {
-        return laps;
-      }
-
-      return this.buildLapsFromSeed(MOCK_LAPS);
+      return laps.length > 0 ? laps : [];
     } catch (error) {
       if (isPrismaClientInitializationError(error)) {
         console.warn('Prisma client unavailable. Falling back to mock lap data.', error);
-        return this.buildLapsFromSeed(MOCK_LAPS);
+        return isBaselineEntrant ? buildMockLaps() : [];
       }
 
       console.warn('Falling back to mock lap data after unexpected error.', error);
-      return this.buildLapsFromSeed(FALLBACK_LAPS);
+      return isBaselineEntrant ? buildFallbackLaps() : [];
     }
   }
 
-  private buildLapsFromSeed(seed: ReadonlyArray<MockLapSeed>) {
+  private buildLapsFromSeed(
+    seed: ReadonlyArray<MockLapSeed>,
+    entrantId: string,
+    sessionId: string,
+  ) {
     return seed.map((lap) => ({
       id: lap.id,
-      entrantId: DEFAULT_ENTRANT_ID,
-      sessionId: DEFAULT_SESSION_ID,
+      entrantId,
+      sessionId,
       lapNumber: lap.lapNumber,
       lapTime: { milliseconds: lap.lapTimeMs },
       createdAt: new Date(),
