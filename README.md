@@ -267,6 +267,8 @@ Use **semantic colour tokens** instead of hard-coding hex in components.
   - `docs/agents/**` — policies, prompts, checklists (auth-ux, auth-security, accessibility, telemetry)
   - `docs/roles/**` — responsibilities & handoffs
 
+
+
 - [`docs/reviews/2025-02-14-markdown-audit.md`](docs/reviews/2025-02-14-markdown-audit.md) tracks the latest doc freshness review and suggested follow-ups.
 
 ### Forthcoming docs (placeholders)
@@ -275,6 +277,7 @@ Use **semantic colour tokens** instead of hard-coding hex in components.
 - `docs/domain-model.md` — entities/relations/invariants
 - `docs/agents/**` — policies, prompts, checklists (auth-ux, auth-security, accessibility, telemetry)
 - `docs/roles/**` — responsibilities & handoffs
+
 
 ### Sample LiveRC fixtures
 
