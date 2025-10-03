@@ -20,10 +20,7 @@ import {
   parseLiveRcUrl,
 } from '@core/app/services/liveRcUrlParser';
 import type { LiveRcImportSummary } from '@core/app/services/importLiveRc';
-import {
-  parseRaceResultPayload,
-  mapRaceResultResponse,
-} from '@core/app/liverc/responseMappers';
+import { mapRaceResultResponse, parseRaceResultPayload } from '@core/app/liverc/responseMappers';
 
 type LiveRcRaceResultResponse = ReturnType<typeof mapRaceResultResponse>;
 
