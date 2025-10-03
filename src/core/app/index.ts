@@ -6,3 +6,4 @@ export * from './ports/raceClassRepository';
 export * from './ports/sessionRepository';
 export * from './services/getLapSummary';
 export * from './services/importLiveRc';
+export * from './services/liveRcUrlParser';
