@@ -69,3 +69,21 @@ Service Unavailable` and an error code of `DATABASE_UNAVAILABLE`.
 
 Unexpected errors remain mapped to `500 Internal Server Error` with code
 `UNEXPECTED_ERROR`.
+
+## Usability flows
+
+- **Paste anything**
+  - Screenshot: _pending quick paste modal capture_
+  - Wireframe: _pending quick paste modal wireframe_
+- **Wizard** _(flagged)_
+  - Screenshot: _pending multi-step wizard capture_
+  - Wireframe: _pending multi-step wizard wireframe_
+- **Bulk paste**
+  - Screenshot: _pending bulk editor capture_
+  - Wireframe: _pending bulk editor wireframe_
+- **Bookmarklet**
+  - Screenshot: _pending bookmarklet handoff capture_
+  - Wireframe: _pending bookmarklet integration wireframe_
+- **File drop** _(flagged)_
+  - Screenshot: _pending drag-and-drop capture_
+  - Wireframe: _pending drag-and-drop wireframe_
