@@ -1,0 +1,20 @@
+{
+  "event": {
+    "event_id": "sample-event",
+    "event_name": "Sample Off-Road Nationals"
+  },
+  "class": {
+    "class_id": "sample-class",
+    "class_name": "Pro Buggy",
+    "class_code": "PRO-BUG"
+  },
+  "entries": [
+    {
+      "entry_id": "entrant-1",
+      "display_name": "Alex Driver",
+      "car_number": "7",
+      "transponder_id": "TX-12345",
+      "withdrawn": false
+    }
+  ]
+}

@@ -259,6 +259,14 @@ Use **semantic colour tokens** instead of hard-coding hex in components.
 ### Roles, reviews, and audits
 - Consult the **role playbooks** in [`docs/roles/`](docs/roles) whenever you are acting in one of those capacities; they capture process and decision context that should shape design choices for that hat.
 - Review the **deep code review archives** in [`docs/reviews/`](docs/reviews) before modifying the covered flows so that new changes preserve the documented learnings.
+
+- Forthcoming docs (placeholders for now):
+  - `docs/design-principles.md` — layering exceptions, server/client rules, ADR policy
+  - `docs/ux-principles.md` — layout, spacing, accessibility, token map
+  - `docs/domain-model.md` — entities/relations/invariants
+  - `docs/agents/**` — policies, prompts, checklists (auth-ux, auth-security, accessibility, telemetry)
+  - `docs/roles/**` — responsibilities & handoffs
+
 - [`docs/reviews/2025-02-14-markdown-audit.md`](docs/reviews/2025-02-14-markdown-audit.md) tracks the latest doc freshness review and suggested follow-ups.
 
 ### Forthcoming docs (placeholders)
@@ -267,6 +275,13 @@ Use **semantic colour tokens** instead of hard-coding hex in components.
 - `docs/domain-model.md` — entities/relations/invariants
 - `docs/agents/**` — policies, prompts, checklists (auth-ux, auth-security, accessibility, telemetry)
 - `docs/roles/**` — responsibilities & handoffs
+
+### Sample LiveRC fixtures
+
+- `fixtures/liverc/results/sample-event/sample-class/entry-list.json` — minimal entry list payload with event/class metadata and
+  an entrant consumed by `mapEntryListResponse`.
+- `fixtures/liverc/results/sample-event/sample-class/race-result.json` — companion race result payload for the same sample event
+  and class.
 
 ---
 
