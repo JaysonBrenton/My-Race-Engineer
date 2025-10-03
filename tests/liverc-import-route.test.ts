@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import { LiveRcHttpError } from '../src/core/infra/http/liveRcClient';
@@ -98,5 +99,28 @@ test('POST /api/liverc/import propagates LiveRC 500 responses', async () => {
       details: { attempt: 1 },
     });
     assert.equal(payload.requestId, 'test-500');
+  });
+});
+
+test('sample LiveRC fixtures are loadable', async () => {
+  const entryListFixture = new URL(
+    '../fixtures/liverc/results/sample-event/sample-class/entry-list.json',
+    import.meta.url,
+  );
+  const raceResultFixture = new URL(
+    '../fixtures/liverc/results/sample-event/sample-class/race-result.json',
+    import.meta.url,
+  );
+
+  const [entryListContents, raceResultContents] = await Promise.all([
+    readFile(entryListFixture, 'utf-8'),
+    readFile(raceResultFixture, 'utf-8'),
+  ]);
+
+  assert.doesNotThrow(() => {
+    JSON.parse(entryListContents);
+  });
+  assert.doesNotThrow(() => {
+    JSON.parse(raceResultContents);
   });
 });

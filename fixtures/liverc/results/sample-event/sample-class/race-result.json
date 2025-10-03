@@ -1,0 +1,36 @@
+{
+  "event_id": "sample-event",
+  "class_id": "sample-class",
+  "round_id": "round-1",
+  "race_id": "race-main",
+  "event": {
+    "id": "sample-event",
+    "name": "Sample Off-Road Nationals"
+  },
+  "class": {
+    "id": "sample-class",
+    "name": "Pro Buggy"
+  },
+  "round": {
+    "id": "round-1",
+    "name": "Round 1"
+  },
+  "race": {
+    "id": "race-main",
+    "name": "A Main"
+  },
+  "laps": [
+    {
+      "entry_id": "entrant-1",
+      "driver_name": "Alex Driver",
+      "lap": 1,
+      "lap_time": 36.432
+    },
+    {
+      "entry_id": "entrant-1",
+      "driver_name": "Alex Driver",
+      "lap": 2,
+      "lap_time": 36.118
+    }
+  ]
+}
