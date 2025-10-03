@@ -46,10 +46,12 @@ export type LiveRcRaceResultResponse = {
 
 export interface LiveRcClient {
   fetchEntryList(params: {
+    resultsBaseUrl: string;
     eventSlug: string;
     classSlug: string;
   }): Promise<LiveRcEntryListResponse>;
   fetchRaceResult(params: {
+    resultsBaseUrl: string;
     eventSlug: string;
     classSlug: string;
     roundSlug: string;

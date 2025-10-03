@@ -11,7 +11,12 @@ test('fetchEntryList surfaces network failures as LiveRcHttpError', async () => 
   });
 
   await assert.rejects(
-    () => client.fetchEntryList({ eventSlug: 'event', classSlug: 'class' }),
+    () =>
+      client.fetchEntryList({
+        resultsBaseUrl: 'https://liverc.com/results',
+        eventSlug: 'event',
+        classSlug: 'class',
+      }),
     (error: unknown) => {
       assert.ok(error instanceof LiveRcHttpError);
       assert.equal(error.status, 502);
@@ -45,6 +50,7 @@ test('fetchRaceResult surfaces invalid JSON payloads', async () => {
   await assert.rejects(
     () =>
       client.fetchRaceResult({
+        resultsBaseUrl: 'https://liverc.com/results',
         eventSlug: 'event',
         classSlug: 'class',
         roundSlug: 'round',
@@ -82,6 +88,7 @@ test('fetchRaceResult returns mapped payload on success', async () => {
   );
 
   const result = await client.fetchRaceResult({
+    resultsBaseUrl: 'https://liverc.com/results',
     eventSlug: 'event',
     classSlug: 'class',
     roundSlug: 'round',

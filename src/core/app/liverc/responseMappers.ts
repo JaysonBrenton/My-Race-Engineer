@@ -6,6 +6,8 @@ import type {
   LiveRcRaceResultResponse,
 } from '../ports/liveRcClient';
 
+export type { LiveRcRaceResultResponse } from '../ports/liveRcClient';
+
 const asObject = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
 
@@ -57,6 +59,8 @@ const asBoolean = (value: unknown): boolean | undefined => {
 };
 
 export type LiveRcRaceContext = {
+  resultsBaseUrl?: string;
+  origin?: string;
   eventSlug: string;
   classSlug: string;
   roundSlug: string;
@@ -237,6 +241,8 @@ export const parseRaceResultPayload = (
   const raceId = asString(root.race_id ?? root.raceId ?? race.race_id ?? race.raceId ?? race.id);
 
   const context: LiveRcRaceContext = {
+    resultsBaseUrl: options?.fallbackContext?.resultsBaseUrl,
+    origin: options?.fallbackContext?.origin,
     eventSlug: normaliseFallback(eventId, options?.fallbackContext?.eventSlug ?? 'uploaded-event'),
     classSlug: normaliseFallback(classId, options?.fallbackContext?.classSlug ?? 'uploaded-class'),
     roundSlug: normaliseFallback(roundId, options?.fallbackContext?.roundSlug ?? 'uploaded-round'),

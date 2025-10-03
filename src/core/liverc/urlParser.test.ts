@@ -8,25 +8,25 @@ import {
   type LiveRcInvalidUrlParseResult,
 } from './urlParser';
 
-void test('parseLiveRcUrl recognises valid JSON results URLs with four segments', () => {
-  const url = 'https://liverc.com/results/SUMMER SERIES/2WD Buggy/Round 3/A Main.json';
+void test('parseLiveRcUrl preserves origin and slug casing for valid JSON results URLs', () => {
+  const url =
+    'https://canberraoffroad.liverc.com/results/SUMMER SERIES/2WD Buggy/Round 3/A Main.json';
   const result = parseLiveRcUrl(url) as LiveRcJsonUrlParseResult;
 
   assert.equal(result.type, 'json');
-  assert.deepEqual(result.slugs, ['summer-series', '2wd-buggy', 'round-3', 'a-main']);
-  assert.equal(result.canonicalJsonPath, '/results/summer-series/2wd-buggy/round-3/a-main.json');
+  assert.equal(result.origin, 'https://canberraoffroad.liverc.com');
+  assert.equal(result.resultsBaseUrl, 'https://canberraoffroad.liverc.com/results');
+  assert.deepEqual(result.slugs, ['SUMMER SERIES', '2WD Buggy', 'Round 3', 'A Main']);
+  assert.equal(result.canonicalJsonPath, '/results/SUMMER SERIES/2WD Buggy/Round 3/A Main.json');
 });
 
 void test('parseLiveRcUrl infers canonical path when JSON extension is omitted', () => {
-  const url = 'https://liverc.com/results/Winter Showdown/Expert 4WD/Round 1/Main Event';
+  const url = 'https://liverc.com/results/Winter Showdown/Expert 4WD/Round 1/Main--Event';
   const result = parseLiveRcUrl(url) as LiveRcJsonUrlParseResult;
 
   assert.equal(result.type, 'json');
-  assert.deepEqual(result.slugs, ['winter-showdown', 'expert-4wd', 'round-1', 'main-event']);
-  assert.equal(
-    result.canonicalJsonPath,
-    '/results/winter-showdown/expert-4wd/round-1/main-event.json',
-  );
+  assert.deepEqual(result.slugs, ['Winter Showdown', 'Expert 4WD', 'Round 1', 'Main--Event']);
+  assert.equal(result.canonicalJsonPath, '/results/Winter Showdown/Expert 4WD/Round 1/Main--Event.json');
 });
 
 void test('parseLiveRcUrl flags legacy HTML results URLs', () => {
