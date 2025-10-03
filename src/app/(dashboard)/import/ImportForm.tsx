@@ -31,6 +31,7 @@ import Wizard from './Wizard';
 type ImportFormProps = {
   enableWizard?: boolean;
   initialUrl?: string;
+  enableFileImport?: boolean;
 };
 
 type ParsedState =
@@ -514,7 +515,11 @@ const BulkImportTab = ({
   );
 };
 
-export default function ImportForm({ enableWizard = false, initialUrl }: ImportFormProps) {
+export default function ImportForm({
+  enableWizard = false,
+  initialUrl,
+  enableFileImport = false,
+}: ImportFormProps) {
   const [activeTab, setActiveTab] = useState<'single' | 'bulk'>('single');
   const [url, setUrl] = useState(() => initialUrl ?? '');
   const [tipsOpen, setTipsOpen] = useState(false);
@@ -662,7 +667,7 @@ export default function ImportForm({ enableWizard = false, initialUrl }: ImportF
   );
 
   const handleImportFile = useCallback(async () => {
-    if (!filePreview || isFileImporting) {
+    if (!enableFileImport || !filePreview || isFileImporting) {
       return;
     }
 
@@ -721,7 +726,7 @@ export default function ImportForm({ enableWizard = false, initialUrl }: ImportF
     } finally {
       setIsFileImporting(false);
     }
-  }, [filePreview, isFileImporting]);
+  }, [enableFileImport, filePreview, isFileImporting]);
 
   useEffect(() => {
     if (typeof initialUrl === 'string' && initialUrl.length > 0) {
@@ -1031,99 +1036,101 @@ export default function ImportForm({ enableWizard = false, initialUrl }: ImportF
             </p>
           </div>
           {renderPreview()}
-          <section className={styles.dropzoneSection} aria-label="Import LiveRC file">
-            <h2 className={styles.dropzoneTitle}>Import from file</h2>
-            <p className={styles.helper}>
-              Drop a LiveRC results JSON file to preview and import it directly.
-            </p>
-            <div
-              className={`${styles.dropzone} ${isDraggingFile ? styles.dropzoneActive : ''}`.trim()}
-              onDragEnter={handleDragEnter}
-              onDragLeave={handleDragLeave}
-              onDragOver={handleDragOver}
-              onDrop={handleDrop}
-              onClick={handleDropzoneClick}
-              onKeyDown={handleDropzoneKeyDown}
-              role="button"
-              tabIndex={0}
-            >
-              <span>Drop a LiveRC .json file</span>
-              <span className={styles.dropzoneHint}>or click to browse</span>
-            </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="application/json,.json"
-              className={styles.hiddenFileInput}
-              onChange={handleFileInputChange}
-              tabIndex={-1}
-            />
-            {fileError ? <p className={styles.error}>{fileError}</p> : null}
-            {filePreview ? (
-              <div className={styles.previewCard}>
-                <div className={styles.previewHeader}>
-                  <h3 className={styles.previewTitle}>{filePreview.raceResult.raceName}</h3>
-                  <p className={styles.helper}>File: {filePreview.fileName}</p>
-                </div>
-                <div className={styles.detailsList}>
-                  <div className={styles.detailsItem}>
-                    <p className={styles.detailLabel}>Event</p>
-                    <p className={styles.detailValue}>
-                      {filePreview.raceResult.eventName ??
-                        slugToTitle(filePreview.raceResult.eventId)}
-                    </p>
-                  </div>
-                  <div className={styles.detailsItem}>
-                    <p className={styles.detailLabel}>Class</p>
-                    <p className={styles.detailValue}>
-                      {filePreview.raceResult.className ??
-                        slugToTitle(filePreview.raceResult.classId)}
-                    </p>
-                  </div>
-                  <div className={styles.detailsItem}>
-                    <p className={styles.detailLabel}>Round</p>
-                    <p className={styles.detailValue}>
-                      {filePreview.raceResult.roundName ??
-                        (filePreview.raceResult.roundId
-                          ? slugToTitle(filePreview.raceResult.roundId)
-                          : '—')}
-                    </p>
-                  </div>
-                  <div className={styles.detailsItem}>
-                    <p className={styles.detailLabel}>Laps detected</p>
-                    <p className={styles.detailValue}>{filePreview.raceResult.laps.length}</p>
-                  </div>
-                </div>
-                <div className={styles.actions}>
-                  <button
-                    type="button"
-                    className={styles.importButton}
-                    onClick={handleImportFile}
-                    disabled={isFileImporting}
-                  >
-                    {isFileImporting ? 'Importing…' : 'Import file'}
-                  </button>
-                </div>
+          {enableFileImport ? (
+            <section className={styles.dropzoneSection} aria-label="Import LiveRC file">
+              <h2 className={styles.dropzoneTitle}>Import from file</h2>
+              <p className={styles.helper}>
+                Drop a LiveRC results JSON file to preview and import it directly.
+              </p>
+              <div
+                className={`${styles.dropzone} ${isDraggingFile ? styles.dropzoneActive : ''}`.trim()}
+                onDragEnter={handleDragEnter}
+                onDragLeave={handleDragLeave}
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
+                onClick={handleDropzoneClick}
+                onKeyDown={handleDropzoneKeyDown}
+                role="button"
+                tabIndex={0}
+              >
+                <span>Drop a LiveRC .json file</span>
+                <span className={styles.dropzoneHint}>or click to browse</span>
               </div>
-            ) : null}
-            {fileSubmission ? (
-              <div className={styles.responsePanel}>
-                <h3 className={styles.responseTitle}>
-                  {fileSubmission.status === 'success' ? 'Import queued' : 'Import failed'}
-                </h3>
-                {'requestId' in fileSubmission && fileSubmission.requestId ? (
-                  <p className={styles.responseMeta}>Request ID: {fileSubmission.requestId}</p>
-                ) : null}
-                {fileSubmission.status === 'success' ? (
-                  <pre className={styles.responsePre}>
-                    {JSON.stringify(fileSubmission.summary, null, 2)}
-                  </pre>
-                ) : (
-                  <pre className={styles.responsePre}>{formatError(fileSubmission.error)}</pre>
-                )}
-              </div>
-            ) : null}
-          </section>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="application/json,.json"
+                className={styles.hiddenFileInput}
+                onChange={handleFileInputChange}
+                tabIndex={-1}
+              />
+              {fileError ? <p className={styles.error}>{fileError}</p> : null}
+              {filePreview ? (
+                <div className={styles.previewCard}>
+                  <div className={styles.previewHeader}>
+                    <h3 className={styles.previewTitle}>{filePreview.raceResult.raceName}</h3>
+                    <p className={styles.helper}>File: {filePreview.fileName}</p>
+                  </div>
+                  <div className={styles.detailsList}>
+                    <div className={styles.detailsItem}>
+                      <p className={styles.detailLabel}>Event</p>
+                      <p className={styles.detailValue}>
+                        {filePreview.raceResult.eventName ??
+                          slugToTitle(filePreview.raceResult.eventId)}
+                      </p>
+                    </div>
+                    <div className={styles.detailsItem}>
+                      <p className={styles.detailLabel}>Class</p>
+                      <p className={styles.detailValue}>
+                        {filePreview.raceResult.className ??
+                          slugToTitle(filePreview.raceResult.classId)}
+                      </p>
+                    </div>
+                    <div className={styles.detailsItem}>
+                      <p className={styles.detailLabel}>Round</p>
+                      <p className={styles.detailValue}>
+                        {filePreview.raceResult.roundName ??
+                          (filePreview.raceResult.roundId
+                            ? slugToTitle(filePreview.raceResult.roundId)
+                            : '—')}
+                      </p>
+                    </div>
+                    <div className={styles.detailsItem}>
+                      <p className={styles.detailLabel}>Laps detected</p>
+                      <p className={styles.detailValue}>{filePreview.raceResult.laps.length}</p>
+                    </div>
+                  </div>
+                  <div className={styles.actions}>
+                    <button
+                      type="button"
+                      className={styles.importButton}
+                      onClick={handleImportFile}
+                      disabled={isFileImporting}
+                    >
+                      {isFileImporting ? 'Importing…' : 'Import file'}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+              {fileSubmission ? (
+                <div className={styles.responsePanel}>
+                  <h3 className={styles.responseTitle}>
+                    {fileSubmission.status === 'success' ? 'Import queued' : 'Import failed'}
+                  </h3>
+                  {'requestId' in fileSubmission && fileSubmission.requestId ? (
+                    <p className={styles.responseMeta}>Request ID: {fileSubmission.requestId}</p>
+                  ) : null}
+                  {fileSubmission.status === 'success' ? (
+                    <pre className={styles.responsePre}>
+                      {JSON.stringify(fileSubmission.summary, null, 2)}
+                    </pre>
+                  ) : (
+                    <pre className={styles.responsePre}>{formatError(fileSubmission.error)}</pre>
+                  )}
+                </div>
+              ) : null}
+            </section>
+          ) : null}
           {submission ? (
             <div className={styles.responsePanel}>
               <h3 className={styles.responseTitle}>
