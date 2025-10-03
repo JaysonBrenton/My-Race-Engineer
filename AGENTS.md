@@ -1,5 +1,5 @@
 # My Race Engineer (MRE) — Agents Guide (Codex & other AI contributors)
-**Repo:** `JaysonBrenton/The-Pace-Tracer`  
+**Repo:** `JaysonBrenton/My-Race-Engineer`
 **Updated:** 2025-09-29  
 **Purpose:** Guardrails for automated/semi-automated contributions. Deep details will live in `docs/**`.
 

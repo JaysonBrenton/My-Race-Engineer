@@ -2,7 +2,7 @@
 **The one-stop lap logic shop.**  
 Next.js (App Router) + TypeScript + Prisma/PostgreSQL with clean layering, strict linting, structured error handling, and CI-friendly conventions.
 
-> Repo: `JaysonBrenton/The-Pace-Tracer` • Default port: **:3001** (binds `0.0.0.0`) • Timezone: **Australia/Sydney**
+> Repo: `JaysonBrenton/My-Race-Engineer` • Default port: **:3001** (binds `0.0.0.0`) • Timezone: **Australia/Sydney**
 
 ---
 
@@ -69,8 +69,8 @@ prisma/
 
 ### 1) Get the code
 ~~~
-git clone https://github.com/JaysonBrenton/The-Pace-Tracer.git
-cd The-Pace-Tracer
+git clone https://github.com/JaysonBrenton/My-Race-Engineer.git
+cd My-Race-Engineer
 ~~~
 
 ### 2) Start Postgres (choose one)

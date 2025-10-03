@@ -31,9 +31,11 @@ Success is measured by the time it takes a driver to understand: *How fast am I?
 4. **Insightful visualisations**
    - Use tokenised chart components (ApexCharts or equivalent) that respect the design token system.
    - Provide distribution/consistency indicators (e.g., box plots, histograms, sparklines).
-   - Highlight anomalies such as slow or missing laps. The definition of a slow lap is;
-
-A slow lap is a lap whose time is meaningfully higher than the driver’s normal pace for that stint/session—i.e., an outlier versus their clean-lap baseline. Rule of thumb: flag it if the lap is >110–115% of median, > median + 2σ, or > +1.5–2.0 s (class-dependent). Common causes: bobble/crash and marshal pickup, traffic, bad landing over jumps, off-line mistakes, pit/stop-go, or short-term mechanical/tyre/battery issues.
+   - Highlight anomalies such as slow or missing laps. Treat a lap as "slow" when one or more of the following rules apply:
+     - Lap time exceeds **110–115%** of the driver’s median for the stint/session.
+     - Lap time is greater than **median + 2σ** for the driver.
+     - Lap time is more than **1.5–2.0 seconds** slower than the driver’s clean-lap baseline (class-dependent).
+   - Call out common causes (bobble/crash and marshal pickup, traffic, poor landings, off-line mistakes, pit/stop-go penalties, mechanical/tyre/battery issues) alongside the flagged laps so operators can triage quickly.
 
 5. **Filtering & focus tools**
    - Toggle visibility of outlaps/inlaps.
