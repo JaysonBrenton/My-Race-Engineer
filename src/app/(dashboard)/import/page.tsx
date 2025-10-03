@@ -19,6 +19,8 @@ const appOrigin = (process.env.NEXT_PUBLIC_APP_ORIGIN ?? '').replace(/\/+$/, '')
 const bookmarkletTarget = appOrigin ? `${appOrigin}/import?src=` : '/import?src=';
 const sanitizedBookmarkletTarget = bookmarkletTarget.replace(/'/g, "\\'");
 const bookmarkletHref = `javascript:(()=>{var u=encodeURIComponent(location.href);location.href='${sanitizedBookmarkletTarget}'+u;})();`;
+const enableFileImport =
+  process.env.NODE_ENV !== 'production' || process.env.ENABLE_IMPORT_FILE === '1';
 
 export default function ImportPage({ searchParams }: ImportPageProps) {
   const srcParam = searchParams?.src;
@@ -50,7 +52,11 @@ export default function ImportPage({ searchParams }: ImportPageProps) {
           Import to My Race Engineer
         </a>
       </section>
-      <ImportForm enableWizard={enableWizard} initialUrl={initialUrl} />
+      <ImportForm
+        enableWizard={enableWizard}
+        initialUrl={initialUrl}
+        enableFileImport={enableFileImport}
+      />
     </div>
   );
 }

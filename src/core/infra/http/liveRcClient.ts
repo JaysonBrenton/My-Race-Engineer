@@ -76,7 +76,10 @@ export class LiveRcHttpClient implements LiveRcClient {
 
     let response: Response;
     try {
-      response = await this.fetchImpl(url, { headers });
+      response = await this.fetchImpl(url, {
+        headers,
+        cache: 'no-store',
+      });
     } catch (error) {
       throw new LiveRcHttpError(options.failureMessage, {
         status: 502,

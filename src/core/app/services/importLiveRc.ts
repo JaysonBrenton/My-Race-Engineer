@@ -432,9 +432,14 @@ export class LiveRcImportService {
     context: LiveRcRaceContext,
     sourceUrl: string,
   ) {
-    const upstreamSessionId = [raceResult.roundId ?? context.roundSlug, raceResult.raceId]
-      .filter(Boolean)
-      .join(':');
+    const upstreamSessionIdSegments = [
+      raceResult.eventId ?? context.eventSlug,
+      raceResult.classId ?? raceResult.classCode ?? context.classSlug,
+      raceResult.roundId ?? context.roundSlug,
+      raceResult.raceId ?? context.raceSlug,
+    ].filter((segment): segment is string => typeof segment === 'string' && segment.length > 0);
+
+    const upstreamSessionId = upstreamSessionIdSegments.join(':') || sourceUrl;
 
     const sessionInput: SessionUpsertInput = {
       eventId,
