@@ -22,8 +22,10 @@ import {
 import type { LiveRcImportSummary } from '@core/app/services/importLiveRc';
 import {
   parseRaceResultPayload,
-  type LiveRcRaceResultResponse,
+  mapRaceResultResponse,
 } from '@core/app/liverc/responseMappers';
+
+type LiveRcRaceResultResponse = ReturnType<typeof mapRaceResultResponse>;
 
 import styles from './ImportForm.module.css';
 import Wizard from './Wizard';
