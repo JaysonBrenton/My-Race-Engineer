@@ -17,6 +17,12 @@ import type {
   SessionUpsertInput,
 } from '@core/app';
 
+import {
+  LiveRcUrlInvalidReasons,
+  type LiveRcUrlInvalidReason,
+  parseLiveRcUrl,
+} from '../../liverc/urlParser';
+
 const normalizeWhitespace = (value: string) => value.replace(/\s+/g, ' ').trim();
 
 const toTitleFromSlug = (slug: string) =>
@@ -163,7 +169,7 @@ export class LiveRcImportService {
     options: LiveRcImportOptions = {},
   ): Promise<LiveRcImportSummary> {
     const includeOutlaps = options.includeOutlaps ?? false;
-    const parsedUrl = this.parseLiveRcUrl(url);
+    const parsedUrl = this.ensureJsonResultsUrl(url);
 
     const [entryList, raceResult] = await Promise.all([
       this.liveRcClient.fetchEntryList({
@@ -262,64 +268,43 @@ export class LiveRcImportService {
     };
   }
 
-  private parseLiveRcUrl(url: string): ParsedLiveRcUrl {
-    let parsed: URL;
+  private ensureJsonResultsUrl(url: string): ParsedLiveRcUrl {
+    const result = parseLiveRcUrl(url);
 
-    try {
-      parsed = new URL(url);
-    } catch (error) {
-      throw new LiveRcImportError('LiveRC import requires a valid URL.', {
-        status: 400,
-        code: 'INVALID_URL',
-        details: { url },
-      });
+    if (result.type === 'json') {
+      const [eventSlug, classSlug, roundSlug, raceSlug] = result.slugs;
+      return { eventSlug, classSlug, roundSlug, raceSlug };
     }
 
-    if (!parsed.pathname.includes('/results/')) {
-      throw new LiveRcImportError('LiveRC URL must point to a results page.', {
+    if (result.type === 'html') {
+      throw new LiveRcImportError('LiveRC HTML results URLs are not supported. Please use the JSON results link.', {
         status: 400,
         code: 'UNSUPPORTED_URL',
-        details: { url },
+        details: { url, detectedType: 'html' },
       });
     }
 
-    const segments = parsed.pathname.split('/').filter(Boolean);
-    const resultsIndex = segments.indexOf('results');
-    const relevant = segments.slice(resultsIndex + 1);
-
-    if (relevant.length < 4) {
-      throw new LiveRcImportError(
-        'LiveRC URL must include event, class, round, and race segments.',
-        {
-          status: 400,
-          code: 'INCOMPLETE_URL',
-          details: { url },
-        },
-      );
-    }
-
-    const [eventSlug, classSlug, roundSlug, ...raceSegments] = relevant;
-
-    if (!raceSegments.length) {
-      throw new LiveRcImportError('LiveRC URL missing race segment.', {
-        status: 400,
-        code: 'INCOMPLETE_URL',
-        details: { url },
-      });
-    }
-
-    const raceSlugWithExtension = raceSegments.join('/');
-    const raceSlug = this.normalizeSlug(raceSlugWithExtension);
-
-    return { eventSlug, classSlug, roundSlug, raceSlug };
+    throw new LiveRcImportError(result.reasonIfInvalid, {
+      status: 400,
+      code: this.mapInvalidReasonToErrorCode(result.reasonIfInvalid),
+      details: { url, reason: result.reasonIfInvalid },
+    });
   }
 
-  private normalizeSlug(slug: string) {
-    if (slug.toLowerCase().endsWith('.json')) {
-      return slug.slice(0, -'.json'.length);
+  private mapInvalidReasonToErrorCode(reason: LiveRcUrlInvalidReason) {
+    switch (reason) {
+      case LiveRcUrlInvalidReasons.INVALID_ABSOLUTE_URL:
+      case LiveRcUrlInvalidReasons.EXTRA_SEGMENTS:
+      case LiveRcUrlInvalidReasons.EMPTY_SEGMENT:
+      case LiveRcUrlInvalidReasons.EMPTY_SLUG:
+        return 'INVALID_URL';
+      case LiveRcUrlInvalidReasons.INVALID_RESULTS_PATH:
+        return 'UNSUPPORTED_URL';
+      case LiveRcUrlInvalidReasons.INCOMPLETE_RESULTS_SEGMENTS:
+        return 'INCOMPLETE_URL';
+      default:
+        return 'INVALID_URL';
     }
-
-    return slug;
   }
 
   private async persistEvent(
