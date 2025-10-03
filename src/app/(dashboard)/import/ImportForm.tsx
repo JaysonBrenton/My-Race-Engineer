@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useId, useMemo, useState, type FormEvent } from 'react';
 
 import {
   LiveRcUrlInvalidReasons,
@@ -20,6 +20,7 @@ type ParsedState =
       kind: 'json';
       result: LiveRcJsonUrlParseResult;
       canonicalAbsoluteJsonUrl: string;
+      wasMissingJsonSuffix: boolean;
     };
 
 type ImportSuccess = {
@@ -43,6 +44,10 @@ const slugToTitle = (slug: string) =>
     .filter(Boolean)
     .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
     .join(' ');
+
+const resolverEnabled = process.env.ENABLE_LIVERC_RESOLVER === '1';
+const hasInternalProxy =
+  typeof process.env.LIVERC_HTTP_BASE === 'string' && process.env.LIVERC_HTTP_BASE.length > 0;
 
 const parseInput = (value: string): ParsedState => {
   const trimmed = value.trim();
@@ -75,8 +80,15 @@ const parseInput = (value: string): ParsedState => {
   }
 
   const canonicalAbsoluteJsonUrl = new URL(result.canonicalJsonPath, parsedUrl.origin).toString();
+  const lastSegment = parsedUrl.pathname.split('/').filter(Boolean).slice(-1)[0] ?? '';
+  const hadJsonSuffix = /\.json$/i.test(lastSegment);
 
-  return { kind: 'json', result, canonicalAbsoluteJsonUrl };
+  return {
+    kind: 'json',
+    result,
+    canonicalAbsoluteJsonUrl,
+    wasMissingJsonSuffix: !hadJsonSuffix,
+  };
 };
 
 const formatError = (error: unknown) => {
@@ -119,16 +131,48 @@ const isImportSummary = (value: unknown): value is LiveRcImportSummary => {
 export default function ImportForm() {
   const [url, setUrl] = useState('');
   const [tipsOpen, setTipsOpen] = useState(false);
+  const [resolveModalOpen, setResolveModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submission, setSubmission] = useState<SubmissionState>(null);
 
   const parsed = useMemo(() => parseInput(url), [url]);
+  const resolveModalTitleId = useId();
 
   useEffect(() => {
     if (parsed.kind !== 'html' && tipsOpen) {
       setTipsOpen(false);
     }
   }, [parsed.kind, tipsOpen]);
+
+  useEffect(() => {
+    if (parsed.kind !== 'html' && resolveModalOpen) {
+      setResolveModalOpen(false);
+    }
+  }, [parsed.kind, resolveModalOpen]);
+
+  const handleResolve = () => {
+    if (!resolverEnabled) {
+      return;
+    }
+
+    if (parsed.kind === 'json' && parsed.wasMissingJsonSuffix) {
+      setUrl(parsed.canonicalAbsoluteJsonUrl);
+      setSubmission(null);
+      return;
+    }
+
+    if (parsed.kind === 'html') {
+      setResolveModalOpen(true);
+    }
+  };
+
+  const handleCloseResolveModal = () => {
+    setResolveModalOpen(false);
+  };
+
+  const shouldShowResolveButton =
+    resolverEnabled &&
+    (parsed.kind === 'html' || (parsed.kind === 'json' && parsed.wasMissingJsonSuffix));
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -217,6 +261,13 @@ export default function ImportForm() {
               before importing.
             </p>
           </div>
+          {shouldShowResolveButton ? (
+            <div className={styles.previewActions}>
+              <button type="button" className={styles.resolveButton} onClick={handleResolve}>
+                Resolve
+              </button>
+            </div>
+          ) : null}
           <button
             type="button"
             className={styles.tipsToggle}
@@ -273,6 +324,11 @@ export default function ImportForm() {
           </div>
         </div>
         <div className={styles.actions}>
+          {shouldShowResolveButton ? (
+            <button type="button" className={styles.resolveButton} onClick={handleResolve}>
+              Resolve
+            </button>
+          ) : null}
           <button type="submit" className={styles.importButton} disabled={isSubmitting}>
             {isSubmitting ? 'Importing…' : 'Import'}
           </button>
@@ -319,6 +375,61 @@ export default function ImportForm() {
           ) : (
             <pre className={styles.responsePre}>{formatError(submission.error)}</pre>
           )}
+        </div>
+      ) : null}
+      {resolverEnabled && resolveModalOpen ? (
+        <div className={styles.modalBackdrop} role="presentation">
+          <div
+            className={styles.modal}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={resolveModalTitleId}
+          >
+            <h3 className={styles.modalTitle} id={resolveModalTitleId}>
+              Resolve LiveRC HTML links
+            </h3>
+            <div className={styles.modalBody}>
+              {hasInternalProxy ? (
+                <>
+                  <p>
+                    QA builds are wired to the internal LiveRC proxy. Swap the HTML link for one of
+                    the JSON fixtures under
+                    <code>fixtures/liverc/results/</code>.
+                  </p>
+                  <p>
+                    Serve it through the proxy by appending <code>?proxy=1</code> in QA.
+                  </p>
+                  <p>
+                    The QA network access playbook covers the full workflow and fixture rollover
+                    steps.
+                    <a
+                      href="https://github.com/JaysonBrenton/My-Race-Engineer/blob/main/docs/guardrails/qa-network-access.md"
+                      target="_blank"
+                      rel="noreferrer"
+                      className={styles.modalLink}
+                    >
+                      Review the QA guide
+                    </a>
+                  </p>
+                </>
+              ) : (
+                <p>
+                  We can’t resolve this HTML page automatically. Open the LiveRC page in a new tab
+                  and use your browser’s DevTools Network panel to copy the matching{' '}
+                  <code>.json</code> request into this form.
+                </p>
+              )}
+            </div>
+            <div className={styles.modalActions}>
+              <button
+                type="button"
+                className={styles.resolveButton}
+                onClick={handleCloseResolveModal}
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       ) : null}
     </form>
