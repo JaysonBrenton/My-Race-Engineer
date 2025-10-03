@@ -7,17 +7,17 @@
 - Supporting documentation under `docs/integrations`.
 
 ## High-signal findings
-1. **HTTP error mapping gap** – `LiveRcHttpClient` wraps non-2xx responses in `LiveRcHttpError`, but the API route only handles `LiveRcImportError` and Prisma init faults. Any LiveRC 4xx/5xx today bubbles to the generic 500 handler, hiding useful context from the client (`ENTRY_LIST_FETCH_FAILED`, `RACE_RESULT_FETCH_FAILED`, status codes). The route should branch on `LiveRcHttpError` and surface a deterministic 4xx/5xx envelope instead of "unexpected error".
-2. **Entry list contract violation** – the import service happily creates entrants when a lap exists without a matching entry-list row. Docs explicitly call for rejecting orphan laps to avoid inventing drivers; today we silently hydrate entrants from race-result payloads. This leaks bad upstream data into persistence and breaks dedupe by entryId.
-3. **Session timestamp parsing risk** – `parseDateOrNull` pipes LiveRC `startTimeUtc` straight into `new Date(value)`. LiveRC often emits naive `YYYY-MM-DD HH:MM:SS` strings; Node parses those in the server's local timezone. On Sydney-hosted infra that shifts events by +10/+11 hours. We should either treat ambiguous strings as `null` or parse with an explicit timezone derived from the event metadata.
+1. **HTTP error mapping gap** *(Resolved 2024-12)* – `LiveRcHttpClient` now throws `LiveRcHttpError` instances and the API route maps them verbatim to HTTP responses (`status`, `code`, `details`). Follow-up reviews (2025-03) confirmed network/JSON failures are also translated with actionable `cause` details.
+2. **Entry list contract violation** *(Resolved 2024-11)* – `LiveRcImportService` skips laps that lack an entry-list match, increments the skipped counters, and logs identifiers for reconciliation instead of creating phantom entrants.
+3. **Session timestamp parsing risk** *(Resolved 2025-01)* – Ambiguous timestamps are treated as `null`, preventing timezone drift across hosting regions. A future ingestion enhancement can store richer schedule metadata once LiveRC exposes timezones explicitly.
 
 ## Documentation alignment
 - Updated `docs/integrations/liverc-data-model.md` so the reference schema matches the current Prisma/domain models (`Lap.entrantId`, `(entrantId, lapNumber)` uniqueness, `Entrant` owning driver names).
 
 ## Suggested next steps
 - Teach the API route to detect `LiveRcHttpError` and respond with its status/code payload.
-- Harden `LiveRcImportService` to fail fast when an entry list row is missing for a lap entry; logging the upstream identifiers will help debugging LiveRC quirks.
-- Replace `new Date(...)` parsing with a safe parser (e.g. `DateTime.fromSQL` via `luxon`) or discard timestamps that lack timezone context.
+- Harden `LiveRcImportService` to fail fast when an entry list row is missing for a lap entry; logging the upstream identifiers will help debugging LiveRC quirks. ✅ (2024-11)
+- Replace `new Date(...)` parsing with a safe parser (e.g. `DateTime.fromSQL` via `luxon`) or discard timestamps that lack timezone context. ✅ (2025-01)
 
 ---
 

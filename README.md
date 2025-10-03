@@ -252,26 +252,13 @@ Use **semantic colour tokens** instead of hard-coding hex in components.
 - [`docs/guardrails/qa-network-access.md`](docs/guardrails/qa-network-access.md) — sandbox networking limits for QA validation.
 
 ### LiveRC ingestion references
-- [`docs/integrations/liverc-data-model.md`](docs/integrations/liverc-data-model.md) — contract that all LiveRC connectors must honour.
+- [`docs/integrations/liverc-data-model.md`](docs/integrations/liverc-data-model.md) — contract that the current entry list + race result pipeline honours.
 - [`docs/integrations/liverc-import-api.md`](docs/integrations/liverc-import-api.md) — `/api/liverc/import` request/response envelopes and error mapping.
-- [`src/core/app/README.md`](src/core/app/README.md) — service pipeline that orchestrates ingestion work.
+- [`src/core/app/README.md`](src/core/app/README.md) — service responsibilities and orchestration notes.
 
 ### Roles, reviews, and audits
 - Consult the **role playbooks** in [`docs/roles/`](docs/roles) whenever you are acting in one of those capacities; they capture process and decision context that should shape design choices for that hat.
 - Review the **deep code review archives** in [`docs/reviews/`](docs/reviews) before modifying the covered flows so that new changes preserve the documented learnings.
-
-- Forthcoming docs (placeholders for now):
-  - `docs/design-principles.md` — layering exceptions, server/client rules, ADR policy
-  - `docs/ux-principles.md` — layout, spacing, accessibility, token map
-  - `docs/domain-model.md` — entities/relations/invariants
-  - `docs/agents/**` — policies, prompts, checklists (auth-ux, auth-security, accessibility, telemetry)
-  - `docs/roles/**` — responsibilities & handoffs
-
-
-codex/create-entry-list-json-fixture-and-update-tests-uma7xw
-
-
-
 - [`docs/reviews/2025-02-14-markdown-audit.md`](docs/reviews/2025-02-14-markdown-audit.md) tracks the latest doc freshness review and suggested follow-ups.
 
 ### Forthcoming docs (placeholders)
@@ -279,10 +266,6 @@ codex/create-entry-list-json-fixture-and-update-tests-uma7xw
 - `docs/ux-principles.md` — layout, spacing, accessibility, token map
 - `docs/domain-model.md` — entities/relations/invariants
 - `docs/agents/**` — policies, prompts, checklists (auth-ux, auth-security, accessibility, telemetry)
-- `docs/roles/**` — responsibilities & handoffs
-
-
-
 
 ### Sample LiveRC fixtures
 

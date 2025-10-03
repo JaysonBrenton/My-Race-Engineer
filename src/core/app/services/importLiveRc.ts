@@ -298,9 +298,28 @@ export class LiveRcImportService {
       );
     }
 
-    const [eventSlug, classSlug, roundSlug, raceSlug] = relevant;
+    const [eventSlug, classSlug, roundSlug, ...raceSegments] = relevant;
+
+    if (!raceSegments.length) {
+      throw new LiveRcImportError('LiveRC URL missing race segment.', {
+        status: 400,
+        code: 'INCOMPLETE_URL',
+        details: { url },
+      });
+    }
+
+    const raceSlugWithExtension = raceSegments.join('/');
+    const raceSlug = this.normalizeSlug(raceSlugWithExtension);
 
     return { eventSlug, classSlug, roundSlug, raceSlug };
+  }
+
+  private normalizeSlug(slug: string) {
+    if (slug.toLowerCase().endsWith('.json')) {
+      return slug.slice(0, -'.json'.length);
+    }
+
+    return slug;
   }
 
   private async persistEvent(

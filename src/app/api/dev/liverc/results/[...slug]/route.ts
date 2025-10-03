@@ -12,6 +12,9 @@ const proxyParamValues = new Set(['1', 'true', 'yes']);
 const isValidPathSegment = (segment: string | undefined) =>
   typeof segment === 'string' && segment.trim().length > 0 && !segment.includes('/');
 
+const ensureJsonFileName = (fileName: string) =>
+  fileName.toLowerCase().endsWith('.json') ? fileName : `${fileName}.json`;
+
 const isValidSlug = (slug: string[]) => {
   if (!Array.isArray(slug)) {
     return false;
@@ -22,7 +25,8 @@ const isValidSlug = (slug: string[]) => {
     return (
       isValidPathSegment(eventSlug) &&
       isValidPathSegment(classSlug) &&
-      fileName === 'entry-list.json'
+      typeof fileName === 'string' &&
+      ensureJsonFileName(fileName) === 'entry-list.json'
     );
   }
 
@@ -33,7 +37,7 @@ const isValidSlug = (slug: string[]) => {
       isValidPathSegment(classSlug) &&
       isValidPathSegment(roundSlug) &&
       typeof fileName === 'string' &&
-      fileName.endsWith('.json') &&
+      ensureJsonFileName(fileName).endsWith('.json') &&
       fileName.trim().length > 0
     );
   }
@@ -96,7 +100,15 @@ export async function GET(request: Request, context: RouteContext) {
     );
   }
 
-  const upstreamUrl = `https://liverc.com/results/${slug
+  const normalizedSlug = slug.map((segment, index) => {
+    if (index === slug.length - 1 && typeof segment === 'string') {
+      return ensureJsonFileName(segment);
+    }
+
+    return segment;
+  });
+
+  const upstreamUrl = `https://liverc.com/results/${normalizedSlug
     .map((segment) => encodeURIComponent(segment))
     .join('/')}`;
 

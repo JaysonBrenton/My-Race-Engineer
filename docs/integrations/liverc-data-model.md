@@ -27,12 +27,13 @@ remote timestamps.
 
 ## Endpoint overview
 
+The current ingestion pipeline depends on two LiveRC endpoints. Additional
+endpoints (heat sheets, rankings, multi-main summaries) will be documented once
+they are implemented.
+
 | Endpoint | LiveRC route | Purpose |
 | --- | --- | --- |
 | Entry list | `/results/{eventSlug}/{classSlug}/entry-list.json` | Discover drivers, car numbers, and membership in a class. |
-| Heat sheet | `/results/{eventSlug}/{classSlug}/{roundSlug}/heats.json` | Enumerate heats and race IDs within a round. |
-| Round ranking | `/results/{eventSlug}/{classSlug}/{roundSlug}/ranking.json` | Determine advancing drivers and seeding. |
-| Multi-main | `/results/{eventSlug}/{classSlug}/multi-main.json` | Resolve combined main events (A/B/C) into a single order. |
 | Race result | `/results/{eventSlug}/{classSlug}/{roundSlug}/{raceSlug}.json` | Fetch lap-by-lap timing, penalties, and metadata per race. |
 
 ### Entry list
@@ -54,62 +55,6 @@ remote timestamps.
 - Ignore entries flagged `withdrawn: true`.
 - When URLs point to a driver-specific page, filter the entry list to that
   driver ID before scheduling race downloads.
-
-### Heat sheet
-
-**Purpose:** map rounds to race (heat/main) identifiers per class.
-
-**Key fields and mapping**
-
-| LiveRC field | Mapping |
-| --- | --- |
-| `heat_id` | Treated as `raceId` component for later hashes. |
-| `round_id` | Combined with class/event to request ranking + race result files. |
-| `session_type` | Used to filter to heats vs mains. `"Qual"` and `"Main"` are kept; `"Practice"` is skipped. |
-| `group_name` | Persisted in ingestion metadata for UI labels. |
-
-**Filtering rules**
-
-- Only schedule heats whose `session_type` matches the session or class slug in
-  the supplied URL (e.g., ignore Truck heats when the URL targets Buggy).
-- When a session URL is supplied, include only heats whose `round_id` equals the
-  targeted round.
-
-### Round ranking
-
-**Purpose:** identify which drivers advance and canonicalise driver ordering.
-
-**Key fields and mapping**
-
-| LiveRC field | Mapping |
-| --- | --- |
-| `entry_id` | Join back to entry list for canonical driver data. |
-| `rank` | Stored in ingestion metadata for seeding; not persisted to Prisma. |
-| `round_points` | Used to determine drop races; influences session selection but not persisted. |
-
-**Filtering rules**
-
-- Discard rankings whose `status` is not `"complete"`.
-- When the ingestion is driver-scoped, keep only rows matching the target
-  `entry_id`.
-
-### Multi-main
-
-**Purpose:** flatten multiple mains for the same class into a composite result.
-
-**Key fields and mapping**
-
-| LiveRC field | Mapping |
-| --- | --- |
-| `main_id` | Appended to `raceId` when hashing lap IDs to disambiguate mains. |
-| `entry_id` | Joins to driver metadata. |
-| `position_overall` | Stored for downstream analytics; not persisted in Prisma. |
-
-**Filtering rules**
-
-- Keep only mains flagged `status: "complete"`.
-- Respect the selected main letter from the URL (e.g., `/amain/` only pulls
-  `main_id` values whose `letter` is `"A"`).
 
 ### Race result
 

@@ -1,14 +1,29 @@
-const appUrlCache = (() => {
-  const value = process.env.APP_URL?.trim();
-  if (!value) {
+const DEFAULT_APP_URL = 'http://localhost:3000';
+
+let cachedAppUrl: URL | null = null;
+
+const normalizeUrl = (value: string) => (value.endsWith('/') ? value.slice(0, -1) : value);
+
+const computeAppUrl = () => {
+  const raw = process.env.APP_URL?.trim();
+
+  if (raw && raw.length > 0) {
+    return new URL(normalizeUrl(raw));
+  }
+
+  if (process.env.NODE_ENV === 'production') {
     throw new Error('APP_URL environment variable must be defined to generate absolute URLs.');
   }
-  const normalized = value.endsWith('/') ? value.slice(0, -1) : value;
-  return new URL(normalized);
-})();
+
+  return new URL(normalizeUrl(process.env.NEXT_PUBLIC_APP_URL?.trim() || DEFAULT_APP_URL));
+};
 
 export function getAppUrl(): URL {
-  return new URL(appUrlCache.toString());
+  if (!cachedAppUrl) {
+    cachedAppUrl = computeAppUrl();
+  }
+
+  return new URL(cachedAppUrl.toString());
 }
 
 export function absUrl(pathname: string | URL): string {
