@@ -7,10 +7,10 @@ export const size = {
 
 export const contentType = 'image/png';
 
-const BACKGROUND = 'linear-gradient(135deg, rgb(11 14 20) 0%, rgb(20 24 32) 100%)';
-const ACCENT = 'rgb(110 231 183)';
-const TEXT_PRIMARY = 'rgb(230 230 230)';
-const TEXT_SECONDARY = 'rgb(185 185 185)';
+const BACKGROUND = 'linear-gradient(135deg, rgb(11, 14, 20) 0%, rgb(20, 24, 32) 100%)';
+const ACCENT = 'rgb(110, 231, 183)';
+const TEXT_PRIMARY = 'rgb(230, 230, 230)';
+const TEXT_SECONDARY = 'rgb(185, 185, 185)';
 
 export default function OpengraphImage() {
   return new ImageResponse(
