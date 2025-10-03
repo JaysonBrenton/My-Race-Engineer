@@ -90,17 +90,13 @@ export class LiveRcHttpClient implements LiveRcClient {
     classSlug: string;
   }): Promise<LiveRcEntryListResponse> {
     const url = this.buildEntryListUrl(params);
-    const response = await this.fetchImpl(url, { headers: { Accept: 'application/json' } });
+    const payload = await this.fetchJson(url, {
+      failureCode: 'ENTRY_LIST_FETCH_FAILED',
+      failureMessage: 'Failed to fetch LiveRC entry list.',
+      invalidResponseCode: 'ENTRY_LIST_INVALID_RESPONSE',
+      invalidResponseMessage: 'LiveRC entry list response was not valid JSON.',
+    });
 
-    if (!response.ok) {
-      throw new LiveRcHttpError('Failed to fetch LiveRC entry list.', {
-        status: response.status,
-        code: 'ENTRY_LIST_FETCH_FAILED',
-        details: { url },
-      });
-    }
-
-    const payload = (await response.json()) as unknown;
     return this.mapEntryListResponse(payload, { ...params, url });
   }
 
@@ -111,18 +107,64 @@ export class LiveRcHttpClient implements LiveRcClient {
     raceSlug: string;
   }): Promise<LiveRcRaceResultResponse> {
     const url = this.buildRaceResultUrl(params);
-    const response = await this.fetchImpl(url, { headers: { Accept: 'application/json' } });
+    const payload = await this.fetchJson(url, {
+      failureCode: 'RACE_RESULT_FETCH_FAILED',
+      failureMessage: 'Failed to fetch LiveRC race result.',
+      invalidResponseCode: 'RACE_RESULT_INVALID_RESPONSE',
+      invalidResponseMessage: 'LiveRC race result response was not valid JSON.',
+    });
 
-    if (!response.ok) {
-      throw new LiveRcHttpError('Failed to fetch LiveRC race result.', {
-        status: response.status,
-        code: 'RACE_RESULT_FETCH_FAILED',
-        details: { url },
+    return this.mapRaceResultResponse(payload, { ...params, url });
+  }
+
+  private async fetchJson(
+    url: string,
+    options: {
+      failureCode: string;
+      failureMessage: string;
+      invalidResponseCode: string;
+      invalidResponseMessage: string;
+    },
+  ) {
+    const headers = { Accept: 'application/json' } as const;
+
+    let response: Response;
+    try {
+      response = await this.fetchImpl(url, { headers });
+    } catch (error) {
+      throw new LiveRcHttpError(options.failureMessage, {
+        status: 502,
+        code: options.failureCode,
+        details: { url, cause: this.serializeError(error) },
       });
     }
 
-    const payload = (await response.json()) as unknown;
-    return this.mapRaceResultResponse(payload, { ...params, url });
+    if (!response.ok) {
+      throw new LiveRcHttpError(options.failureMessage, {
+        status: response.status,
+        code: options.failureCode,
+        details: { url, statusText: response.statusText },
+      });
+    }
+
+    try {
+      const payload = (await response.json()) as unknown;
+      return payload;
+    } catch (error) {
+      throw new LiveRcHttpError(options.invalidResponseMessage, {
+        status: 502,
+        code: options.invalidResponseCode,
+        details: { url, cause: this.serializeError(error) },
+      });
+    }
+  }
+
+  private serializeError(error: unknown) {
+    if (error instanceof Error) {
+      return { message: error.message, name: error.name };
+    }
+
+    return { message: String(error) };
   }
 
   private buildEntryListUrl(params: { eventSlug: string; classSlug: string }) {
@@ -203,10 +245,21 @@ export class LiveRcHttpClient implements LiveRcClient {
     const round = asObject(root.round);
     const race = asObject(root.race);
 
-    const eventId = asString(root.event_id ?? root.eventId ?? event.id) ?? context.eventSlug;
-    const classId = asString(root.class_id ?? root.classId ?? raceClass.id) ?? context.classSlug;
-    const roundId = asString(root.round_id ?? root.roundId ?? round.id) ?? context.roundSlug;
-    const raceId = asString(root.race_id ?? root.raceId ?? race.id) ?? context.raceSlug;
+    const eventId =
+      asString(
+        root.event_id ?? root.eventId ?? event.event_id ?? event.eventId ?? event.id,
+      ) ?? context.eventSlug;
+    const classId =
+      asString(
+        root.class_id ?? root.classId ?? raceClass.class_id ?? raceClass.classId ?? raceClass.id,
+      ) ?? context.classSlug;
+    const roundId =
+      asString(
+        root.round_id ?? root.roundId ?? round.round_id ?? round.roundId ?? round.id,
+      ) ?? context.roundSlug;
+    const raceId =
+      asString(root.race_id ?? root.raceId ?? race.race_id ?? race.raceId ?? race.id) ??
+      context.raceSlug;
 
     const lapsRaw = asArray(root.laps ?? root.results ?? root.lap_data);
 

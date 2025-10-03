@@ -9,11 +9,11 @@
 | File | Status | Notes | Suggested follow-up |
 | --- | --- | --- | --- |
 | `AGENTS.md` | ✅ Accurate | Aligns with repository guardrails and layering expectations. | None.
-| `README.md` | ✅ Accurate | Provides complete setup plus guardrails; consider surfacing the product guardrails link more prominently for newcomers. | Optional: add a "Product scope" link near the quickstart for new contributors.
-| `src/core/app/README.md` | ✅ Updated | Adjusted the dedupe constraint to reference `(entrantId, lapNumber)` so it matches the documented Prisma unique key. | None.
-| `docs/integrations/liverc-data-model.md` | ✅ Accurate | Contract mirrors current schema and ingestion rules, including hashing guidance. | None until schema changes.
-| `docs/integrations/liverc-import-api.md` | ✅ Accurate | Response envelopes and error handling guidance remain aligned with the API review. | Future enhancement: add rate limiting/backoff note once implemented.
-| `docs/reviews/2024-10-07-deep-code-review.md` | ⚠️ Time-sensitive | Still authoritative but assumes pending fixes (HTTP error mapping, orphan lap rejection). | Refresh once those fixes land to mark recommendations as resolved.
+| `README.md` | ✅ Accurate | Setup and doc index refreshed; duplicate sections and stray branch slugs removed. | Consider surfacing the product guardrails link near the quickstart for new contributors.
+| `src/core/app/README.md` | ✅ Accurate | Documents the shipped LiveRC import service instead of future pipelines. | None.
+| `docs/integrations/liverc-data-model.md` | ✅ Accurate | Now scopes the contract to entry list + race result endpoints that exist today. | Expand once heat-sheet ingestion ships.
+| `docs/integrations/liverc-import-api.md` | ✅ Accurate | Notes optional `.json` suffixes and new LiveRC error codes. | Future enhancement: add rate limiting/backoff note once implemented.
+| `docs/reviews/2024-10-07-deep-code-review.md` | ✅ Historical | Updated with resolution dates for all prior action items. | None.
 | `docs/guardrails/product-guardrails.md` | ✅ Accurate | MVP scope and non-goals are clear; definition of "slow lap" is detailed. | Consider formatting the slow-lap heuristics as a sub-list for quicker scanning.
 | `docs/roles/typescript-domain-engineer.md` | ✅ Accurate | Responsibilities align with layering rules and ADR expectations. | None.
 | `docs/roles/nextjs-front-end-engineer.md` | ✅ Accurate | Reinforces App Router guardrails and performance budgets. | Add reference to forthcoming design principles doc when published.
@@ -24,5 +24,5 @@
 | `docs/roles/documentation-knowledge-steward.md` | ✅ Accurate | Highlights doc freshness and ADR facilitation. | None.
 
 ## Next steps
-- Track the outstanding action items noted in the 2024-10-07 deep review and update that document after remediation.
+- Keep future LiveRC documentation updates in sync as additional ingestion stages (heat sheets, rankings, multi-main) ship.
 - When design principle documentation is authored, remember to link it from the README and the Next.js role guide per the suggestions above.

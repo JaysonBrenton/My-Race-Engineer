@@ -9,17 +9,17 @@ type FetchCall = {
 };
 
 const withPatchedFetch = async (
-  stub: (input: RequestInfo, init?: RequestInit) => Promise<Response>,
+  stub: typeof fetch,
   run: (calls: FetchCall[]) => Promise<void>,
 ) => {
   const calls: FetchCall[] = [];
   const originalFetch = globalThis.fetch;
 
-  globalThis.fetch = async (input: RequestInfo, init?: RequestInit) => {
+  globalThis.fetch = (async (input: RequestInfo, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
     calls.push({ url, init });
     return stub(input, init);
-  };
+  }) as typeof fetch;
 
   try {
     await run(calls);

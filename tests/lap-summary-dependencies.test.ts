@@ -46,7 +46,7 @@ const withDatabaseUrl = async (value: string | undefined, fn: () => Promise<void
   }
 };
 
-test('non-baseline entrants with zero laps produce an empty summary', async () => {
+test('non-baseline entrants receive fallback laps when the database is unavailable', async () => {
   await withDatabaseUrl(undefined, async () => {
     const entrant: Entrant = {
       id: 'entrant-non-baseline',
@@ -67,9 +67,16 @@ test('non-baseline entrants with zero laps produce an empty summary', async () =
     const summary = await service.getSummaryForEntrant(entrant.id);
 
     assert.equal(summary.entrantId, entrant.id);
-    assert.equal(summary.lapsCompleted, 0);
-    assert.equal(summary.bestLapMs, 0);
-    assert.equal(summary.averageLapMs, 0);
+    assert.equal(summary.lapsCompleted, 2);
+    assert.ok(summary.bestLapMs > 0);
+    assert.ok(summary.averageLapMs >= summary.bestLapMs);
+
+    const storedLaps = await lapRepository.listByEntrant(entrant.id);
+    assert.equal(storedLaps.length, 2);
+    assert.ok(
+      storedLaps.every((lap) => lap.entrantId === entrant.id),
+      'fallback laps should match the non-baseline entrant context',
+    );
   });
 });
 

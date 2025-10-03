@@ -1,67 +1,53 @@
 # `core/app` services
 
-This package coordinates domain logic with infra adapters. The LiveRC ingestion
-service (to be implemented) will follow the pipeline below so all connectors stay
-consistent with the [`LiveRC → My Race Engineer (MRE) Data Contract`](../../../docs/integrations/liverc-data-model.md).
+The `core/app` layer orchestrates domain workflows by coordinating pure domain
+rules with infrastructure adapters. Today it contains the LiveRC import service
+that turns LiveRC timing endpoints into persisted Prisma records.
 
-## Ingestion workflow
+## LiveRC import service
 
-1. **Bootstrap context**
-   - Accept one or more LiveRC URLs (event, class, session, or driver views).
-   - Parse the URL to extract `eventSlug`, `classSlug`, optional `roundSlug`,
-     `raceSlug`, and/or `entryId` query parameters.
-   - Resolve the target scope: *event-wide*, *class-only*, *specific round*, or
-     *single driver*.
+`LiveRcImportService#importFromUrl(url, options)` is the public entry point. It:
 
-2. **Discovery (entry list + session selection)**
-   - Fetch the entry list for each targeted class.
-   - Normalise driver names to NFC and cache `entry_id` → driver metadata.
-   - When URLs include a driver filter, drop all other entries before
-     scheduling downstream requests.
-   - Load the heat sheet for each relevant round and filter heats whose
-     `session_type` matches the URL intent (e.g., skip practice when the URL is a
-     qualifying round).
-   - Combine ranking and multi-main data to determine which race IDs are
-     complete and relevant to the selected drivers/classes.
+1. **Parses the supplied URL** – extracts the event, class, round, and race
+   slugs. Trailing `.json` extensions are trimmed so contributors can paste
+   either the public results URL or the raw JSON endpoint.
+2. **Fetches upstream data** – requests the class entry list and the race result
+   JSON through the `LiveRcHttpClient`. Network failures, HTTP errors, and
+   malformed JSON payloads are surfaced as structured `LiveRcHttpError`
+   instances with retry-friendly detail.
+3. **Upserts supporting records** – ensures the event, class, session, entrants,
+   and laps exist in persistence, replacing stale lap rows when re-ingesting the
+   same race.
+4. **Builds a summary response** – returns the counts of entrants/laps processed
+   (and skipped), the resolved upstream identifiers, and the `sourceUrl` for
+   auditing.
 
-3. **Download + normalise race data**
-   - For each race ID, fetch the race result JSON.
-   - Join back to the cached entry list to enrich driver metadata (number,
-     spelling, sponsor tags) before creating domain models.
-   - Convert lap times to integer milliseconds and generate deterministic lap
-     IDs as described in the data contract.
-   - Tag laps with metadata (`isOutlap`, penalties) to support filtering in the
-     app layer.
+### Lap persistence rules
 
-4. **Deduplication and persistence**
-   - Upsert every lap through the Prisma `Lap` model using the composite
-     constraint `(entrantId, lapNumber)` to guarantee idempotency.
-   - If a new payload reports fewer laps than currently stored for the same
-     driver/race, delete the superseded rows so re-scored results stay accurate.
-   - Persist import metadata (source URL, fetched at, checksum) alongside the lap
-     batch once the infra layer exposes a store for it.
+- Lap identifiers are deterministic hashes derived from event/class/race/entrant
+  identifiers plus `lapNumber`.
+- Re-ingesting the same race updates existing laps (via
+  `(entrantId, lapNumber)` uniqueness) and removes obsolete laps for that
+  entrant/race pair.
+- Laps flagged as outlaps are dropped unless `includeOutlaps: true` is supplied.
+- Race laps with no matching entry-list entrant are skipped and recorded in the
+  summary so operators can reconcile gaps with LiveRC.
 
-5. **Session/class selection heuristics**
-   - **Event URL** → ingest every class whose slug matches the supplied path.
-     Respect class filters embedded in query parameters (e.g., `?class=2wd-mod`).
-   - **Class URL** → ingest only the matching class; include all completed rounds
-     unless a `round` query parameter is supplied.
-   - **Session URL** → ingest only heats/mains whose round or race slug matches
-     the path segment (e.g., `/round-3/heat-2` → `round_id === 3`, `heat_id === 2`).
-   - **Driver URL** → intersect the above scopes with the targeted `entry_id` to
-     avoid pulling unrelated drivers.
+### Testing guidance
 
-6. **Normalisation outputs**
-   - Return an application DTO describing the import (counts, fastest lap,
-     per-driver summary) alongside the persisted lap IDs.
-   - Emit structured logs and analytics events (success/failure, scope, source
-     URLs) for observability.
+- Unit tests stub repositories/HTTP clients so service logic runs in isolation.
+- Integration tests should exercise the service against the fixtures under
+  `fixtures/liverc/results/sample-event/sample-class/` to catch schema drift.
+- Contract tests belong with the HTTP client to guarantee it translates upstream
+  failures into meaningful `LiveRcHttpError` instances.
 
-## Testing guidance
+## Adding new services
 
-- Provide fixture payloads for each LiveRC endpoint and assert that repeated
-  ingestion runs are idempotent.
-- Mock infra adapters in unit tests so the domain/service logic can run without
-  network access.
-- Add integration tests that exercise the full pipeline against recorded LiveRC
-  responses to catch schema drift.
+When you add additional orchestration services, keep the following conventions:
+
+- Accept domain-friendly inputs and depend only on interface-shaped adapters
+  (repositories, HTTP clients) supplied via constructor injection.
+- Emit typed error classes from the `core/app` layer so API routes can map
+  failures deterministically.
+- Update this README with the new service responsibilities so downstream
+  maintainers can discover the behaviour quickly.

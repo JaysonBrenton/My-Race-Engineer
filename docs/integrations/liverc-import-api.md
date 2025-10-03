@@ -13,12 +13,13 @@ X-Request-Id: <optional>
 
 ```json
 {
-  "url": "https://liverc.com/results/<event>/<class>/<round>/<race>.json",
+  "url": "https://liverc.com/results/<event>/<class>/<round>/<race>[.json]",
   "includeOutlaps": false
 }
 ```
 
-- `url` *(required)* – LiveRC race result URL to ingest.
+- `url` *(required)* – LiveRC race result URL to ingest. Trailing `.json` is
+  optional; the service trims it before reconstructing upstream requests.
 - `includeOutlaps` *(optional)* – set to `true` to include outlaps in lap
   summaries; defaults to `false`.
 
@@ -38,9 +39,9 @@ correlation.
 
 ### LiveRC upstream failures
 
-When the LiveRC HTTP client surfaces a `LiveRcHttpError`, the route now
-propagates the upstream status code, error code, and error details directly to
-the caller. Example:
+When the LiveRC HTTP client surfaces a `LiveRcHttpError`, the route propagates
+the upstream status code, error code, and error details directly to the caller.
+Example:
 
 ```json
 {
@@ -55,7 +56,11 @@ the caller. Example:
 
 This behaviour applies to any HTTP status (404, 500, etc.) raised by the LiveRC
 client so downstream systems can differentiate between missing resources and
-transient server issues without additional mapping logic.
+transient server issues without additional mapping logic. Network failures and
+JSON parse errors are reported with `502` status, a failure-specific error code
+(`ENTRY_LIST_FETCH_FAILED`, `ENTRY_LIST_INVALID_RESPONSE`,
+`RACE_RESULT_FETCH_FAILED`, or `RACE_RESULT_INVALID_RESPONSE`), and an embedded
+`cause` describing the underlying error.
 
 ### Infrastructure failures
 
