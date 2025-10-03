@@ -12,6 +12,8 @@ const nextConfig = {
   },
   env: {
     TZ: process.env.TZ ?? 'Australia/Sydney',
+    ENABLE_LIVERC_RESOLVER: process.env.ENABLE_LIVERC_RESOLVER,
+    LIVERC_HTTP_BASE: process.env.LIVERC_HTTP_BASE,
   },
   poweredByHeader: false,
   async redirects() {
