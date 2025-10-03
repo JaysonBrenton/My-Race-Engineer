@@ -175,6 +175,10 @@ outside the Prisma schema until we widen storage.
   feed gaps with LiveRC.
 - Duplicate laps (same driver + lap number) must update the existing row rather
   than insert a second copy.
+- Sample fixtures for manual inspection live under
+  `fixtures/liverc/results/sample-event/sample-class/`:
+  - `entry-list.json` — entry list metadata consumed by `mapEntryListResponse`.
+  - `race-result.json` — race result payload for the same sample event/class.
 
 Any future schema changes must update this document, regenerate fixtures, and
 communicate the new rules to downstream teams.

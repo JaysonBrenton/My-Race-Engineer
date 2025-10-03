@@ -252,9 +252,16 @@ Use **semantic colour tokens** instead of hard-coding hex in components.
 - Forthcoming docs (placeholders for now):
   - `docs/design-principles.md` — layering exceptions, server/client rules, ADR policy
   - `docs/ux-principles.md` — layout, spacing, accessibility, token map
-  - `docs/domain-model.md` — entities/relations/invariants  
-  - `docs/agents/**` — policies, prompts, checklists (auth-ux, auth-security, accessibility, telemetry)  
+  - `docs/domain-model.md` — entities/relations/invariants
+  - `docs/agents/**` — policies, prompts, checklists (auth-ux, auth-security, accessibility, telemetry)
   - `docs/roles/**` — responsibilities & handoffs
+
+### Sample LiveRC fixtures
+
+- `fixtures/liverc/results/sample-event/sample-class/entry-list.json` — minimal entry list payload with event/class metadata and
+  an entrant consumed by `mapEntryListResponse`.
+- `fixtures/liverc/results/sample-event/sample-class/race-result.json` — companion race result payload for the same sample event
+  and class.
 
 ---
 
