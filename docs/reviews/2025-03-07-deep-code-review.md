@@ -6,6 +6,7 @@
 - Documentation sweep across `README.md`, `docs/**`, and other tracked Markdown assets (excluding vendored `node_modules/**`).
 
 ## Critical issues
+odex/perform-deep-code-review-and-markdown-audit
 1. **Race URL handling contradicts the documented `.json` contract (blocking imports).** ✅ *Resolved 2025-03-07*
    - Parsed race slugs now trim trailing `.json` tokens before building upstream URLs, so callers can submit either the human-facing results URL or the raw JSON endpoint without triggering double extensions.【F:src/core/app/services/importLiveRc.ts†L276-L316】
    - The dev LiveRC proxy accepts both `entry-list` and `entry-list.json`, normalises the final segment, and mirrors the ingestion rules to avoid future drift.【F:src/app/api/dev/liverc/results/[...slug]/route.ts†L12-L111】
@@ -22,9 +23,11 @@
 - **Slug validation accepts `entry-list.json` only in the dev proxy, but the import service expects an entry list without the `.json` suffix.** ✅ *Resolved 2025-03-07* – The proxy now normalises the filename and forwards consistent slugs to LiveRC.【F:src/app/api/dev/liverc/results/[...slug]/route.ts†L12-L111】
 - **Baseline data fallbacks only cover the default entrant.** ✅ *Resolved 2025-03-07* – Mock lap repositories seed deterministic fallback laps for any entrant when Prisma is unavailable or misconfigured, preventing empty UI states during development.【F:src/dependencies/server.ts†L48-L131】
 
+
 ## Documentation audit
 | File | Status | Notes |
 | --- | --- | --- |
+codex/perform-deep-code-review-and-markdown-audit
 | `README.md` | ✅ Updated | Duplicate "Forthcoming docs" sections and stray branch slugs removed; doc index now reflects the maintained references only.【F:README.md†L263-L297】 |
 | `src/core/app/README.md` | ✅ Updated | Documents the shipped LiveRC import service instead of a future pipeline, including persistence rules and test strategy.【F:src/core/app/README.md†L1-L52】 |
 | `docs/reviews/2024-10-07-deep-code-review.md` | ✅ Historical | Annotated with resolution dates so readers know the flagged issues have been addressed.【F:docs/reviews/2024-10-07-deep-code-review.md†L9-L34】 |
@@ -34,3 +37,4 @@
 
 ## Suggested next steps
 All follow-up items from this review were completed on 2025-03-07. Future audits should focus on upcoming ingestion stages (heat sheets, rankings, multi-main) and ensuring rate-limit/backoff guidance is documented when implemented.
+
