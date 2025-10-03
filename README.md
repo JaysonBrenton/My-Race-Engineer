@@ -267,6 +267,7 @@ Use **semantic colour tokens** instead of hard-coding hex in components.
   - `docs/agents/**` — policies, prompts, checklists (auth-ux, auth-security, accessibility, telemetry)
   - `docs/roles/**` — responsibilities & handoffs
 
+
 codex/create-entry-list-json-fixture-and-update-tests-uma7xw
 
 
@@ -279,6 +280,7 @@ codex/create-entry-list-json-fixture-and-update-tests-uma7xw
 - `docs/domain-model.md` — entities/relations/invariants
 - `docs/agents/**` — policies, prompts, checklists (auth-ux, auth-security, accessibility, telemetry)
 - `docs/roles/**` — responsibilities & handoffs
+
 
 
 
