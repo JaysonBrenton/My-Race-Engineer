@@ -6,8 +6,6 @@ import type {
   LiveRcRaceResultResponse,
 } from '../ports/liveRcClient';
 
-export type { LiveRcRaceResultResponse } from '../ports/liveRcClient';
-
 const asObject = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
 
