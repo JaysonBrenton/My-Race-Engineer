@@ -11,6 +11,11 @@ import {
 import type { LiveRcImportSummary } from '@core/app/services/importLiveRc';
 
 import styles from './ImportForm.module.css';
+import Wizard from './Wizard';
+
+type ImportFormProps = {
+  enableWizard?: boolean;
+};
 
 type ParsedState =
   | { kind: 'empty' }
@@ -128,12 +133,13 @@ const isImportSummary = (value: unknown): value is LiveRcImportSummary => {
   );
 };
 
-export default function ImportForm() {
+export default function ImportForm({ enableWizard = false }: ImportFormProps) {
   const [url, setUrl] = useState('');
   const [tipsOpen, setTipsOpen] = useState(false);
   const [resolveModalOpen, setResolveModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submission, setSubmission] = useState<SubmissionState>(null);
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   const parsed = useMemo(() => parseInput(url), [url]);
   const resolveModalTitleId = useId();
@@ -340,6 +346,30 @@ export default function ImportForm() {
 
   return (
     <form className={styles.form} onSubmit={handleSubmit}>
+      {enableWizard ? (
+        <section className={styles.wizardSection}>
+          <div className={styles.wizardHeader}>
+            <p className={styles.wizardTitle}>Need help finding the JSON link?</p>
+            <button
+              type="button"
+              className={styles.wizardToggle}
+              onClick={() => setWizardOpen((previous) => !previous)}
+              aria-expanded={wizardOpen}
+            >
+              {wizardOpen ? 'Hide wizard' : 'Open wizard'}
+            </button>
+          </div>
+          {wizardOpen ? (
+            <Wizard
+              onComplete={(wizardUrl) => {
+                setUrl(wizardUrl);
+                setSubmission(null);
+                setWizardOpen(false);
+              }}
+            />
+          ) : null}
+        </section>
+      ) : null}
       <div className={styles.inputGroup}>
         <label className={styles.label} htmlFor="liverc-url">
           LiveRC link

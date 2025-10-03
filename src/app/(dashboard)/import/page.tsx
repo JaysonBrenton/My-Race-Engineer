@@ -8,6 +8,8 @@ export const metadata: Metadata = {
   description: 'Preview LiveRC results links before triggering an import.',
 };
 
+const enableWizard = process.env.ENABLE_IMPORT_WIZARD === '1';
+
 export default function ImportPage() {
   return (
     <div className={styles.container}>
@@ -17,7 +19,7 @@ export default function ImportPage() {
           Paste a LiveRC results link to see whether it resolves to an import-ready JSON endpoint.
         </p>
       </header>
-      <ImportForm />
+      <ImportForm enableWizard={enableWizard} />
     </div>
   );
 }

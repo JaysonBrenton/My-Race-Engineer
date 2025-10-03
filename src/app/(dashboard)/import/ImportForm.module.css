@@ -4,6 +4,48 @@
   gap: 1.75rem;
 }
 
+.wizardSection {
+  border: 1px solid var(--color-border);
+  border-radius: 1rem;
+  background: var(--color-surface);
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.wizardHeader {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.wizardTitle {
+  margin: 0;
+  font-weight: 600;
+}
+
+.wizardToggle {
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-overlay);
+  color: var(--color-fg);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+.wizardToggle:hover {
+  background: color-mix(in srgb, var(--color-surface-overlay) 65%, var(--color-bg) 35%);
+  border-color: color-mix(in srgb, var(--color-border) 70%, var(--color-accent) 30%);
+}
+
 .inputGroup {
   display: flex;
   flex-direction: column;
