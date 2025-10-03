@@ -1,0 +1,187 @@
+.wrapper {
+  width: min(100%, 26.25rem);
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+  padding: 2.5rem 2.25rem;
+  border-radius: 1.5rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-elevated);
+}
+
+.cardHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(1.75rem, 1.6rem + 0.5vw, 2rem);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.description {
+  margin: 0;
+  color: var(--color-fg-muted);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.label {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.input {
+  appearance: none;
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  background: var(--color-surface-overlay);
+  color: var(--color-fg);
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.input:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 3px;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
+.input::placeholder {
+  color: color-mix(in srgb, var(--color-fg-muted) 80%, transparent);
+}
+
+.checkboxField {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.95rem;
+}
+
+.checkbox {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: var(--color-accent);
+}
+
+.helpText {
+  margin: 0;
+  color: var(--color-fg-muted);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.requirements {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: grid;
+  gap: 0.35rem;
+  color: var(--color-fg-muted);
+  font-size: 0.85rem;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.primaryButton {
+  appearance: none;
+  border: none;
+  border-radius: 9999px;
+  padding: 0.85rem 1rem;
+  background: var(--color-accent);
+  color: var(--color-bg);
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  text-align: center;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.primaryButton:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-elevated-strong);
+}
+
+.primaryButton:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 4px;
+  box-shadow: var(--shadow-elevated-strong);
+}
+
+.linkRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.9rem;
+}
+
+.secondaryLink {
+  color: var(--color-accent);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.secondaryLink:hover {
+  text-decoration: underline;
+}
+
+.statusRegion {
+  min-height: 1.25rem;
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-warning);
+}
+
+.supportingLink {
+  display: block;
+  margin-top: -0.25rem;
+  font-size: 0.9rem;
+  color: var(--color-accent);
+}
+
+.supportingLink:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 40rem) {
+  .card {
+    padding: 2rem 1.75rem;
+  }
+
+  .linkRow {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .secondaryLink {
+    width: 100%;
+  }
+}

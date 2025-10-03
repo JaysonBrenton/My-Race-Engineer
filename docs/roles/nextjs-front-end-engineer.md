@@ -5,7 +5,7 @@ Own the App Router user interface for My Race Engineer (MRE), delivering resilie
 
 ## Core Responsibilities
 - Build and maintain server and client components inside `src/app/**`, ensuring imports only target `core/app`, design-system primitives, and approved shared utilities.
-- Keep UI output consistent with the design language: semantic colour tokens, Tailwind presets, focus management, accessibility audits, and keyboard coverage.
+- Keep UI output consistent with the design language documented in [docs/ux-principles.md](../ux-principles.md): semantic colour tokens, Tailwind presets, focus management, accessibility audits, and keyboard coverage.
 - Implement and maintain route-level error boundaries (`error.tsx`, `global-error.tsx`, `not-found.tsx`) with structured logging hooks and user-facing recovery paths.
 - Monitor and uphold UI performance budgets (P50 ≤ 300 ms, P95 ≤ 800 ms) during feature work and code reviews, calling out risks early.
 - Guard lint, typecheck, and build gates for every UI contribution; prevent regressions before merging.

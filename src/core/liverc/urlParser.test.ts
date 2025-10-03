@@ -26,7 +26,10 @@ void test('parseLiveRcUrl infers canonical path when JSON extension is omitted',
 
   assert.equal(result.type, 'json');
   assert.deepEqual(result.slugs, ['Winter Showdown', 'Expert 4WD', 'Round 1', 'Main--Event']);
-  assert.equal(result.canonicalJsonPath, '/results/Winter Showdown/Expert 4WD/Round 1/Main--Event.json');
+  assert.equal(
+    result.canonicalJsonPath,
+    '/results/Winter Showdown/Expert 4WD/Round 1/Main--Event.json',
+  );
 });
 
 void test('parseLiveRcUrl flags legacy HTML results URLs', () => {
