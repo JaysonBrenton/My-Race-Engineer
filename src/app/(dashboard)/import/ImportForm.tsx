@@ -5,9 +5,12 @@ import {
   useEffect,
   useId,
   useMemo,
+  useRef,
   useState,
   type ChangeEvent,
+  type DragEvent,
   type FormEvent,
+  type KeyboardEvent,
 } from 'react';
 
 import {
@@ -17,6 +20,10 @@ import {
   parseLiveRcUrl,
 } from '@core/app/services/liveRcUrlParser';
 import type { LiveRcImportSummary } from '@core/app/services/importLiveRc';
+import {
+  parseRaceResultPayload,
+  type LiveRcRaceResultResponse,
+} from '@core/app/liverc/responseMappers';
 
 import styles from './ImportForm.module.css';
 import Wizard from './Wizard';
@@ -66,6 +73,12 @@ type BulkImportRow = {
   status: BulkImportRowStatus;
   statusMessage?: string;
   requestId?: string;
+};
+
+type FileImportPreview = {
+  fileName: string;
+  raceResult: LiveRcRaceResultResponse;
+  rawPayload: unknown;
 };
 
 const slugToTitle = (slug: string) =>
@@ -509,6 +522,12 @@ export default function ImportForm({ enableWizard = false, initialUrl }: ImportF
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submission, setSubmission] = useState<SubmissionState>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [filePreview, setFilePreview] = useState<FileImportPreview | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [fileSubmission, setFileSubmission] = useState<SubmissionState>(null);
+  const [isFileImporting, setIsFileImporting] = useState(false);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const parsed = useMemo(() => parseInput(url), [url]);
   const tabSetId = useId();
@@ -525,6 +544,184 @@ export default function ImportForm({ enableWizard = false, initialUrl }: ImportF
   const handleSelectBulk = useCallback(() => {
     setActiveTab('bulk');
   }, []);
+
+  const handleFileSelection = useCallback(async (files: FileList | null) => {
+    if (!files || files.length === 0) {
+      return;
+    }
+
+    const file = files[0];
+    let rawPayload: unknown;
+
+    try {
+      const text = await file.text();
+      rawPayload = JSON.parse(text) as unknown;
+    } catch {
+      setFileError('File must contain valid JSON.');
+      setFilePreview(null);
+      setFileSubmission(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
+
+    const parsedPayload = parseRaceResultPayload(rawPayload);
+    const issues: string[] = [];
+
+    if (parsedPayload.missingIdentifiers.length > 0) {
+      const friendlyNames = parsedPayload.missingIdentifiers
+        .map((identifier) => {
+          switch (identifier) {
+            case 'eventId':
+              return 'event ID';
+            case 'classId':
+              return 'class ID';
+            case 'raceId':
+              return 'race ID';
+            default:
+              return identifier;
+          }
+        })
+        .join(', ');
+      issues.push(`Missing identifiers: ${friendlyNames}.`);
+    }
+
+    if (!parsedPayload.hasLapData) {
+      issues.push('No laps array was present in the payload.');
+    }
+
+    if (issues.length > 0) {
+      setFileError(issues.join(' '));
+      setFilePreview(null);
+      setFileSubmission(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
+
+    setFilePreview({
+      fileName: file.name,
+      raceResult: parsedPayload.raceResult,
+      rawPayload,
+    });
+    setFileError(null);
+    setFileSubmission(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }, []);
+
+  const handleFileInputChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      void handleFileSelection(event.target.files);
+    },
+    [handleFileSelection],
+  );
+
+  const handleDropzoneClick = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleDropzoneKeyDown = useCallback((event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === ' ' || event.key === 'Enter') {
+      event.preventDefault();
+      fileInputRef.current?.click();
+    }
+  }, []);
+
+  const handleDragEnter = useCallback((event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDraggingFile(true);
+  }, []);
+
+  const handleDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  }, []);
+
+  const handleDragLeave = useCallback((event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const nextTarget = event.relatedTarget as Node | null;
+    if (!nextTarget || !event.currentTarget.contains(nextTarget)) {
+      setIsDraggingFile(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback(
+    async (event: DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      setIsDraggingFile(false);
+      const files = event.dataTransfer?.files;
+      if (files && files.length > 0) {
+        await handleFileSelection(files);
+      }
+    },
+    [handleFileSelection],
+  );
+
+  const handleImportFile = useCallback(async () => {
+    if (!filePreview || isFileImporting) {
+      return;
+    }
+
+    setIsFileImporting(true);
+    setFileSubmission(null);
+
+    try {
+      const response = await fetch('/api/liverc/import-file', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(filePreview.rawPayload),
+      });
+
+      const payload: unknown = await response.json().catch(() => null);
+      const requestId =
+        isRecord(payload) && typeof payload.requestId === 'string' ? payload.requestId : undefined;
+
+      if (response.ok) {
+        const summary =
+          isRecord(payload) && 'data' in payload && isImportSummary(payload.data)
+            ? payload.data
+            : undefined;
+
+        if (summary) {
+          setFileSubmission({
+            status: 'success',
+            summary,
+            requestId,
+          });
+          return;
+        }
+
+        setFileSubmission({
+          status: 'error',
+          statusCode: response.status,
+          requestId,
+          error: 'Import succeeded but response payload was missing summary data.',
+        });
+        return;
+      }
+
+      setFileSubmission({
+        status: 'error',
+        statusCode: response.status,
+        requestId,
+        error: isRecord(payload) && 'error' in payload ? payload.error : payload,
+      });
+    } catch (error) {
+      setFileSubmission({
+        status: 'error',
+        statusCode: 0,
+        error,
+      });
+    } finally {
+      setIsFileImporting(false);
+    }
+  }, [filePreview, isFileImporting]);
 
   useEffect(() => {
     if (typeof initialUrl === 'string' && initialUrl.length > 0) {
@@ -834,6 +1031,99 @@ export default function ImportForm({ enableWizard = false, initialUrl }: ImportF
             </p>
           </div>
           {renderPreview()}
+          <section className={styles.dropzoneSection} aria-label="Import LiveRC file">
+            <h2 className={styles.dropzoneTitle}>Import from file</h2>
+            <p className={styles.helper}>
+              Drop a LiveRC results JSON file to preview and import it directly.
+            </p>
+            <div
+              className={`${styles.dropzone} ${isDraggingFile ? styles.dropzoneActive : ''}`.trim()}
+              onDragEnter={handleDragEnter}
+              onDragLeave={handleDragLeave}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+              onClick={handleDropzoneClick}
+              onKeyDown={handleDropzoneKeyDown}
+              role="button"
+              tabIndex={0}
+            >
+              <span>Drop a LiveRC .json file</span>
+              <span className={styles.dropzoneHint}>or click to browse</span>
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/json,.json"
+              className={styles.hiddenFileInput}
+              onChange={handleFileInputChange}
+              tabIndex={-1}
+            />
+            {fileError ? <p className={styles.error}>{fileError}</p> : null}
+            {filePreview ? (
+              <div className={styles.previewCard}>
+                <div className={styles.previewHeader}>
+                  <h3 className={styles.previewTitle}>{filePreview.raceResult.raceName}</h3>
+                  <p className={styles.helper}>File: {filePreview.fileName}</p>
+                </div>
+                <div className={styles.detailsList}>
+                  <div className={styles.detailsItem}>
+                    <p className={styles.detailLabel}>Event</p>
+                    <p className={styles.detailValue}>
+                      {filePreview.raceResult.eventName ??
+                        slugToTitle(filePreview.raceResult.eventId)}
+                    </p>
+                  </div>
+                  <div className={styles.detailsItem}>
+                    <p className={styles.detailLabel}>Class</p>
+                    <p className={styles.detailValue}>
+                      {filePreview.raceResult.className ??
+                        slugToTitle(filePreview.raceResult.classId)}
+                    </p>
+                  </div>
+                  <div className={styles.detailsItem}>
+                    <p className={styles.detailLabel}>Round</p>
+                    <p className={styles.detailValue}>
+                      {filePreview.raceResult.roundName ??
+                        (filePreview.raceResult.roundId
+                          ? slugToTitle(filePreview.raceResult.roundId)
+                          : '—')}
+                    </p>
+                  </div>
+                  <div className={styles.detailsItem}>
+                    <p className={styles.detailLabel}>Laps detected</p>
+                    <p className={styles.detailValue}>{filePreview.raceResult.laps.length}</p>
+                  </div>
+                </div>
+                <div className={styles.actions}>
+                  <button
+                    type="button"
+                    className={styles.importButton}
+                    onClick={handleImportFile}
+                    disabled={isFileImporting}
+                  >
+                    {isFileImporting ? 'Importing…' : 'Import file'}
+                  </button>
+                </div>
+              </div>
+            ) : null}
+            {fileSubmission ? (
+              <div className={styles.responsePanel}>
+                <h3 className={styles.responseTitle}>
+                  {fileSubmission.status === 'success' ? 'Import queued' : 'Import failed'}
+                </h3>
+                {'requestId' in fileSubmission && fileSubmission.requestId ? (
+                  <p className={styles.responseMeta}>Request ID: {fileSubmission.requestId}</p>
+                ) : null}
+                {fileSubmission.status === 'success' ? (
+                  <pre className={styles.responsePre}>
+                    {JSON.stringify(fileSubmission.summary, null, 2)}
+                  </pre>
+                ) : (
+                  <pre className={styles.responsePre}>{formatError(fileSubmission.error)}</pre>
+                )}
+              </div>
+            ) : null}
+          </section>
           {submission ? (
             <div className={styles.responsePanel}>
               <h3 className={styles.responseTitle}>

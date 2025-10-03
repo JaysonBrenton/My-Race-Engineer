@@ -1,13 +1,15 @@
 export const LiveRcUrlInvalidReasons = {
   INVALID_ABSOLUTE_URL: 'LiveRC import requires an absolute URL.',
   INVALID_RESULTS_PATH: 'LiveRC URL must point to a JSON results endpoint under /results/.',
-  INCOMPLETE_RESULTS_SEGMENTS: 'LiveRC results URL must include event, class, round, and race segments.',
+  INCOMPLETE_RESULTS_SEGMENTS:
+    'LiveRC results URL must include event, class, round, and race segments.',
   EXTRA_SEGMENTS: 'LiveRC results URL must not include extra path segments after the race slug.',
   EMPTY_SEGMENT: 'LiveRC results URL must not include empty path segments.',
   EMPTY_SLUG: 'LiveRC results URL contains a segment that resolves to an empty slug.',
 } as const;
 
-export type LiveRcUrlInvalidReason = (typeof LiveRcUrlInvalidReasons)[keyof typeof LiveRcUrlInvalidReasons];
+export type LiveRcUrlInvalidReason =
+  (typeof LiveRcUrlInvalidReasons)[keyof typeof LiveRcUrlInvalidReasons];
 
 export type LiveRcJsonUrlParseResult = {
   type: 'json';
@@ -86,11 +88,17 @@ export const parseLiveRcUrl = (input: string): LiveRcUrlParseResult => {
   const afterResults = pathSegments.slice(resultsIndex + 1);
 
   if (afterResults.length === 0) {
-    return { type: 'invalid', reasonIfInvalid: LiveRcUrlInvalidReasons.INCOMPLETE_RESULTS_SEGMENTS };
+    return {
+      type: 'invalid',
+      reasonIfInvalid: LiveRcUrlInvalidReasons.INCOMPLETE_RESULTS_SEGMENTS,
+    };
   }
 
   if (afterResults.length < 4) {
-    return { type: 'invalid', reasonIfInvalid: LiveRcUrlInvalidReasons.INCOMPLETE_RESULTS_SEGMENTS };
+    return {
+      type: 'invalid',
+      reasonIfInvalid: LiveRcUrlInvalidReasons.INCOMPLETE_RESULTS_SEGMENTS,
+    };
   }
 
   if (afterResults.length > 4) {
@@ -100,7 +108,9 @@ export const parseLiveRcUrl = (input: string): LiveRcUrlParseResult => {
   const normalisedSlugs: string[] = [];
   for (let index = 0; index < afterResults.length; index += 1) {
     const segment = afterResults[index];
-    const normalised = normaliseSegment(segment, { isRaceSegment: index === afterResults.length - 1 });
+    const normalised = normaliseSegment(segment, {
+      isRaceSegment: index === afterResults.length - 1,
+    });
 
     if (!normalised.ok) {
       return { type: 'invalid', reasonIfInvalid: normalised.reason };

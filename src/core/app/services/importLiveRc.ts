@@ -16,6 +16,7 @@ import type {
   SessionRepository,
   SessionUpsertInput,
 } from '@core/app';
+import { parseRaceResultPayload, type LiveRcRaceContext } from '../liverc/responseMappers';
 
 import {
   LiveRcUrlInvalidReasons,
@@ -84,13 +85,6 @@ const buildLapId = (parts: {
       `${parts.eventId}|${parts.sessionId}|${parts.raceId}|${parts.driverId}|${parts.lapNumber}`,
     )
     .digest('hex');
-
-type ParsedLiveRcUrl = {
-  eventSlug: string;
-  classSlug: string;
-  roundSlug: string;
-  raceSlug: string;
-};
 
 export type LiveRcImportOptions = {
   includeOutlaps?: boolean;
@@ -184,11 +178,74 @@ export class LiveRcImportService {
       }),
     ]);
 
-    const event = await this.persistEvent(entryList, raceResult, parsedUrl);
-    const raceClass = await this.persistRaceClass(event.id, entryList, raceResult, parsedUrl);
-    const session = await this.persistSession(event.id, raceClass.id, raceResult, parsedUrl, url);
+    return this.executeImport({
+      entryList,
+      raceResult,
+      parsedContext: parsedUrl,
+      sourceUrl: url,
+      includeOutlaps,
+    });
+  }
 
-    const entryMap = this.buildEntryMap(entryList.entries);
+  async importFromPayload(
+    payload: unknown,
+    options: LiveRcImportOptions = {},
+  ): Promise<LiveRcImportSummary> {
+    const includeOutlaps = options.includeOutlaps ?? false;
+    const parsed = parseRaceResultPayload(payload);
+
+    const hasValidationIssues = parsed.missingIdentifiers.length > 0 || parsed.hasLapData === false;
+
+    if (hasValidationIssues) {
+      throw new LiveRcImportError('LiveRC race result payload is missing required fields.', {
+        status: 422,
+        code: 'INVALID_RACE_RESULT_PAYLOAD',
+        details: {
+          missingIdentifiers: parsed.missingIdentifiers,
+          hasLapData: parsed.hasLapData,
+        },
+      });
+    }
+
+    const entryList = this.buildEntryListFromRaceResult(parsed.raceResult);
+    const sourceUrl = this.buildUploadedSourceUrl(parsed.context);
+
+    return this.executeImport({
+      entryList,
+      raceResult: parsed.raceResult,
+      parsedContext: parsed.context,
+      sourceUrl,
+      includeOutlaps,
+    });
+  }
+
+  private async executeImport(params: {
+    entryList: LiveRcEntryListResponse;
+    raceResult: LiveRcRaceResultResponse;
+    parsedContext: LiveRcRaceContext;
+    sourceUrl: string;
+    includeOutlaps: boolean;
+  }): Promise<LiveRcImportSummary> {
+    const event = await this.persistEvent(
+      params.entryList,
+      params.raceResult,
+      params.parsedContext,
+    );
+    const raceClass = await this.persistRaceClass(
+      event.id,
+      params.entryList,
+      params.raceResult,
+      params.parsedContext,
+    );
+    const session = await this.persistSession(
+      event.id,
+      raceClass.id,
+      params.raceResult,
+      params.parsedContext,
+      params.sourceUrl,
+    );
+
+    const entryMap = this.buildEntryMap(params.entryList.entries);
 
     let entrantsProcessed = 0;
     let lapsImported = 0;
@@ -196,7 +253,7 @@ export class LiveRcImportService {
     let skippedEntrantCount = 0;
     let skippedOutlapCount = 0;
 
-    const groupedLaps = this.groupLapsByEntry(raceResult, includeOutlaps);
+    const groupedLaps = this.groupLapsByEntry(params.raceResult, params.includeOutlaps);
     skippedLapCount += groupedLaps.skipped;
     skippedOutlapCount += groupedLaps.skippedOutlaps;
 
@@ -205,13 +262,10 @@ export class LiveRcImportService {
       if (!entry) {
         skippedEntrantCount += 1;
         skippedLapCount += laps.length;
-        console.warn(
-          '[LiveRcImportService] Skipping laps with no matching entry list row',
-          {
-            entryId,
-            lapsSkipped: laps.length,
-          },
-        );
+        console.warn('[LiveRcImportService] Skipping laps with no matching entry list row', {
+          entryId,
+          lapsSkipped: laps.length,
+        });
         continue;
       }
       if (entry.withdrawn) {
@@ -233,9 +287,9 @@ export class LiveRcImportService {
             lap,
             entrantId: entrant.id,
             sessionId: session.id,
-            raceId: raceResult.raceId,
+            raceId: params.raceResult.raceId,
             upstreamSessionId: session.source.sessionId,
-            upstreamEventId: raceResult.eventId,
+            upstreamEventId: params.raceResult.eventId,
           }),
         )
         .filter((lap): lap is LapUpsertInput => lap !== null)
@@ -256,19 +310,19 @@ export class LiveRcImportService {
       raceClassName: raceClass.name,
       sessionId: session.id,
       sessionName: session.name,
-      raceId: raceResult.raceId,
-      roundId: raceResult.roundId ?? parsedUrl.roundSlug,
+      raceId: params.raceResult.raceId,
+      roundId: params.raceResult.roundId ?? params.parsedContext.roundSlug,
       entrantsProcessed,
       lapsImported,
       skippedLapCount,
       skippedEntrantCount,
       skippedOutlapCount,
-      sourceUrl: url,
-      includeOutlaps,
+      sourceUrl: params.sourceUrl,
+      includeOutlaps: params.includeOutlaps,
     };
   }
 
-  private ensureJsonResultsUrl(url: string): ParsedLiveRcUrl {
+  private ensureJsonResultsUrl(url: string): LiveRcRaceContext {
     const result = parseLiveRcUrl(url);
 
     if (result.type === 'json') {
@@ -277,11 +331,14 @@ export class LiveRcImportService {
     }
 
     if (result.type === 'html') {
-      throw new LiveRcImportError('LiveRC HTML results URLs are not supported. Please use the JSON results link.', {
-        status: 400,
-        code: 'UNSUPPORTED_URL',
-        details: { url, detectedType: 'html' },
-      });
+      throw new LiveRcImportError(
+        'LiveRC HTML results URLs are not supported. Please use the JSON results link.',
+        {
+          status: 400,
+          code: 'UNSUPPORTED_URL',
+          details: { url, detectedType: 'html' },
+        },
+      );
     }
 
     throw new LiveRcImportError(result.reasonIfInvalid, {
@@ -310,14 +367,14 @@ export class LiveRcImportService {
   private async persistEvent(
     entryList: LiveRcEntryListResponse,
     raceResult: LiveRcRaceResultResponse,
-    parsedUrl: ParsedLiveRcUrl,
+    context: LiveRcRaceContext,
   ) {
     const eventInput: EventUpsertInput = {
-      sourceEventId: raceResult.eventId || entryList.eventId || parsedUrl.eventSlug,
-      sourceUrl: `https://liverc.com/results/${parsedUrl.eventSlug}`,
+      sourceEventId: raceResult.eventId || entryList.eventId || context.eventSlug,
+      sourceUrl: `https://liverc.com/results/${context.eventSlug}`,
       name: normalizeWhitespace(
-        (raceResult.eventName ?? entryList.eventName ?? toTitleFromSlug(parsedUrl.eventSlug)) ||
-          toTitleFromSlug(parsedUrl.eventSlug),
+        (raceResult.eventName ?? entryList.eventName ?? toTitleFromSlug(context.eventSlug)) ||
+          toTitleFromSlug(context.eventSlug),
       ),
     };
 
@@ -328,17 +385,17 @@ export class LiveRcImportService {
     eventId: string,
     entryList: LiveRcEntryListResponse,
     raceResult: LiveRcRaceResultResponse,
-    parsedUrl: ParsedLiveRcUrl,
+    context: LiveRcRaceContext,
   ) {
     const classCode = normalizeWhitespace(
-      (entryList.classCode ?? raceResult.classCode ?? parsedUrl.classSlug).toUpperCase(),
+      (entryList.classCode ?? raceResult.classCode ?? context.classSlug).toUpperCase(),
     );
 
     const raceClassInput: RaceClassUpsertInput = {
       eventId,
       classCode,
-      sourceUrl: `https://liverc.com/results/${parsedUrl.eventSlug}/${parsedUrl.classSlug}`,
-      name: raceResult.className ?? entryList.className ?? toTitleFromSlug(parsedUrl.classSlug),
+      sourceUrl: `https://liverc.com/results/${context.eventSlug}/${context.classSlug}`,
+      name: raceResult.className ?? entryList.className ?? toTitleFromSlug(context.classSlug),
     };
 
     return this.raceClassRepository.upsertBySource(raceClassInput);
@@ -348,10 +405,10 @@ export class LiveRcImportService {
     eventId: string,
     raceClassId: string,
     raceResult: LiveRcRaceResultResponse,
-    parsedUrl: ParsedLiveRcUrl,
+    context: LiveRcRaceContext,
     sourceUrl: string,
   ) {
-    const upstreamSessionId = [raceResult.roundId ?? parsedUrl.roundSlug, raceResult.raceId]
+    const upstreamSessionId = [raceResult.roundId ?? context.roundSlug, raceResult.raceId]
       .filter(Boolean)
       .join(':');
 
@@ -360,7 +417,7 @@ export class LiveRcImportService {
       raceClassId,
       sourceSessionId: upstreamSessionId,
       sourceUrl,
-      name: raceResult.raceName ?? toTitleFromSlug(parsedUrl.raceSlug),
+      name: raceResult.raceName ?? toTitleFromSlug(context.raceSlug),
       scheduledStart: parseDateOrNull(raceResult.startTimeUtc),
     };
 
@@ -389,6 +446,43 @@ export class LiveRcImportService {
     };
 
     return this.entrantRepository.upsertBySource(entrantInput);
+  }
+
+  private buildEntryListFromRaceResult(
+    raceResult: LiveRcRaceResultResponse,
+  ): LiveRcEntryListResponse {
+    const entries = new Map<string, LiveRcEntryListEntry>();
+
+    for (const lap of raceResult.laps) {
+      if (!entries.has(lap.entryId)) {
+        entries.set(lap.entryId, {
+          entryId: lap.entryId,
+          displayName: lap.driverName,
+          carNumber: null,
+          sourceTransponderId: null,
+        });
+      }
+    }
+
+    return {
+      eventId: raceResult.eventId,
+      eventName: raceResult.eventName,
+      classId: raceResult.classId,
+      className: raceResult.className,
+      classCode: raceResult.classCode,
+      entries: Array.from(entries.values()),
+    };
+  }
+
+  private buildUploadedSourceUrl(context: LiveRcRaceContext) {
+    const encodedSegments = [
+      context.eventSlug,
+      context.classSlug,
+      context.roundSlug,
+      context.raceSlug,
+    ].map((segment) => encodeURIComponent(segment));
+
+    return `uploaded-file://${encodedSegments.join('/')}`;
   }
 
   private buildEntryMap(entries: LiveRcEntryListEntry[]) {
