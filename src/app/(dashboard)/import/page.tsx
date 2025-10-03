@@ -3,14 +3,35 @@ import type { Metadata } from 'next';
 import ImportForm from './ImportForm';
 import styles from './page.module.css';
 
+type ImportPageProps = {
+  searchParams?: {
+    src?: string | string[];
+  };
+};
+
 export const metadata: Metadata = {
   title: 'Import from LiveRC',
   description: 'Preview LiveRC results links before triggering an import.',
 };
 
 const enableWizard = process.env.ENABLE_IMPORT_WIZARD === '1';
+const appOrigin = (process.env.NEXT_PUBLIC_APP_ORIGIN ?? '').replace(/\/+$/, '');
+const bookmarkletTarget = appOrigin ? `${appOrigin}/import?src=` : '/import?src=';
+const sanitizedBookmarkletTarget = bookmarkletTarget.replace(/'/g, "\\'");
+const bookmarkletHref = `javascript:(()=>{var u=encodeURIComponent(location.href);location.href='${sanitizedBookmarkletTarget}'+u;})();`;
 
-export default function ImportPage() {
+export default function ImportPage({ searchParams }: ImportPageProps) {
+  const srcParam = searchParams?.src;
+  let initialUrl: string | undefined;
+
+  if (typeof srcParam === 'string' && srcParam.length > 0) {
+    try {
+      initialUrl = decodeURIComponent(srcParam);
+    } catch {
+      initialUrl = srcParam;
+    }
+  }
+
   return (
     <div className={styles.container}>
       <header className={styles.header}>
@@ -19,7 +40,17 @@ export default function ImportPage() {
           Paste a LiveRC results link to see whether it resolves to an import-ready JSON endpoint.
         </p>
       </header>
-      <ImportForm enableWizard={enableWizard} />
+      <section className={styles.bookmarkletCard}>
+        <h2 className={styles.bookmarkletTitle}>Bookmarklet</h2>
+        <p className={styles.bookmarkletDescription}>
+          Drag to bookmarks bar. When on a LiveRC race page, click it to open this importer with the
+          page URL prefilled.
+        </p>
+        <a className={styles.bookmarkletLink} href={bookmarkletHref}>
+          Import to My Race Engineer
+        </a>
+      </section>
+      <ImportForm enableWizard={enableWizard} initialUrl={initialUrl} />
     </div>
   );
 }

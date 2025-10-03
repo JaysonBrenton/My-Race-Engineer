@@ -15,6 +15,7 @@ import Wizard from './Wizard';
 
 type ImportFormProps = {
   enableWizard?: boolean;
+  initialUrl?: string;
 };
 
 type ParsedState =
@@ -133,8 +134,8 @@ const isImportSummary = (value: unknown): value is LiveRcImportSummary => {
   );
 };
 
-export default function ImportForm({ enableWizard = false }: ImportFormProps) {
-  const [url, setUrl] = useState('');
+export default function ImportForm({ enableWizard = false, initialUrl }: ImportFormProps) {
+  const [url, setUrl] = useState(() => initialUrl ?? '');
   const [tipsOpen, setTipsOpen] = useState(false);
   const [resolveModalOpen, setResolveModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -143,6 +144,13 @@ export default function ImportForm({ enableWizard = false }: ImportFormProps) {
 
   const parsed = useMemo(() => parseInput(url), [url]);
   const resolveModalTitleId = useId();
+
+  useEffect(() => {
+    if (typeof initialUrl === 'string' && initialUrl.length > 0) {
+      setUrl(initialUrl);
+      setSubmission(null);
+    }
+  }, [initialUrl]);
 
   useEffect(() => {
     if (parsed.kind !== 'html' && tipsOpen) {

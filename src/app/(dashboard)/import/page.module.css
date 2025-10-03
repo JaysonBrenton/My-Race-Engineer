@@ -13,6 +13,53 @@
   gap: 0.75rem;
 }
 
+.bookmarkletCard {
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: var(--color-bg);
+}
+
+.bookmarkletTitle {
+  margin: 0;
+  font-size: 1.25rem;
+  line-height: 1.3;
+}
+
+.bookmarkletDescription {
+  margin: 0;
+  color: var(--color-fg-muted);
+}
+
+.bookmarkletLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  align-self: flex-start;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  color: var(--color-bg);
+  background: var(--color-accent);
+  text-decoration: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.bookmarkletLink:hover,
+.bookmarkletLink:focus-visible {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+}
+
+.bookmarkletLink:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
 .title {
   margin: 0;
   font-size: 2rem;
@@ -29,6 +76,10 @@
   .container {
     padding: 2.5rem 1.25rem 3rem;
     gap: 1.5rem;
+  }
+
+  .bookmarkletCard {
+    padding: 1.25rem;
   }
 
   .title {
