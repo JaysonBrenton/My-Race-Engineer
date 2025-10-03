@@ -26,3 +26,9 @@
 - Update the URL parser to retain protocol + host alongside the untouched slug segments, pass that through the import service, and have the HTTP client respect it when issuing requests and storing provenance.
 - Relax slug normalisation so we only strip the optional `.json` extension and basic leading/trailing whitespace; keep every other character intact.
 - Refresh the integration guide’s usability section so external teams aren’t blocked waiting on “pending” artefacts.
+
+
+## Resolution status — 2025-03-09 follow-up
+- The LiveRC URL parser now preserves the original host, exposes it to callers, and stops forcing slug lowercasing or hyphen normalisation. The import service threads the resulting base URL through the HTTP client and persistence layer so subdomain imports store and fetch against the correct origin.【F:src/core/liverc/urlParser.ts†L17-L131】【F:src/core/app/services/importLiveRc.ts†L1-L429】【F:src/core/infra/http/liveRcClient.ts†L1-L126】
+- Integration docs now describe each usability flow in plain language, removing the `_pending_` placeholders that blocked partner onboarding.【F:docs/integrations/liverc-import-api.md†L53-L72】
+

@@ -30,6 +30,7 @@ export class LiveRcHttpClient implements LiveRcClient {
   }
 
   async fetchEntryList(params: {
+    resultsBaseUrl: string;
     eventSlug: string;
     classSlug: string;
   }): Promise<LiveRcEntryListResponse> {
@@ -45,6 +46,7 @@ export class LiveRcHttpClient implements LiveRcClient {
   }
 
   async fetchRaceResult(params: {
+    resultsBaseUrl: string;
     eventSlug: string;
     classSlug: string;
     roundSlug: string;
@@ -111,16 +113,38 @@ export class LiveRcHttpClient implements LiveRcClient {
     return { message: String(error) };
   }
 
-  private buildEntryListUrl(params: { eventSlug: string; classSlug: string }) {
-    return `https://liverc.com/results/${params.eventSlug}/${params.classSlug}/entry-list.json`;
+  private buildEntryListUrl(params: {
+    resultsBaseUrl: string;
+    eventSlug: string;
+    classSlug: string;
+  }) {
+    const base = this.normaliseResultsBaseUrl(params.resultsBaseUrl);
+    const encodedSegments = [params.eventSlug, params.classSlug].map(encodeURIComponent);
+    return `${base}/${encodedSegments.join('/')}/entry-list.json`;
   }
 
   private buildRaceResultUrl(params: {
+    resultsBaseUrl: string;
     eventSlug: string;
     classSlug: string;
     roundSlug: string;
     raceSlug: string;
   }) {
-    return `https://liverc.com/results/${params.eventSlug}/${params.classSlug}/${params.roundSlug}/${params.raceSlug}.json`;
+    const base = this.normaliseResultsBaseUrl(params.resultsBaseUrl);
+    const encodedSegments = [
+      params.eventSlug,
+      params.classSlug,
+      params.roundSlug,
+      params.raceSlug,
+    ].map(encodeURIComponent);
+    return `${base}/${encodedSegments.join('/')}.json`;
+  }
+
+  private normaliseResultsBaseUrl(resultsBaseUrl: string) {
+    if (!resultsBaseUrl) {
+      return 'https://liverc.com/results';
+    }
+
+    return resultsBaseUrl.replace(/\/+$/, '');
   }
 }

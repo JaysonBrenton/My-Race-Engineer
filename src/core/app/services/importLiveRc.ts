@@ -35,6 +35,20 @@ const toTitleFromSlug = (slug: string) =>
       .join(' '),
   );
 
+const normaliseResultsBaseUrl = (value: string | undefined) => {
+  if (!value || value.trim().length === 0) {
+    return 'https://liverc.com/results';
+  }
+
+  return value.replace(/\/+$/, '');
+};
+
+const buildResultsUrl = (base: string | undefined, segments: string[]) => {
+  const normalisedBase = normaliseResultsBaseUrl(base);
+  const encodedSegments = segments.map((segment) => encodeURIComponent(segment));
+  return `${normalisedBase}/${encodedSegments.join('/')}`;
+};
+
 const hasExplicitTimezone = (value: string) =>
   /(Z|[+-]\d{2}:?\d{2})$/i.test(value.replace(/\s+/g, ''));
 
@@ -164,13 +178,16 @@ export class LiveRcImportService {
   ): Promise<LiveRcImportSummary> {
     const includeOutlaps = options.includeOutlaps ?? false;
     const parsedUrl = this.ensureJsonResultsUrl(url);
+    const resultsBaseUrl = normaliseResultsBaseUrl(parsedUrl.resultsBaseUrl);
 
     const [entryList, raceResult] = await Promise.all([
       this.liveRcClient.fetchEntryList({
+        resultsBaseUrl,
         eventSlug: parsedUrl.eventSlug,
         classSlug: parsedUrl.classSlug,
       }),
       this.liveRcClient.fetchRaceResult({
+        resultsBaseUrl,
         eventSlug: parsedUrl.eventSlug,
         classSlug: parsedUrl.classSlug,
         roundSlug: parsedUrl.roundSlug,
@@ -327,7 +344,14 @@ export class LiveRcImportService {
 
     if (result.type === 'json') {
       const [eventSlug, classSlug, roundSlug, raceSlug] = result.slugs;
-      return { eventSlug, classSlug, roundSlug, raceSlug };
+      return {
+        resultsBaseUrl: result.resultsBaseUrl,
+        origin: result.origin,
+        eventSlug,
+        classSlug,
+        roundSlug,
+        raceSlug,
+      };
     }
 
     if (result.type === 'html') {
@@ -371,7 +395,7 @@ export class LiveRcImportService {
   ) {
     const eventInput: EventUpsertInput = {
       sourceEventId: raceResult.eventId || entryList.eventId || context.eventSlug,
-      sourceUrl: `https://liverc.com/results/${context.eventSlug}`,
+      sourceUrl: buildResultsUrl(context.resultsBaseUrl, [context.eventSlug]),
       name: normalizeWhitespace(
         (raceResult.eventName ?? entryList.eventName ?? toTitleFromSlug(context.eventSlug)) ||
           toTitleFromSlug(context.eventSlug),
@@ -394,7 +418,7 @@ export class LiveRcImportService {
     const raceClassInput: RaceClassUpsertInput = {
       eventId,
       classCode,
-      sourceUrl: `https://liverc.com/results/${context.eventSlug}/${context.classSlug}`,
+      sourceUrl: buildResultsUrl(context.resultsBaseUrl, [context.eventSlug, context.classSlug]),
       name: raceResult.className ?? entryList.className ?? toTitleFromSlug(context.classSlug),
     };
 

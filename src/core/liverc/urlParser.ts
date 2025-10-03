@@ -15,6 +15,8 @@ export type LiveRcJsonUrlParseResult = {
   type: 'json';
   slugs: [string, string, string, string];
   canonicalJsonPath: string;
+  origin: string;
+  resultsBaseUrl: string;
 };
 
 export type LiveRcHtmlUrlParseResult = {
@@ -44,21 +46,13 @@ const normaliseSegment = (segment: string, { isRaceSegment }: { isRaceSegment: b
     return { ok: false as const, reason: LiveRcUrlInvalidReasons.EMPTY_SEGMENT };
   }
 
-  let slug = trimmed.replace(/\s+/g, '-');
-  slug = slug.replace(/-+/g, '-');
-  slug = slug.replace(/^[-]+|[-]+$/g, '');
+  const withoutJsonSuffix = isRaceSegment ? trimmed.replace(/\.json$/i, '') : trimmed;
 
-  if (isRaceSegment) {
-    slug = slug.replace(/\.json$/i, '');
-  }
-
-  slug = slug.toLowerCase();
-
-  if (!slug) {
+  if (!withoutJsonSuffix.trim()) {
     return { ok: false as const, reason: LiveRcUrlInvalidReasons.EMPTY_SLUG };
   }
 
-  return { ok: true as const, slug };
+  return { ok: true as const, slug: withoutJsonSuffix.trim() };
 };
 
 export const parseLiveRcUrl = (input: string): LiveRcUrlParseResult => {
@@ -124,9 +118,13 @@ export const parseLiveRcUrl = (input: string): LiveRcUrlParseResult => {
     .map((slug, index) => (index === slugs.length - 1 ? `${slug}.json` : slug))
     .join('/')}`;
 
+  const resultsBaseUrl = `${parsedUrl.origin}/results`;
+
   return {
     type: 'json',
     slugs,
     canonicalJsonPath,
+    origin: parsedUrl.origin,
+    resultsBaseUrl,
   };
 };

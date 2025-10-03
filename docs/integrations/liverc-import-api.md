@@ -72,18 +72,22 @@ Unexpected errors remain mapped to `500 Internal Server Error` with code
 
 ## Usability flows
 
-- **Paste anything**
-  - Screenshot: _pending quick paste modal capture_
-  - Wireframe: _pending quick paste modal wireframe_
-- **Wizard** _(flagged)_
-  - Screenshot: _pending multi-step wizard capture_
-  - Wireframe: _pending multi-step wizard wireframe_
-- **Bulk paste**
-  - Screenshot: _pending bulk editor capture_
-  - Wireframe: _pending bulk editor wireframe_
-- **Bookmarklet**
-  - Screenshot: _pending bookmarklet handoff capture_
-  - Wireframe: _pending bookmarklet integration wireframe_
-- **File drop** _(flagged)_
-  - Screenshot: _pending drag-and-drop capture_
-  - Wireframe: _pending drag-and-drop wireframe_
+- **Paste anything** – operators land on a single-field form that accepts any
+  LiveRC URL. The parser validates the link in real time, explains whether it
+  maps to JSON or legacy HTML results, and highlights the canonical JSON link
+  they should submit.
+- **Wizard** _(flagged)_ – when the `ENABLE_LIVERC_RESOLVER` flag is enabled the
+  UI exposes a guided, multi-step flow. It starts with the paste field, adds a
+  confirmation step that previews the detected event/class/race, and finishes
+  with the import summary so teams can retry failures without leaving the
+  wizard.
+- **Bulk paste** – the bulk editor accepts newline-delimited URLs, validates
+  each entry, and shows queue states (`queued`, `importing`, `done`, `error`) so
+  stewards can watch hundreds of imports progress without reloading the page.
+- **Bookmarklet** – internal integrators can install the bookmarklet to capture
+  the current LiveRC results page. Activating it opens the import form with the
+  URL pre-filled, bypassing copy/paste friction for production race control.
+- **File drop** _(flagged)_ – when enabled, operators can drag a JSON payload
+  exported from LiveRC straight onto the form. The app parses the file
+  client-side, shows a preview of detected drivers and laps, and only sends the
+  payload to the server after the steward confirms the metadata.
