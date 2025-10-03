@@ -251,6 +251,9 @@ Use **semantic colour tokens** instead of hard-coding hex in components.
 - [`docs/guardrails/product-guardrails.md`](docs/guardrails/product-guardrails.md) — MVP scope, success measures, and non-goals.
 - [`docs/guardrails/qa-network-access.md`](docs/guardrails/qa-network-access.md) — sandbox networking limits for QA validation.
 
+### UX principles
+- [`docs/ux-principles.md`](docs/ux-principles.md) — layout, spacing, accessibility, and microcopy standards for authentication flows.
+
 ### LiveRC ingestion references
 - [`docs/integrations/liverc-data-model.md`](docs/integrations/liverc-data-model.md) — contract that the current entry list + race result pipeline honours.
 - [`docs/integrations/liverc-import-api.md`](docs/integrations/liverc-import-api.md) — `/api/liverc/import` request/response envelopes and error mapping.
@@ -263,7 +266,6 @@ Use **semantic colour tokens** instead of hard-coding hex in components.
 
 ### Forthcoming docs (placeholders)
 - `docs/design-principles.md` — layering exceptions, server/client rules, ADR policy
-- `docs/ux-principles.md` — layout, spacing, accessibility, token map
 - `docs/domain-model.md` — entities/relations/invariants
 - `docs/agents/**` — policies, prompts, checklists (auth-ux, auth-security, accessibility, telemetry)
 
