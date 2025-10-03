@@ -9,9 +9,7 @@ type WebVitalsPayload = {
   timestamp: number;
 };
 
-type ValidationResult =
-  | { ok: true; payload: WebVitalsPayload }
-  | { ok: false; errors: string[] };
+type ValidationResult = { ok: true; payload: WebVitalsPayload } | { ok: false; errors: string[] };
 
 const baseHeaders = {
   'X-Robots-Tag': 'noindex, nofollow',

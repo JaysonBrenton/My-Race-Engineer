@@ -8,7 +8,7 @@ import {
   type LiveRcInvalidUrlParseResult,
 } from './urlParser';
 
-test('parseLiveRcUrl recognises valid JSON results URLs with four segments', () => {
+void test('parseLiveRcUrl recognises valid JSON results URLs with four segments', () => {
   const url = 'https://liverc.com/results/SUMMER SERIES/2WD Buggy/Round 3/A Main.json';
   const result = parseLiveRcUrl(url) as LiveRcJsonUrlParseResult;
 
@@ -17,24 +17,30 @@ test('parseLiveRcUrl recognises valid JSON results URLs with four segments', () 
   assert.equal(result.canonicalJsonPath, '/results/summer-series/2wd-buggy/round-3/a-main.json');
 });
 
-test('parseLiveRcUrl infers canonical path when JSON extension is omitted', () => {
+void test('parseLiveRcUrl infers canonical path when JSON extension is omitted', () => {
   const url = 'https://liverc.com/results/Winter Showdown/Expert 4WD/Round 1/Main Event';
   const result = parseLiveRcUrl(url) as LiveRcJsonUrlParseResult;
 
   assert.equal(result.type, 'json');
   assert.deepEqual(result.slugs, ['winter-showdown', 'expert-4wd', 'round-1', 'main-event']);
-  assert.equal(result.canonicalJsonPath, '/results/winter-showdown/expert-4wd/round-1/main-event.json');
+  assert.equal(
+    result.canonicalJsonPath,
+    '/results/winter-showdown/expert-4wd/round-1/main-event.json',
+  );
 });
 
-test('parseLiveRcUrl flags legacy HTML results URLs', () => {
+void test('parseLiveRcUrl flags legacy HTML results URLs', () => {
   const url = 'https://liverc.com/?p=view_race_result&id=12345';
   const result = parseLiveRcUrl(url);
 
   assert.equal(result.type, 'html');
 });
 
-test('parseLiveRcUrl reports invalid URLs with descriptive reasons', () => {
-  const invalidResults: Array<{ input: string; reason: LiveRcInvalidUrlParseResult['reasonIfInvalid'] }> = [
+void test('parseLiveRcUrl reports invalid URLs with descriptive reasons', () => {
+  const invalidResults: Array<{
+    input: string;
+    reason: LiveRcInvalidUrlParseResult['reasonIfInvalid'];
+  }> = [
     { input: 'not-a-url', reason: LiveRcUrlInvalidReasons.INVALID_ABSOLUTE_URL },
     {
       input: 'https://liverc.com/results/event/class/round',
