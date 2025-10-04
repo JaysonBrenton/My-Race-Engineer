@@ -114,11 +114,14 @@ export const parseLiveRcUrl = (input: string): LiveRcUrlParseResult => {
   }
 
   const slugs = normalisedSlugs as [string, string, string, string];
-  const canonicalJsonPath = `/results/${slugs
-    .map((slug, index) => (index === slugs.length - 1 ? `${slug}.json` : slug))
-    .join('/')}`;
+  const baseSegments = pathSegments.slice(0, resultsIndex + 1);
+  const canonicalSegments = baseSegments.concat(
+    slugs.map((slug, index) => (index === slugs.length - 1 ? `${slug}.json` : slug)),
+  );
 
-  const resultsBaseUrl = `${parsedUrl.origin}/results`;
+  const canonicalJsonPath = `/${canonicalSegments.join('/')}`;
+
+  const resultsBaseUrl = `${parsedUrl.origin}/${baseSegments.join('/')}`.replace(/\/+$/, '');
 
   return {
     type: 'json',
