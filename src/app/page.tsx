@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import type { Metadata } from 'next';
 import Script from 'next/script';
 
@@ -72,6 +73,10 @@ export default async function Home() {
         name: 'Home',
         path: '/',
       },
+      {
+        name: 'Sign in',
+        path: '/auth/login',
+      },
     ]),
   ];
 
@@ -86,6 +91,11 @@ export default async function Home() {
       <header className={styles.heroHeader}>
         <h1 className={styles.heroTitle}>My Race Engineer (MRE)</h1>
         <p className={styles.heroDescription}>{PAGE_DESCRIPTION}</p>
+        <div className={styles.heroActions}>
+          <Link className={styles.heroCta} href="/auth/login">
+            Sign in to your telemetry
+          </Link>
+        </div>
       </header>
       <div className={styles.cards}>
         <LapSummaryCard summary={summary} />
