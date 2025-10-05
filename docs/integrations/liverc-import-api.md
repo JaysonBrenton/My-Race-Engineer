@@ -52,7 +52,7 @@ that the event has been archived or the slug is mistyped.
 
 ```bash
 # Submit a race to the importer with outlaps disabled
-curl -X POST https://my-race-engineer.local/api/liverc/import \
+curl -X POST http://localhost:3001/api/liverc/import \
   -H 'Content-Type: application/json' \
   -H 'X-Request-Id: cli-demo-001' \
   -d '{
@@ -61,7 +61,7 @@ curl -X POST https://my-race-engineer.local/api/liverc/import \
   }'
 
 # Submit another race and include outlaps in the summary
-curl -X POST https://my-race-engineer.local/api/liverc/import \
+curl -X POST http://localhost:3001/api/liverc/import \
   -H 'Content-Type: application/json' \
   -d '{
     "url": "https://club.liverc.com/results/<event>/<class>/<round>/<race>",
@@ -124,6 +124,18 @@ Service Unavailable` and an error code of `DATABASE_UNAVAILABLE`.
 
 Unexpected errors remain mapped to `500 Internal Server Error` with code
 `UNEXPECTED_ERROR`.
+
+## Troubleshooting
+
+- **Connection refused on port 80:** The Next.js app only listens on the port
+  defined by the `PORT` environment variable (`3001` in the default `.env`
+  template). Point `curl` at `http://localhost:3001` (or the host/port combo you
+  configured) rather than port `80` or the framework default of `3000`.
+- **Next.js 404 page on `/api/liverc/import`:** This typically means the request
+  reached the app but on the wrong host/port, so the API route was never
+  matched. Double-check that the `APP_URL`, `HOST`, and `PORT` values in your
+  environment match the URL you are posting to. Restart the dev server after any
+  `.env` changes so the updated settings take effect.
 
 ## Usability flows
 
