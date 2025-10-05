@@ -1,16 +1,19 @@
-import path from 'node:path';
+import { mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 import pino, {
   type DestinationStream,
   type Logger as PinoInstance,
-  type TransportMultiOptions,
-  type TransportTargetOptions,
+  type LoggerOptions,
 } from 'pino';
 
 import type { Logger, LoggerContext, LogLevel } from '@core/app/ports/logger';
 
 const DEFAULT_LOG_LEVEL: LogLevel = 'info';
-const DEFAULT_LOG_DIRECTORY = path.join(process.cwd(), 'logs');
+const DEFAULT_LOG_DIRECTORY = join(process.cwd(), 'logs');
+
+// Detect Next build step
+const isBuildPhase = process.env.NEXT_PHASE === 'phase-production-build';
 
 export type CreatePinoLoggerOptions = {
   level?: string;
@@ -113,63 +116,55 @@ class PinoLoggerAdapter implements Logger {
   }
 }
 
-const buildTransportTargets = (
-  options: Required<Pick<CreatePinoLoggerOptions, 'disableFileLogs'>> & {
-    logDirectory: string;
-  },
-): TransportTargetOptions[] => {
-  const targets: TransportTargetOptions[] = [
-    {
-      target: 'pino/file',
-      options: { destination: 1 },
-    },
-  ];
+type PinoDestinationFn = (options: {
+  dest: string | number;
+  mkdir?: boolean;
+  append?: boolean;
+  sync?: boolean;
+}) => DestinationStream;
+type PinoMultistreamFn = (streams: Array<{ stream: DestinationStream; level?: LogLevel }>) => DestinationStream;
 
-  if (!options.disableFileLogs) {
-    targets.push(
-      {
-        target: 'pino/file',
-        options: {
-          destination: path.join(options.logDirectory, 'app.log'),
-          mkdir: true,
-          append: true,
-          rotate: { interval: '1d', maxFiles: 7, size: '50m' },
-        },
-      },
-      {
-        level: 'warn',
-        target: 'pino/file',
-        options: {
-          destination: path.join(options.logDirectory, 'error.log'),
-          mkdir: true,
-          append: true,
-          rotate: { interval: '1d', maxFiles: 7, size: '20m' },
-        },
-      },
-    );
-  }
+type PinoExport = {
+  (options?: LoggerOptions, destination?: DestinationStream): PinoInstance;
+  destination: PinoDestinationFn;
+  multistream: PinoMultistreamFn;
+};
 
-  return targets;
+const pinoExport = pino as unknown as PinoExport;
+
+const fileStream = (
+  filePath: string,
+  level?: LogLevel,
+): { stream: DestinationStream; level?: LogLevel } => {
+  const stream = pinoExport.destination({ dest: filePath, mkdir: true, append: true, sync: false });
+  return level ? { stream, level } : { stream };
 };
 
 export const createPinoLogger = (options: CreatePinoLoggerOptions = {}): Logger => {
   const level = options.level ?? DEFAULT_LOG_LEVEL;
-  const disableFileLogs = options.disableFileLogs ?? false;
+  const disableFileLogs = (options.disableFileLogs ?? false) || isBuildPhase;
   const logDirectory = options.logDirectory ?? DEFAULT_LOG_DIRECTORY;
 
-  const transportOptions: TransportMultiOptions = {
-    targets: buildTransportTargets({ disableFileLogs, logDirectory }),
-  };
+  const streams: Array<{ stream: DestinationStream; level?: LogLevel }> = [
+    { stream: pinoExport.destination({ dest: 1, sync: false }) },
+  ];
 
-  const transport = pino.transport(transportOptions) as DestinationStream;
+  if (!disableFileLogs) {
+    mkdirSync(logDirectory, { recursive: true });
 
-  const instance = pino(
+    streams.push(
+      fileStream(join(logDirectory, 'app.log')),
+      fileStream(join(logDirectory, 'error.log'), 'warn'),
+    );
+  }
+
+  const instance = pinoExport(
     {
       level,
       base: undefined,
       timestamp: () => `,"timestamp":"${new Date().toISOString()}"`,
     },
-    transport,
+    pinoExport.multistream(streams),
   );
 
   return new PinoLoggerAdapter(instance);
