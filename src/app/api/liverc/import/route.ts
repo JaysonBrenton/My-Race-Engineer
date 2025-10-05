@@ -43,7 +43,7 @@ export type ImportRouteDependencies = {
   logger: Logger;
 };
 
-const createImportRouteHandlers = (dependencies: ImportRouteDependencies) => {
+export const createImportRouteHandlers = (dependencies: ImportRouteDependencies) => {
   const { service, logger } = dependencies;
 
   const post = async (request: Request) => {
