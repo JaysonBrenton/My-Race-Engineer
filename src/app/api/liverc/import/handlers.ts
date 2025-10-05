@@ -15,6 +15,18 @@ const baseHeaders = {
   'X-Robots-Tag': 'noindex, nofollow',
 } as const;
 
+type RouteHandler = (req: Request) => Promise<Response> | Response;
+
+type ImportRouteHandlers = {
+  POST: RouteHandler;
+  OPTIONS?: RouteHandler;
+  GET?: RouteHandler;
+  PUT?: RouteHandler;
+  PATCH?: RouteHandler;
+  DELETE?: RouteHandler;
+  HEAD?: RouteHandler;
+};
+
 const buildJsonResponse = (status: number, payload: unknown, requestId: string) =>
   new Response(JSON.stringify(payload), {
     status,
@@ -78,7 +90,9 @@ export type ImportRouteDependencies = {
   isDatabaseUnavailable?: (error: unknown) => boolean;
 };
 
-export const createImportRouteHandlers = (overrides: ImportRouteDependencies = {}) => {
+export const createImportRouteHandlers = (
+  overrides: ImportRouteDependencies = {},
+): ImportRouteHandlers => {
   const {
     service = defaultDependencies.service,
     logger = defaultDependencies.logger,
@@ -97,163 +111,167 @@ export const createImportRouteHandlers = (overrides: ImportRouteDependencies = {
       route: '/api/liverc/import',
     });
 
-  return {
-    OPTIONS: () =>
-      new Response(null, {
-        status: 204,
-        headers: {
-          ...baseHeaders,
-          Allow: 'OPTIONS, POST',
+  const OPTIONS: RouteHandler = (_request) =>
+    new Response(null, {
+      status: 204,
+      headers: {
+        ...baseHeaders,
+        Allow: 'OPTIONS, POST',
+      },
+    });
+
+  const POST: RouteHandler = async (request) => {
+    const requestId = request.headers.get('x-request-id') ?? randomUUID();
+    const requestLogger = buildRequestLogger(requestId);
+
+    let rawBody: unknown;
+    try {
+      rawBody = await request.json();
+    } catch (error) {
+      requestLogger.warn('Failed to parse LiveRC import request as JSON.', {
+        event: 'liverc.import.invalid_json',
+        outcome: 'invalid-payload',
+        error,
+      });
+
+      return buildJsonResponse(
+        400,
+        {
+          error: {
+            code: 'INVALID_JSON',
+            message: 'Request body must be valid JSON.',
+          },
+          requestId,
         },
-      }),
-    POST: async (request: Request) => {
-      const requestId = request.headers.get('x-request-id') ?? randomUUID();
-      const requestLogger = buildRequestLogger(requestId);
+        requestId,
+      );
+    }
 
-      let rawBody: unknown;
-      try {
-        rawBody = await request.json();
-      } catch (error) {
-        requestLogger.warn('Failed to parse LiveRC import request as JSON.', {
-          event: 'liverc.import.invalid_json',
-          outcome: 'invalid-payload',
-          error,
-        });
+    const parsed = importRequestSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      requestLogger.warn('LiveRC import request failed validation.', {
+        event: 'liverc.import.invalid_request',
+        outcome: 'invalid-payload',
+        details: { issues: normaliseZodIssues(parsed.error.issues) },
+      });
 
-        return buildJsonResponse(
-          400,
-          {
-            error: {
-              code: 'INVALID_JSON',
-              message: 'Request body must be valid JSON.',
-            },
-            requestId,
+      return buildJsonResponse(
+        400,
+        {
+          error: {
+            code: 'INVALID_REQUEST',
+            message: 'LiveRC import request payload is invalid.',
+            details: { issues: normaliseZodIssues(parsed.error.issues) },
           },
           requestId,
-        );
-      }
+        },
+        requestId,
+      );
+    }
 
-      const parsed = importRequestSchema.safeParse(rawBody);
-      if (!parsed.success) {
-        requestLogger.warn('LiveRC import request failed validation.', {
-          event: 'liverc.import.invalid_request',
-          outcome: 'invalid-payload',
-          details: { issues: normaliseZodIssues(parsed.error.issues) },
-        });
+    try {
+      const summary = await dependencies.service.importFromUrl(parsed.data.url, {
+        includeOutlaps: parsed.data.includeOutlaps ?? false,
+        logger: requestLogger,
+      });
 
-        return buildJsonResponse(
-          400,
-          {
-            error: {
-              code: 'INVALID_REQUEST',
-              message: 'LiveRC import request payload is invalid.',
-              details: { issues: normaliseZodIssues(parsed.error.issues) },
-            },
-            requestId,
-          },
+      requestLogger.info('LiveRC import accepted.', buildSuccessLogContext(summary));
+
+      return buildJsonResponse(
+        202,
+        {
+          data: summary,
           requestId,
-        );
-      }
-
-      try {
-        const summary = await dependencies.service.importFromUrl(parsed.data.url, {
-          includeOutlaps: parsed.data.includeOutlaps ?? false,
-          logger: requestLogger,
-        });
-
-        requestLogger.info('LiveRC import accepted.', buildSuccessLogContext(summary));
-
-        return buildJsonResponse(
-          202,
-          {
-            data: summary,
-            requestId,
-          },
-          requestId,
-        );
-      } catch (error) {
-        if (error instanceof LiveRcHttpError) {
-          requestLogger.warn('LiveRC import failed due to upstream error.', {
-            event: 'liverc.import.upstream_failure',
-            outcome: 'failure',
-            code: error.code,
-            status: error.status,
-            details: error.details,
-          });
-
-          return buildJsonResponse(
-            error.status,
-            {
-              error: {
-                code: error.code,
-                message: error.message,
-                details: error.details,
-              },
-              requestId,
-            },
-            requestId,
-          );
-        }
-
-        if (error instanceof LiveRcImportError) {
-          requestLogger.warn('LiveRC import rejected due to validation error.', {
-            event: 'liverc.import.validation_failed',
-            outcome: 'failure',
-            code: error.code,
-            details: error.details,
-          });
-
-          return buildJsonResponse(
-            error.status,
-            {
-              error: {
-                code: error.code,
-                message: error.message,
-                details: error.details,
-              },
-              requestId,
-            },
-            requestId,
-          );
-        }
-
-        if (dependencies.isDatabaseUnavailable(error)) {
-          requestLogger.error('Database unavailable while importing LiveRC data.', {
-            event: 'liverc.import.database_unavailable',
-            outcome: 'failure',
-          });
-
-          return buildJsonResponse(
-            503,
-            {
-              error: {
-                code: 'DATABASE_UNAVAILABLE',
-                message: 'Database is not available to store LiveRC data.',
-              },
-              requestId,
-            },
-            requestId,
-          );
-        }
-
-        requestLogger.error('Unexpected error while importing LiveRC data.', {
-          event: 'liverc.import.unexpected_error',
+        },
+        requestId,
+      );
+    } catch (error) {
+      if (error instanceof LiveRcHttpError) {
+        requestLogger.warn('LiveRC import failed due to upstream error.', {
+          event: 'liverc.import.upstream_failure',
           outcome: 'failure',
-          error,
+          code: error.code,
+          status: error.status,
+          details: error.details,
         });
 
         return buildJsonResponse(
-          500,
+          error.status,
           {
             error: {
-              code: 'UNEXPECTED_ERROR',
-              message: 'Unexpected error while importing from LiveRC.',
+              code: error.code,
+              message: error.message,
+              details: error.details,
             },
             requestId,
           },
           requestId,
         );
       }
-    },
+
+      if (error instanceof LiveRcImportError) {
+        requestLogger.warn('LiveRC import rejected due to validation error.', {
+          event: 'liverc.import.validation_failed',
+          outcome: 'failure',
+          code: error.code,
+          details: error.details,
+        });
+
+        return buildJsonResponse(
+          error.status,
+          {
+            error: {
+              code: error.code,
+              message: error.message,
+              details: error.details,
+            },
+            requestId,
+          },
+          requestId,
+        );
+      }
+
+      if (dependencies.isDatabaseUnavailable(error)) {
+        requestLogger.error('Database unavailable while importing LiveRC data.', {
+          event: 'liverc.import.database_unavailable',
+          outcome: 'failure',
+        });
+
+        return buildJsonResponse(
+          503,
+          {
+            error: {
+              code: 'DATABASE_UNAVAILABLE',
+              message: 'Database is not available to store LiveRC data.',
+            },
+            requestId,
+          },
+          requestId,
+        );
+      }
+
+      requestLogger.error('Unexpected error while importing LiveRC data.', {
+        event: 'liverc.import.unexpected_error',
+        outcome: 'failure',
+        error,
+      });
+
+      return buildJsonResponse(
+        500,
+        {
+          error: {
+            code: 'UNEXPECTED_ERROR',
+            message: 'Unexpected error while importing from LiveRC.',
+          },
+          requestId,
+        },
+        requestId,
+      );
+    }
+  };
+
+  return {
+    OPTIONS,
+    POST,
   };
 };
