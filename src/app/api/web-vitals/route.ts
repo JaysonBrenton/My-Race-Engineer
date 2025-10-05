@@ -1,4 +1,8 @@
+import { randomUUID } from 'node:crypto';
+
 import { NextResponse } from 'next/server';
+
+import { applicationLogger } from '@/dependencies/logger';
 
 type WebVitalsPayload = {
   id: string;
@@ -75,16 +79,26 @@ function validatePayload(data: unknown): ValidationResult {
 }
 
 export async function POST(request: Request) {
+  const requestId = request.headers.get('x-request-id') ?? randomUUID();
+  const logger = applicationLogger.withContext({
+    requestId,
+    route: '/api/web-vitals',
+  });
   let data: unknown;
 
   try {
     data = await request.json();
   } catch (error) {
+    logger.warn('Failed to parse web-vitals request body.', {
+      event: 'web-vitals.invalid_json',
+      outcome: 'invalid-payload',
+      error,
+    });
     return NextResponse.json(
       { error: 'Invalid JSON body.' },
       {
         status: 400,
-        headers: baseHeaders,
+        headers: { ...baseHeaders, 'x-request-id': requestId },
       },
     );
   }
@@ -92,16 +106,23 @@ export async function POST(request: Request) {
   const validation = validatePayload(data);
 
   if (!validation.ok) {
+    logger.warn('Web vitals payload failed validation.', {
+      event: 'web-vitals.invalid_payload',
+      outcome: 'invalid-payload',
+      errors: validation.errors,
+    });
     return NextResponse.json(
       { error: 'Invalid payload.', details: validation.errors },
       {
         status: 422,
-        headers: baseHeaders,
+        headers: { ...baseHeaders, 'x-request-id': requestId },
       },
     );
   }
 
-  console.info('web-vitals', {
+  logger.info('Received web vitals measurement.', {
+    event: 'web-vitals.received',
+    outcome: 'success',
     id: validation.payload.id,
     name: validation.payload.name,
     value: validation.payload.value,
@@ -112,7 +133,7 @@ export async function POST(request: Request) {
 
   return new NextResponse(null, {
     status: 204,
-    headers: baseHeaders,
+    headers: { ...baseHeaders, 'x-request-id': requestId },
   });
 }
 

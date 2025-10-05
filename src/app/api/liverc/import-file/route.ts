@@ -4,6 +4,7 @@ import { LiveRcImportError } from '@core/app';
 import { NextResponse } from 'next/server';
 
 import { isPrismaUnavailableError, liveRcImportService } from '@/dependencies/liverc';
+import { applicationLogger } from '@/dependencies/logger';
 
 const baseHeaders = {
   'Cache-Control': 'no-store',
@@ -28,12 +29,20 @@ export async function POST(request: Request) {
   }
 
   const requestId = request.headers.get('x-request-id') ?? randomUUID();
+  const logger = applicationLogger.withContext({
+    requestId,
+    route: '/api/liverc/import-file',
+  });
   let rawBody: unknown;
 
   try {
     rawBody = await request.json();
   } catch (error) {
-    console.warn('liverc.importFile.invalid_json', { requestId, error });
+    logger.warn('Failed to parse LiveRC import file payload as JSON.', {
+      event: 'liverc.importFile.invalid_json',
+      outcome: 'invalid-payload',
+      error,
+    });
     return jsonResponse(
       400,
       {
@@ -48,10 +57,13 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await liveRcImportService.importFromPayload(rawBody);
+    const result = await liveRcImportService.importFromPayload(rawBody, {
+      logger,
+    });
 
-    console.info('liverc.importFile.success', {
-      requestId,
+    logger.info('LiveRC import file processed.', {
+      event: 'liverc.importFile.success',
+      outcome: 'success',
       entrantsProcessed: result.entrantsProcessed,
       lapsImported: result.lapsImported,
       skippedLapCount: result.skippedLapCount,
@@ -69,8 +81,9 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     if (error instanceof LiveRcImportError) {
-      console.warn('liverc.importFile.failure', {
-        requestId,
+      logger.warn('LiveRC import file failed validation or processing.', {
+        event: 'liverc.importFile.failure',
+        outcome: 'failure',
         code: error.code,
         message: error.message,
         details: error.details,
@@ -91,9 +104,9 @@ export async function POST(request: Request) {
     }
 
     if (isPrismaUnavailableError(error)) {
-      console.error('liverc.importFile.database_unavailable', {
-        requestId,
-        message: 'Database connection unavailable.',
+      logger.error('Database unavailable while persisting LiveRC import file.', {
+        event: 'liverc.importFile.database_unavailable',
+        outcome: 'failure',
       });
 
       return jsonResponse(
@@ -109,7 +122,11 @@ export async function POST(request: Request) {
       );
     }
 
-    console.error('liverc.importFile.unexpected_error', { requestId, error });
+    logger.error('Unexpected error while ingesting LiveRC import file.', {
+      event: 'liverc.importFile.unexpected_error',
+      outcome: 'failure',
+      error,
+    });
 
     return jsonResponse(
       500,

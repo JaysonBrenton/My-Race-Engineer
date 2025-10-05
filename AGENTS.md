@@ -65,6 +65,7 @@ Copy code
 - **APIs & server components:** boundary `try/catch`; return **typed error envelopes** with proper HTTP codes for expected failures; throw only for unexpected faults.
 - **Correlation:** include `requestId` across logs and error responses.
 - **Structured logs (JSON):** `timestamp`, `level`, `requestId`, `route`, `userAnonId`, `event`, `durationMs`, `outcome`, and a redacted error object.
+- **Logger implementation:** server-side code must call the logger from `src/dependencies/logger.ts` (`applicationLogger` or `getRequestLogger`) instead of `console.*`; ensure request-scoped handlers attach `{ requestId, route }` context.
 - **PII:** never log secrets/tokens/passwords/cookies.
 - **Retention:** raw logs 7d; aggregated metrics 90d.
 - **Reporter:** Sentry/Bugsnag allowed (with redaction).
