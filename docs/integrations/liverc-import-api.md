@@ -13,19 +13,18 @@ X-Request-Id: <optional>
 
 ```json
 {
-  "url": "https://liverc.com/results/<event>/<class>/<round>/<race>[.json]",
+  "url": "https://dnc.liverc.com/results/?p=view_race_result&id=3485642",
   "includeOutlaps": false
 }
 ```
 
-Where the `<event>/<class>/<round>/<race>` segments map to the structure used by
-LiveRC URLs. For example, the final race of the 2024 Summer Nationals 17.5
-Buggy class might live at
-`https://liverc.com/results/2024-summer-nationals/17-5-buggy/round-4/a-main.json`.
-Another example for a club night heat could be
-`https://liverc.com/results/rc-club-night-012524/sportsman-2wd/round-2/heat-3`.
-The service accepts either version—with or without the trailing `.json`—and
-automatically normalises the URL before ingestion.
+LiveRC organises result links using `<event>/<class>/<round>/<race>` segments,
+but the public site often serves them via query-string pages. The example above
+resolves today (`curl -IL https://dnc.liverc.com/results/?p=view_race_result&id=3485642`) and represents the 1:8 Pro Nitro Buggy
+A-Main from the 2022 Dirt Nitro Challenge. The canonical slug pieces for that
+race would be `2022-the-dirt-nitro-challenge/1-8-pro-nitro-buggy/main-events/a-main`,
+and the importer normalises either slug-style or query-string URLs—trailing
+`.json` remains optional.
 
 - `url` *(required)* – LiveRC race result URL to ingest. Trailing `.json` is
   optional; the service trims it before reconstructing upstream requests.
