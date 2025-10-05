@@ -33,8 +33,72 @@ export function generateMetadata(): Metadata {
   };
 }
 
-export default function RegisterPage() {
+type RegisterPageProps = {
+  searchParams?: Record<string, string | string[] | undefined>;
+};
+
+type StatusTone = 'info' | 'error';
+
+type StatusMessage = {
+  tone: StatusTone;
+  message: string;
+};
+
+const getParam = (value: string | string[] | undefined) => {
+  if (Array.isArray(value)) {
+    return value[0];
+  }
+
+  return value ?? undefined;
+};
+
+const buildStatusMessage = (errorCode: string | undefined): StatusMessage => {
+  switch (errorCode) {
+    case 'invalid-token':
+      return {
+        tone: 'error' as const,
+        message: 'Your session expired. Refresh the page and try again.',
+      };
+    case 'validation':
+      return {
+        tone: 'error' as const,
+        message: 'Check the highlighted fields and try submitting again.',
+      };
+    case 'email-taken':
+      return {
+        tone: 'error' as const,
+        message: 'An account already exists for that email address. Try signing in instead.',
+      };
+    case 'server-error':
+      return {
+        tone: 'error' as const,
+        message:
+          'We hit an unexpected error while creating your account. Please try again shortly.',
+      };
+    default:
+      return {
+        tone: 'info' as const,
+        message: 'We will send you a verification email after submission.',
+      };
+  }
+};
+
+const getStatusClassName = (tone: StatusTone) => {
+  switch (tone) {
+    case 'error':
+      return `${styles.statusRegion} ${styles.statusError}`;
+    default:
+      return `${styles.statusRegion} ${styles.statusInfo}`;
+  }
+};
+
+export default function RegisterPage({ searchParams }: RegisterPageProps) {
   const formToken = generateAuthFormToken('registration');
+  const errorCode = getParam(searchParams?.error);
+  const status = buildStatusMessage(errorCode);
+  const namePrefill = getParam(searchParams?.name) ?? '';
+  const emailPrefill = getParam(searchParams?.email) ?? '';
+  const statusClassName = getStatusClassName(status.tone);
 
   return (
     <section className={styles.wrapper} aria-labelledby="auth-register-heading">
@@ -51,7 +115,7 @@ export default function RegisterPage() {
         <form
           className={styles.form}
           method="post"
-          action="/auth/register"
+          action="/auth/register/submit"
           aria-describedby="auth-register-status"
         >
           <input type="hidden" name="formToken" value={formToken} />
@@ -68,6 +132,7 @@ export default function RegisterPage() {
               aria-required="true"
               className={styles.input}
               aria-describedby="auth-register-name-help auth-register-status"
+              defaultValue={namePrefill}
             />
             <p className={styles.helpText} id="auth-register-name-help">
               This name is displayed in dashboards and team rosters.
@@ -87,6 +152,7 @@ export default function RegisterPage() {
               aria-required="true"
               className={styles.input}
               aria-describedby="auth-register-email-help auth-register-status"
+              defaultValue={emailPrefill}
             />
             <p className={styles.helpText} id="auth-register-email-help">
               We use this email to verify your identity and send race updates.
@@ -136,13 +202,13 @@ export default function RegisterPage() {
             </Link>
           </div>
           <p
-            className={styles.statusRegion}
+            className={statusClassName}
             id="auth-register-status"
             role="status"
             aria-live="polite"
             aria-atomic="true"
           >
-            We will send you a verification email after submission.
+            {status.message}
           </p>
         </form>
       </article>
