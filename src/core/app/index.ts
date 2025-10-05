@@ -1,3 +1,4 @@
+export * from './ports/logger';
 export * from './ports/entrantRepository';
 export * from './ports/eventRepository';
 export * from './ports/liveRcClient';

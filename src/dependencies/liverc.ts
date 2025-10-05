@@ -9,6 +9,8 @@ import {
   isPrismaClientInitializationError,
 } from '@core/infra';
 
+import { applicationLogger } from '@/dependencies/logger';
+
 const liveRcClient = new LiveRcHttpClient();
 const eventRepository = new PrismaEventRepository();
 const raceClassRepository = new PrismaRaceClassRepository();
@@ -23,6 +25,7 @@ export const liveRcImportService = new LiveRcImportService({
   sessionRepository,
   entrantRepository,
   lapRepository,
+  logger: applicationLogger,
 });
 
 export const liveRcDependencies = {
@@ -32,6 +35,7 @@ export const liveRcDependencies = {
   sessionRepository,
   entrantRepository,
   lapRepository,
+  logger: applicationLogger,
 };
 
 export const isPrismaUnavailableError = isPrismaClientInitializationError;

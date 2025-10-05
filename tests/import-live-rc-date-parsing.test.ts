@@ -11,6 +11,7 @@ import type {
   LiveRcClient,
   LiveRcEntryListResponse,
   LiveRcRaceResultResponse,
+  Logger,
   RaceClassRepository,
   RaceClassUpsertInput,
   SessionRepository,
@@ -20,6 +21,18 @@ import type { Entrant, Event, Lap, RaceClass, Session } from '../src/core/domain
 import { LiveRcImportService } from '../src/core/app/services/importLiveRc';
 
 const fixedNow = new Date('2024-01-01T00:00:00Z');
+
+const createNoopLogger = (): Logger => {
+  const logger: Logger = {
+    debug: () => {},
+    info: () => {},
+    warn: () => {},
+    error: () => {},
+    withContext: () => logger,
+  };
+
+  return logger;
+};
 
 class StubEventRepository implements EventRepository {
   lastUpsert?: EventUpsertInput;
@@ -209,6 +222,8 @@ const createService = (startTimeUtc?: string): ServiceSetup => {
   const entrantRepository = new StubEntrantRepository();
   const lapRepository = new StubLapRepository();
 
+  const logger = createNoopLogger();
+
   const service = new LiveRcImportService({
     liveRcClient,
     eventRepository,
@@ -216,6 +231,7 @@ const createService = (startTimeUtc?: string): ServiceSetup => {
     sessionRepository,
     entrantRepository,
     lapRepository,
+    logger,
   });
 
   return { service, sessionRepository };

@@ -1,13 +1,19 @@
 import { PrismaClient } from '@prisma/client';
 
+import { applicationLogger } from '../src/dependencies/logger';
+
 const prisma = new PrismaClient();
+const logger = applicationLogger.withContext({ route: 'prisma/seed' });
 
 async function main() {
   const sourceEventId = 'liverc-event-baseline';
   const existingEvent = await prisma.event.findUnique({ where: { sourceEventId } });
 
   if (existingEvent) {
-    console.info('Seed skipped: baseline LiveRC event already exists.');
+    logger.info('Seed skipped: baseline LiveRC event already exists.', {
+      event: 'seed.skip_existing_event',
+      outcome: 'skipped',
+    });
     return;
   }
 
@@ -63,12 +69,19 @@ async function main() {
     skipDuplicates: true,
   });
 
-  console.info('Seed completed: inserted baseline LiveRC entities and laps.');
+  logger.info('Seed completed: inserted baseline LiveRC entities and laps.', {
+    event: 'seed.completed',
+    outcome: 'success',
+  });
 }
 
 main()
   .catch((error) => {
-    console.error('Seed failed', error);
+    logger.error('Seed failed.', {
+      event: 'seed.failed',
+      outcome: 'failure',
+      error,
+    });
     process.exitCode = 1;
   })
   .finally(async () => {

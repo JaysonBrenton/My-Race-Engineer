@@ -11,6 +11,7 @@ import type {
   LiveRcEntryListEntry,
   LiveRcEntryListResponse,
   LiveRcRaceResultResponse,
+  Logger,
   RaceClassRepository,
   RaceClassUpsertInput,
   SessionRepository,
@@ -102,6 +103,7 @@ const buildLapId = (parts: {
 
 export type LiveRcImportOptions = {
   includeOutlaps?: boolean;
+  logger?: Logger;
 };
 
 export type LiveRcImportSummary = {
@@ -129,6 +131,7 @@ type ImportDependencies = {
   sessionRepository: SessionRepository;
   entrantRepository: EntrantRepository;
   lapRepository: LapRepository;
+  logger: Logger;
 };
 
 export class LiveRcImportError extends Error {
@@ -163,6 +166,8 @@ export class LiveRcImportService {
 
   private readonly lapRepository: LapRepository;
 
+  private readonly logger: Logger;
+
   constructor(dependencies: ImportDependencies) {
     this.liveRcClient = dependencies.liveRcClient;
     this.eventRepository = dependencies.eventRepository;
@@ -170,6 +175,7 @@ export class LiveRcImportService {
     this.sessionRepository = dependencies.sessionRepository;
     this.entrantRepository = dependencies.entrantRepository;
     this.lapRepository = dependencies.lapRepository;
+    this.logger = dependencies.logger;
   }
 
   async importFromUrl(
@@ -195,13 +201,18 @@ export class LiveRcImportService {
       }),
     ]);
 
-    return this.executeImport({
-      entryList,
-      raceResult,
-      parsedContext: parsedUrl,
-      sourceUrl: url,
-      includeOutlaps,
-    });
+    const logger = options.logger ?? this.logger;
+
+    return this.executeImport(
+      {
+        entryList,
+        raceResult,
+        parsedContext: parsedUrl,
+        sourceUrl: url,
+        includeOutlaps,
+      },
+      logger,
+    );
   }
 
   async importFromPayload(
@@ -227,22 +238,30 @@ export class LiveRcImportService {
     const entryList = this.buildEntryListFromRaceResult(parsed.raceResult);
     const sourceUrl = this.buildUploadedSourceUrl(parsed.context);
 
-    return this.executeImport({
-      entryList,
-      raceResult: parsed.raceResult,
-      parsedContext: parsed.context,
-      sourceUrl,
-      includeOutlaps,
-    });
+    const logger = options.logger ?? this.logger;
+
+    return this.executeImport(
+      {
+        entryList,
+        raceResult: parsed.raceResult,
+        parsedContext: parsed.context,
+        sourceUrl,
+        includeOutlaps,
+      },
+      logger,
+    );
   }
 
-  private async executeImport(params: {
-    entryList: LiveRcEntryListResponse;
-    raceResult: LiveRcRaceResultResponse;
-    parsedContext: LiveRcRaceContext;
-    sourceUrl: string;
-    includeOutlaps: boolean;
-  }): Promise<LiveRcImportSummary> {
+  private async executeImport(
+    params: {
+      entryList: LiveRcEntryListResponse;
+      raceResult: LiveRcRaceResultResponse;
+      parsedContext: LiveRcRaceContext;
+      sourceUrl: string;
+      includeOutlaps: boolean;
+    },
+    logger: Logger,
+  ): Promise<LiveRcImportSummary> {
     const event = await this.persistEvent(
       params.entryList,
       params.raceResult,
@@ -279,9 +298,11 @@ export class LiveRcImportService {
       if (!entry) {
         skippedEntrantCount += 1;
         skippedLapCount += laps.length;
-        console.warn('[LiveRcImportService] Skipping laps with no matching entry list row', {
+        logger.warn('Skipping laps with no matching entry list row.', {
+          event: 'liverc.import.skipped_entry',
           entryId,
           lapsSkipped: laps.length,
+          outcome: 'skipped',
         });
         continue;
       }

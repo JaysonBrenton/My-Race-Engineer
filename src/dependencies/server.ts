@@ -8,6 +8,8 @@ import {
 import type { Entrant } from '@core/domain';
 import type { LapUpsertInput } from '@core/app';
 
+import { applicationLogger } from '@/dependencies/logger';
+
 const DEFAULT_EVENT_ID = 'baseline-event';
 const DEFAULT_RACE_CLASS_ID = 'baseline-race-class';
 const DEFAULT_SESSION_ID = 'baseline-session';
@@ -19,6 +21,8 @@ const DEFAULT_CLASS_URL = 'https://liverc.com/events/baseline/classes/pro-lite';
 const DEFAULT_SESSION_SOURCE_ID = 'liverc-session-baseline';
 const DEFAULT_SESSION_URL = 'https://liverc.com/events/baseline/classes/pro-lite/heat-1';
 const DEFAULT_ENTRANT_SOURCE_ID = 'liverc-entrant-baseline';
+
+const logger = applicationLogger.withContext({ route: 'dependencies/server' });
 
 const createMockEntrant = (): Entrant => ({
   id: DEFAULT_ENTRANT_ID,
@@ -86,11 +90,21 @@ export class MockLapRepository extends PrismaLapRepository {
       return buildStoredLaps() ?? [];
     } catch (error) {
       if (isPrismaClientInitializationError(error)) {
-        console.warn('Prisma client unavailable. Falling back to mock lap data.', error);
+        logger.warn('Prisma client unavailable. Falling back to mock lap data.', {
+          event: 'dependencies.laps.prisma_unavailable',
+          outcome: 'fallback',
+          entrantId,
+          error,
+        });
         return buildStoredLaps() ?? (isBaselineEntrant ? buildMockLaps() : buildFallbackLaps());
       }
 
-      console.warn('Falling back to mock lap data after unexpected error.', error);
+      logger.warn('Unexpected error when loading laps; serving fallback data.', {
+        event: 'dependencies.laps.unexpected_fallback',
+        outcome: 'fallback',
+        entrantId,
+        error,
+      });
       return buildStoredLaps() ?? buildFallbackLaps();
     }
   }
@@ -132,7 +146,13 @@ export class MockLapRepository extends PrismaLapRepository {
       storeLaps();
     } catch (error) {
       if (isPrismaClientInitializationError(error)) {
-        console.warn('Prisma client unavailable during lap replace. Storing in memory.', error);
+        logger.warn('Prisma client unavailable during lap replace. Storing laps in memory.', {
+          event: 'dependencies.laps.replace.prisma_unavailable',
+          outcome: 'fallback',
+          entrantId,
+          sessionId,
+          error,
+        });
         storeLaps();
         return;
       }
@@ -167,11 +187,21 @@ class MockEntrantRepository extends PrismaEntrantRepository {
       }
     } catch (error) {
       if (isPrismaClientInitializationError(error)) {
-        console.warn('Prisma client unavailable. Falling back to mock entrant data.', error);
+        logger.warn('Prisma client unavailable. Falling back to mock entrant data.', {
+          event: 'dependencies.entrants.prisma_unavailable',
+          outcome: 'fallback',
+          entrantId: id,
+          error,
+        });
         return id === DEFAULT_ENTRANT_ID ? createMockEntrant() : null;
       }
 
-      console.warn('Falling back to mock entrant data after unexpected error.', error);
+      logger.warn('Unexpected error when loading entrant. Returning fallback entrant data.', {
+        event: 'dependencies.entrants.unexpected_fallback',
+        outcome: 'fallback',
+        entrantId: id,
+        error,
+      });
       return id === DEFAULT_ENTRANT_ID ? createMockEntrant() : null;
     }
 
@@ -190,11 +220,21 @@ class MockEntrantRepository extends PrismaEntrantRepository {
       }
     } catch (error) {
       if (isPrismaClientInitializationError(error)) {
-        console.warn('Prisma client unavailable. Falling back to mock entrant data.', error);
+        logger.warn('Prisma client unavailable. Falling back to mock entrant data.', {
+          event: 'dependencies.entrants.find.prisma_unavailable',
+          outcome: 'fallback',
+          sourceEntrantId,
+          error,
+        });
         return sourceEntrantId === DEFAULT_ENTRANT_SOURCE_ID ? createMockEntrant() : null;
       }
 
-      console.warn('Falling back to mock entrant data after unexpected error.', error);
+      logger.warn('Unexpected error when looking up entrant by source ID.', {
+        event: 'dependencies.entrants.find.unexpected_fallback',
+        outcome: 'fallback',
+        sourceEntrantId,
+        error,
+      });
       return sourceEntrantId === DEFAULT_ENTRANT_SOURCE_ID ? createMockEntrant() : null;
     }
 
@@ -213,11 +253,24 @@ class MockEntrantRepository extends PrismaEntrantRepository {
       }
     } catch (error) {
       if (isPrismaClientInitializationError(error)) {
-        console.warn('Prisma client unavailable. Falling back to mock entrant data.', error);
+        logger.warn('Prisma client unavailable. Falling back to mock entrant list.', {
+          event: 'dependencies.entrants.session.prisma_unavailable',
+          outcome: 'fallback',
+          sessionId,
+          error,
+        });
         return sessionId === DEFAULT_SESSION_ID ? [createMockEntrant()] : [];
       }
 
-      console.warn('Falling back to mock entrant data after unexpected error.', error);
+      logger.warn(
+        'Unexpected error when listing entrants by session. Returning fallback entrants.',
+        {
+          event: 'dependencies.entrants.session.unexpected_fallback',
+          outcome: 'fallback',
+          sessionId,
+          error,
+        },
+      );
       return sessionId === DEFAULT_SESSION_ID ? [createMockEntrant()] : [];
     }
 
