@@ -3,6 +3,7 @@ const nextConfig = {
   reactStrictMode: true,
   experimental: {
     typedRoutes: true,
+    serverComponentsExternalPackages: ['pino', 'pino-pretty', 'thread-stream', 'pino-abstract-transport'],
   },
   eslint: {
     dirs: ['src'],
@@ -14,6 +15,18 @@ const nextConfig = {
     TZ: process.env.TZ ?? 'Australia/Sydney',
     ENABLE_LIVERC_RESOLVER: process.env.ENABLE_LIVERC_RESOLVER,
     LIVERC_HTTP_BASE: process.env.LIVERC_HTTP_BASE,
+  },
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals = config.externals || [];
+      config.externals.push({
+        'pino-pretty': 'commonjs pino-pretty',
+        'thread-stream': 'commonjs thread-stream',
+        'pino-abstract-transport': 'commonjs pino-abstract-transport',
+      });
+    }
+
+    return config;
   },
   poweredByHeader: false,
   async redirects() {
