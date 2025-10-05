@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import { generateAuthFormToken } from '@/lib/auth/formTokens';
+import { MissingAuthFormTokenSecretError, generateAuthFormToken } from '@/lib/auth/formTokens';
 import { canonicalFor } from '@/lib/seo';
 
 import styles from '../auth.module.css';
@@ -92,13 +92,31 @@ const getStatusClassName = (tone: StatusTone) => {
   }
 };
 
+const buildConfigurationErrorStatus = (): StatusMessage => ({
+  tone: 'error',
+  message:
+    'Account registration is temporarily unavailable due to a server configuration issue. Please contact your administrator.',
+});
+
 export default function RegisterPage({ searchParams }: RegisterPageProps) {
-  const formToken = generateAuthFormToken('registration');
+  let formToken: string | null = null;
+  let configurationStatus: StatusMessage | null = null;
+
+  try {
+    formToken = generateAuthFormToken('registration');
+  } catch (error) {
+    if (error instanceof MissingAuthFormTokenSecretError) {
+      configurationStatus = buildConfigurationErrorStatus();
+    } else {
+      throw error;
+    }
+  }
   const errorCode = getParam(searchParams?.error);
-  const status = buildStatusMessage(errorCode);
+  const status = configurationStatus ?? buildStatusMessage(errorCode);
   const namePrefill = getParam(searchParams?.name) ?? '';
   const emailPrefill = getParam(searchParams?.email) ?? '';
   const statusClassName = getStatusClassName(status.tone);
+  const isFormDisabled = !formToken;
 
   return (
     <section className={styles.wrapper} aria-labelledby="auth-register-heading">
@@ -118,7 +136,7 @@ export default function RegisterPage({ searchParams }: RegisterPageProps) {
           action="/auth/register/submit"
           aria-describedby="auth-register-status"
         >
-          <input type="hidden" name="formToken" value={formToken} />
+          {formToken ? <input type="hidden" name="formToken" value={formToken} /> : null}
           <div className={styles.field}>
             <label className={styles.label} htmlFor="auth-register-name">
               Full name
@@ -133,6 +151,7 @@ export default function RegisterPage({ searchParams }: RegisterPageProps) {
               className={styles.input}
               aria-describedby="auth-register-name-help auth-register-status"
               defaultValue={namePrefill}
+              disabled={isFormDisabled}
             />
             <p className={styles.helpText} id="auth-register-name-help">
               This name is displayed in dashboards and team rosters.
@@ -153,6 +172,7 @@ export default function RegisterPage({ searchParams }: RegisterPageProps) {
               className={styles.input}
               aria-describedby="auth-register-email-help auth-register-status"
               defaultValue={emailPrefill}
+              disabled={isFormDisabled}
             />
             <p className={styles.helpText} id="auth-register-email-help">
               We use this email to verify your identity and send race updates.
@@ -171,6 +191,7 @@ export default function RegisterPage({ searchParams }: RegisterPageProps) {
               aria-required="true"
               className={styles.input}
               aria-describedby="auth-register-password-rules auth-register-status"
+              disabled={isFormDisabled}
             />
             <ul className={styles.requirements} id="auth-register-password-rules">
               <li>At least 12 characters</li>
@@ -191,10 +212,11 @@ export default function RegisterPage({ searchParams }: RegisterPageProps) {
               aria-required="true"
               className={styles.input}
               aria-describedby="auth-register-status"
+              disabled={isFormDisabled}
             />
           </div>
           <div className={styles.actions}>
-            <button type="submit" className={styles.primaryButton}>
+            <button type="submit" className={styles.primaryButton} disabled={isFormDisabled}>
               Create account
             </button>
             <Link className={styles.secondaryLink} href="/auth/login">

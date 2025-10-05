@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import { generateAuthFormToken } from '@/lib/auth/formTokens';
+import { MissingAuthFormTokenSecretError, generateAuthFormToken } from '@/lib/auth/formTokens';
 import { canonicalFor } from '@/lib/seo';
 
 import styles from '../auth.module.css';
@@ -109,13 +109,31 @@ const getStatusClassName = (tone: StatusTone) => {
   }
 };
 
+const buildConfigurationStatusMessage = (): StatusMessage => ({
+  tone: 'error',
+  message:
+    'Sign in is temporarily unavailable due to a server configuration issue. Please contact your administrator.',
+});
+
 export default function LoginPage({ searchParams }: LoginPageProps) {
-  const formToken = generateAuthFormToken('login');
+  let formToken: string | null = null;
+  let configurationStatus: StatusMessage | null = null;
+
+  try {
+    formToken = generateAuthFormToken('login');
+  } catch (error) {
+    if (error instanceof MissingAuthFormTokenSecretError) {
+      configurationStatus = buildConfigurationStatusMessage();
+    } else {
+      throw error;
+    }
+  }
   const statusCode = getParam(searchParams?.status);
   const errorCode = getParam(searchParams?.error);
-  const status = buildStatusMessage(statusCode, errorCode);
+  const status = configurationStatus ?? buildStatusMessage(statusCode, errorCode);
   const emailPrefill = getParam(searchParams?.email) ?? '';
   const statusClassName = getStatusClassName(status.tone);
+  const isFormDisabled = !formToken;
 
   return (
     <section className={styles.wrapper} aria-labelledby="auth-login-heading">
@@ -134,7 +152,7 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
           action="/auth/login/submit"
           aria-describedby="auth-login-status"
         >
-          <input type="hidden" name="formToken" value={formToken} />
+          {formToken ? <input type="hidden" name="formToken" value={formToken} /> : null}
           <div className={styles.field}>
             <label className={styles.label} htmlFor="auth-login-email">
               Email address
@@ -150,6 +168,7 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
               className={styles.input}
               aria-describedby="auth-login-email-help auth-login-status"
               defaultValue={emailPrefill}
+              disabled={isFormDisabled}
             />
             <p className={styles.helpText} id="auth-login-email-help">
               Use the email associated with your paddock or club account.
@@ -168,6 +187,7 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
               aria-required="true"
               className={styles.input}
               aria-describedby="auth-login-password-help auth-login-status"
+              disabled={isFormDisabled}
             />
             <p className={styles.helpText} id="auth-login-password-help">
               Passwords are case sensitive and must meet the team security policy.
@@ -180,11 +200,12 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
               name="remember"
               type="checkbox"
               value="true"
+              disabled={isFormDisabled}
             />
             <label htmlFor="auth-login-remember">Remember me on this device</label>
           </div>
           <div className={styles.actions}>
-            <button type="submit" className={styles.primaryButton}>
+            <button type="submit" className={styles.primaryButton} disabled={isFormDisabled}>
               Sign in
             </button>
             <div className={styles.linkRow}>

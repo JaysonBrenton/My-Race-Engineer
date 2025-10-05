@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { registerUserService } from '@/dependencies/auth';
+import { applicationLogger } from '@/dependencies/logger';
 import { validateAuthFormToken } from '@/lib/auth/formTokens';
 
 const passwordSchema = z
@@ -68,6 +69,8 @@ const getFormValue = (data: FormData, key: string) => {
   return typeof value === 'string' ? value : undefined;
 };
 
+const logger = applicationLogger.withContext({ route: 'auth/register/submit' });
+
 export async function POST(request: Request) {
   const formData = await request.formData();
   const token = formData.get('formToken');
@@ -127,7 +130,14 @@ export async function POST(request: Request) {
 
     return NextResponse.redirect(redirectUrl, 303);
   } catch (error) {
-    console.error('Registration failed unexpectedly', error);
+    logger.error('Registration failed unexpectedly', {
+      event: 'auth.registration.unexpected_failure',
+      outcome: 'error',
+      error:
+        error instanceof Error
+          ? { name: error.name, message: error.message }
+          : { message: 'Unknown error' },
+    });
     const redirectUrl = buildRedirectUrl(request.url, '/auth/register', {
       error: 'server-error',
       name,
