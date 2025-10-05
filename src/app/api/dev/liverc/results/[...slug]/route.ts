@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 
 import { NextResponse } from 'next/server';
 
+import { applicationLogger } from '@/dependencies/logger';
+
 const baseHeaders = {
   'Cache-Control': 'no-store',
   'X-Robots-Tag': 'noindex, nofollow',
@@ -63,9 +65,17 @@ type RouteContext = {
 export async function GET(request: Request, context: RouteContext) {
   const requestId = request.headers.get('x-request-id') ?? randomUUID();
   const slug = context.params.slug ?? [];
+  const logger = applicationLogger.withContext({
+    requestId,
+    route: '/api/dev/liverc/results',
+  });
 
   if (!isValidSlug(slug)) {
-    console.warn('liverc.dev.invalid_slug', { requestId, slug });
+    logger.warn('LiveRC dev proxy received an invalid slug.', {
+      event: 'liverc.dev.invalid_slug',
+      outcome: 'invalid-request',
+      slug,
+    });
 
     return jsonResponse(
       400,
@@ -85,7 +95,11 @@ export async function GET(request: Request, context: RouteContext) {
   const proxyParam = url.searchParams.get('proxy');
 
   if (!proxyParam || !proxyParamValues.has(proxyParam.toLowerCase())) {
-    console.warn('liverc.dev.proxy_disabled', { requestId, slug });
+    logger.warn('LiveRC dev proxy invoked without ?proxy=1 flag.', {
+      event: 'liverc.dev.proxy_disabled',
+      outcome: 'invalid-request',
+      slug,
+    });
 
     return jsonResponse(
       400,
@@ -131,7 +145,13 @@ export async function GET(request: Request, context: RouteContext) {
       headers,
     });
   } catch (error) {
-    console.error('liverc.dev.proxy_failure', { requestId, slug, error });
+    logger.error('LiveRC dev proxy failed to fetch upstream resource.', {
+      event: 'liverc.dev.proxy_failure',
+      outcome: 'failure',
+      slug,
+      upstreamUrl,
+      error,
+    });
 
     return jsonResponse(
       502,

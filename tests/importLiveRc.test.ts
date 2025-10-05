@@ -11,6 +11,9 @@ import {
   type LapRepository,
   type LapUpsertInput,
   type LiveRcClient,
+  type Logger,
+  type LoggerContext,
+  type LogLevel,
   type RaceClassRepository,
   type RaceClassUpsertInput,
   type SessionRepository,
@@ -18,6 +21,36 @@ import {
 } from '../src/core/app';
 
 const now = new Date();
+
+type CapturedLog = {
+  level: LogLevel;
+  message: string;
+  context?: LoggerContext;
+};
+
+const createTestLogger = () => {
+  const logs: CapturedLog[] = [];
+
+  const build = (baseContext: LoggerContext = {}): Logger => ({
+    debug(message, context) {
+      logs.push({ level: 'debug', message, context: { ...baseContext, ...(context ?? {}) } });
+    },
+    info(message, context) {
+      logs.push({ level: 'info', message, context: { ...baseContext, ...(context ?? {}) } });
+    },
+    warn(message, context) {
+      logs.push({ level: 'warn', message, context: { ...baseContext, ...(context ?? {}) } });
+    },
+    error(message, context) {
+      logs.push({ level: 'error', message, context: { ...baseContext, ...(context ?? {}) } });
+    },
+    withContext(context) {
+      return build({ ...baseContext, ...context });
+    },
+  });
+
+  return { logger: build(), logs };
+};
 
 test('orphan laps without entry list rows are skipped and reported', async () => {
   const persistedEntrants: unknown[] = [];
@@ -164,6 +197,8 @@ test('orphan laps without entry list rows are skipped and reported', async () =>
     },
   };
 
+  const testLogger = createTestLogger();
+
   const service = new LiveRcImportService({
     liveRcClient,
     eventRepository,
@@ -171,6 +206,7 @@ test('orphan laps without entry list rows are skipped and reported', async () =>
     sessionRepository,
     entrantRepository,
     lapRepository,
+    logger: testLogger.logger,
   });
 
   const summary = await service.importFromUrl('https://liverc.com/results/event/class/round/race');
@@ -182,6 +218,11 @@ test('orphan laps without entry list rows are skipped and reported', async () =>
   assert.equal(summary.skippedOutlapCount, 0);
   assert.equal(persistedEntrants.length, 0);
   assert.equal(lapReplacements.length, 0);
+
+  const skippedLog = testLogger.logs.find((log) => log.context?.event === 'liverc.import.skipped_entry');
+  assert.ok(skippedLog, 'expected skipped entry log');
+  assert.equal(skippedLog?.context?.outcome, 'skipped');
+  assert.equal(skippedLog?.context?.entryId, 'missing-entry');
 });
 
 test('importFromPayload hydrates repositories from raw race result', async () => {
@@ -308,6 +349,8 @@ test('importFromPayload hydrates repositories from raw race result', async () =>
     },
   };
 
+  const testLogger = createTestLogger();
+
   const service = new LiveRcImportService({
     liveRcClient,
     eventRepository,
@@ -315,6 +358,7 @@ test('importFromPayload hydrates repositories from raw race result', async () =>
     sessionRepository,
     entrantRepository,
     lapRepository,
+    logger: testLogger.logger,
   });
 
   const raceResultFixture = new URL(
@@ -323,7 +367,7 @@ test('importFromPayload hydrates repositories from raw race result', async () =>
   );
   const racePayload = JSON.parse(readFileSync(raceResultFixture, 'utf-8')) as unknown;
 
-  const summary = await service.importFromPayload(racePayload);
+  const summary = await service.importFromPayload(racePayload, { logger: testLogger.logger });
 
   assert.equal(summary.eventId, 'event-1');
   assert.equal(summary.raceClassId, 'class-1');

@@ -141,6 +141,7 @@ Dev server listens on `http://localhost:3001/` (also `http://0.0.0.0:3001/`).
 | `SMTP_HOST`/`SMTP_PORT`/`SMTP_SECURE`/`SMTP_USER`/`SMTP_PASS` | Mail for verification/approvals |
 | `MAIL_FROM`/`MAIL_REPLY_TO` | Email identities |
 | `LOG_LEVEL` | `info` (or `debug`) |
+| `DISABLE_FILE_LOGS` | `false`; set `true` in ephemeral environments without writable disks |
 | `OTEL_*` | Optional OpenTelemetry exporter settings |
 | `FEATURE_REQUIRE_EMAIL_VERIFICATION` | `true` / `false` |
 | `FEATURE_REQUIRE_ADMIN_APPROVAL` | `false` by default |
@@ -171,6 +172,8 @@ Dev server listens on `http://localhost:3001/` (also `http://0.0.0.0:3001/`).
 - **APIs & server components:** wrap boundaries with `try/catch`; return **typed error envelopes** (HTTP status + `{ code, message, details? }`) for expected failures; reserve `throw` for unexpected faults.
 - **Correlation:** propagate a `requestId` (e.g., from `x-request-id`) and include it in all logs and error responses.
 - **Structured logs (JSON):** include `timestamp`, `level`, `requestId`, `route`, `userAnonId`, `event`, `durationMs`, `outcome`, and a redacted error object.
+- **Logger usage:** always use `applicationLogger`/`getRequestLogger` from `src/dependencies/logger.ts` for server-side logging; avoid `console.*` in APIs and infrastructure.
+- **File outputs:** structured logs stream to `logs/app.log` (all levels) and `logs/error.log` (warn+), rotating daily with seven days retained; set `DISABLE_FILE_LOGS=true` when persistent storage is unavailable.
 - **PII guardrails:** never log secrets/tokens/passwords/raw cookies.
 - **Retention:** raw logs **7 days**, aggregated metrics **90 days**.
 - **Reporter:** Sentry/Bugsnag is pluggable when desired (with redaction).

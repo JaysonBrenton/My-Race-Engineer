@@ -1,10 +1,15 @@
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 
+import { applicationLogger } from '@/dependencies/logger';
+
 export type AuthFormContext = 'login' | 'registration' | 'password-reset';
 
 const FORM_TOKEN_PREFIX = 'mre.auth';
 let ephemeralSecret: string | null = null;
+
 const FORM_TOKEN_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const logger = applicationLogger.withContext({ route: 'auth/formTokens' });
+main
 
 const getFormTokenSecret = () => {
   const configuredSecret = process.env.SESSION_SECRET?.trim();
@@ -14,8 +19,12 @@ const getFormTokenSecret = () => {
 
   if (!ephemeralSecret) {
     ephemeralSecret = randomBytes(32).toString('hex');
-    console.warn(
-      'SESSION_SECRET is not set or too short. Generated an ephemeral auth form token secret for this process. Do not rely on this outside local development.',
+    logger.warn(
+      'SESSION_SECRET missing or too short; generated ephemeral auth form token secret.',
+      {
+        event: 'auth.form_tokens.ephemeral_secret_generated',
+        outcome: 'degraded',
+      },
     );
   }
 
