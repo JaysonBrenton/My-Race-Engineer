@@ -151,6 +151,8 @@ Dev server listens on `http://localhost:3001/` (also `http://0.0.0.0:3001/`).
 | `NEXT_PUBLIC_ENV` | `development` / `production` (UI only) |
 | `NEXT_PUBLIC_BASE_URL` | Same as `APP_URL` for client code |
 
+> ⚠️ Authentication forms are disabled when `SESSION_SECRET` is missing or shorter than 32 characters. Always set a strong value in production so registration, sign-in, and password reset flows function correctly.
+
 ---
 
 ## Scripts

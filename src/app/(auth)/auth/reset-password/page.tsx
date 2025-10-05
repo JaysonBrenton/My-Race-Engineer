@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import { generateAuthFormToken } from '@/lib/auth/formTokens';
+import { MissingAuthFormTokenSecretError, generateAuthFormToken } from '@/lib/auth/formTokens';
 import { canonicalFor } from '@/lib/seo';
 
 import styles from '../auth.module.css';
@@ -33,8 +33,42 @@ export function generateMetadata(): Metadata {
   };
 }
 
+type ResetStatusTone = 'info' | 'error';
+
+type ResetStatusMessage = {
+  tone: ResetStatusTone;
+  message: string;
+};
+
+const buildConfigurationStatus = (): ResetStatusMessage => ({
+  tone: 'error',
+  message:
+    'Password reset requests are temporarily unavailable due to a server configuration issue. Please contact your administrator.',
+});
+
+const getStatusClassName = (tone: ResetStatusTone) =>
+  tone === 'error' ? `${styles.statusRegion} ${styles.statusError}` : styles.statusRegion;
+
 export default function ResetPasswordPage() {
-  const formToken = generateAuthFormToken('password-reset');
+  let formToken: string | null = null;
+  const defaultStatus: ResetStatusMessage = {
+    tone: 'info',
+    message: 'We’ll send reset instructions within a minute if the email is recognised.',
+  };
+  let status: ResetStatusMessage = defaultStatus;
+
+  try {
+    formToken = generateAuthFormToken('password-reset');
+  } catch (error) {
+    if (error instanceof MissingAuthFormTokenSecretError) {
+      status = buildConfigurationStatus();
+    } else {
+      throw error;
+    }
+  }
+
+  const statusClassName = getStatusClassName(status.tone);
+  const isFormDisabled = !formToken;
 
   return (
     <section className={styles.wrapper} aria-labelledby="auth-reset-heading">
@@ -53,7 +87,7 @@ export default function ResetPasswordPage() {
           action="/auth/reset-password"
           aria-describedby="auth-reset-status"
         >
-          <input type="hidden" name="formToken" value={formToken} />
+          {formToken ? <input type="hidden" name="formToken" value={formToken} /> : null}
           <div className={styles.field}>
             <label className={styles.label} htmlFor="auth-reset-email">
               Email address
@@ -68,13 +102,14 @@ export default function ResetPasswordPage() {
               aria-required="true"
               className={styles.input}
               aria-describedby="auth-reset-email-help auth-reset-status"
+              disabled={isFormDisabled}
             />
             <p className={styles.helpText} id="auth-reset-email-help">
               We will send reset instructions to this inbox if it matches an account.
             </p>
           </div>
           <div className={styles.actions}>
-            <button type="submit" className={styles.primaryButton}>
+            <button type="submit" className={styles.primaryButton} disabled={isFormDisabled}>
               Send reset link
             </button>
             <Link className={styles.secondaryLink} href="/auth/login">
@@ -82,13 +117,13 @@ export default function ResetPasswordPage() {
             </Link>
           </div>
           <p
-            className={styles.statusRegion}
+            className={statusClassName}
             id="auth-reset-status"
             role="status"
             aria-live="polite"
             aria-atomic="true"
           >
-            We’ll send reset instructions within a minute if the email is recognised.
+            {status.message}
           </p>
         </form>
       </article>

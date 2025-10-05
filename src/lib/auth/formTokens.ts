@@ -4,28 +4,56 @@ import { applicationLogger } from '@/dependencies/logger';
 
 export type AuthFormContext = 'login' | 'registration' | 'password-reset';
 
+export class MissingAuthFormTokenSecretError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'MissingAuthFormTokenSecretError';
+  }
+}
+
 const FORM_TOKEN_PREFIX = 'mre.auth';
 let ephemeralSecret: string | null = null;
 
 const FORM_TOKEN_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const logger = applicationLogger.withContext({ route: 'auth/formTokens' });
-main
+
+const buildMissingSecretError = (reason: 'unset' | 'too-short') =>
+  new MissingAuthFormTokenSecretError(
+    reason === 'unset'
+      ? 'SESSION_SECRET is not configured. Auth forms cannot be submitted until it is set to a 32+ character value.'
+      : 'SESSION_SECRET must be at least 32 characters long. Auth forms cannot be submitted until it is updated.',
+  );
 
 const getFormTokenSecret = () => {
   const configuredSecret = process.env.SESSION_SECRET?.trim();
-  if (configuredSecret && configuredSecret.length >= 32) {
-    return configuredSecret;
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  if (configuredSecret) {
+    if (configuredSecret.length >= 32) {
+      return configuredSecret;
+    }
+
+    if (isProduction) {
+      throw buildMissingSecretError('too-short');
+    }
+
+    logger.warn(
+      'SESSION_SECRET shorter than recommended length; falling back to ephemeral secret.',
+      {
+        event: 'auth.form_tokens.session_secret_too_short',
+        outcome: 'degraded',
+      },
+    );
+  } else if (isProduction) {
+    throw buildMissingSecretError('unset');
   }
 
   if (!ephemeralSecret) {
     ephemeralSecret = randomBytes(32).toString('hex');
-    logger.warn(
-      'SESSION_SECRET missing or too short; generated ephemeral auth form token secret.',
-      {
-        event: 'auth.form_tokens.ephemeral_secret_generated',
-        outcome: 'degraded',
-      },
-    );
+    logger.warn('Generated ephemeral auth form token secret for development use.', {
+      event: 'auth.form_tokens.ephemeral_secret_generated',
+      outcome: 'degraded',
+    });
   }
 
   return ephemeralSecret;
