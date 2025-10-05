@@ -20,11 +20,58 @@ X-Request-Id: <optional>
 
 LiveRC organises result links using `<event>/<class>/<round>/<race>` segments,
 but the public site often serves them via query-string pages. The example above
-resolves today (`curl -IL https://dnc.liverc.com/results/?p=view_race_result&id=3485642`) and represents the 1:8 Pro Nitro Buggy
-A-Main from the 2022 Dirt Nitro Challenge. The canonical slug pieces for that
-race would be `2022-the-dirt-nitro-challenge/1-8-pro-nitro-buggy/main-events/a-main`,
-and the importer normalises either slug-style or query-string URLs—trailing
-`.json` remains optional.
+points at the 1:8 Pro Nitro Buggy A-Main from the 2022 Dirt Nitro Challenge.
+LiveRC occasionally retires historical events, so treat the URL as
+illustrative—swap in a current race when exercising the importer. The canonical
+slug pieces for the example race would be
+`2022-the-dirt-nitro-challenge/1-8-pro-nitro-buggy/main-events/a-main`, and the
+importer normalises either slug-style or query-string URLs—trailing `.json`
+remains optional.
+
+### Example `curl` requests
+
+The importer accepts both the query-string links LiveRC exposes in its UI and
+the canonical slug-based URLs. The commands below demonstrate how to verify a
+result endpoint before submitting it to the API.
+
+```bash
+# Query-string view as shown in LiveRC UI (replace <race-id> with a live entry)
+curl -IL "https://club.liverc.com/results/?p=view_race_result&id=<race-id>"
+
+# Canonical slug without the optional .json suffix
+curl -IL "https://club.liverc.com/results/<event>/<class>/<round>/<race>"
+
+# Canonical slug with explicit .json suffix (importer trims it automatically)
+curl -IL "https://club.liverc.com/results/<event>/<class>/<round>/<race>.json"
+```
+
+Use the placeholder commands to confirm that a specific race is reachable
+before invoking the importer. A `200 OK` (or a redirect that lands on `200`)
+signals that the upstream resource is available; a `404` typically indicates
+that the event has been archived or the slug is mistyped.
+
+```bash
+# Submit a race to the importer with outlaps disabled
+curl -X POST https://my-race-engineer.local/api/liverc/import \
+  -H 'Content-Type: application/json' \
+  -H 'X-Request-Id: cli-demo-001' \
+  -d '{
+    "url": "https://club.liverc.com/results/?p=view_race_result&id=<race-id>",
+    "includeOutlaps": false
+  }'
+
+# Submit another race and include outlaps in the summary
+curl -X POST https://my-race-engineer.local/api/liverc/import \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "url": "https://club.liverc.com/results/<event>/<class>/<round>/<race>",
+    "includeOutlaps": true
+  }'
+```
+
+The importer responds with a `202 Accepted` payload on success and returns a
+structured error envelope (with an HTTP status that mirrors the upstream
+failure) when validation or LiveRC fetches fail.
 
 - `url` *(required)* – LiveRC race result URL to ingest. Trailing `.json` is
   optional; the service trims it before reconstructing upstream requests.
