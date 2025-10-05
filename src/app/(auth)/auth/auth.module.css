@@ -157,7 +157,18 @@
   min-height: 1.25rem;
   margin: 0;
   font-size: 0.85rem;
-  color: var(--color-warning);
+}
+
+.statusInfo {
+  color: var(--color-fg-muted);
+}
+
+.statusSuccess {
+  color: var(--color-success);
+}
+
+.statusError {
+  color: var(--color-danger);
 }
 
 .supportingLink {
