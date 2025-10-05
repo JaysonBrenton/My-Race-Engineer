@@ -43,7 +43,7 @@ export type ImportRouteDependencies = {
   logger: Logger;
 };
 
-export const createImportRouteHandlers = (dependencies: ImportRouteDependencies) => {
+const createImportRouteHandlers = (dependencies: ImportRouteDependencies) => {
   const { service, logger } = dependencies;
 
   const post = async (request: Request) => {
@@ -224,11 +224,11 @@ export const createImportRouteHandlers = (dependencies: ImportRouteDependencies)
   return { POST: post, GET: get };
 };
 
-const handlers = createImportRouteHandlers({
+const _handlers = createImportRouteHandlers({
   service: liveRcImportService,
   logger: applicationLogger,
 });
 
-export const POST = handlers.POST;
+export const POST = _handlers.POST;
 
-export const GET = handlers.GET;
+export const GET = _handlers.GET;
