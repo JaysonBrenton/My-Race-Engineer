@@ -18,6 +18,15 @@ X-Request-Id: <optional>
 }
 ```
 
+Where the `<event>/<class>/<round>/<race>` segments map to the structure used by
+LiveRC URLs. For example, the final race of the 2024 Summer Nationals 17.5
+Buggy class might live at
+`https://liverc.com/results/2024-summer-nationals/17-5-buggy/round-4/a-main.json`.
+Another example for a club night heat could be
+`https://liverc.com/results/rc-club-night-012524/sportsman-2wd/round-2/heat-3`.
+The service accepts either version—with or without the trailing `.json`—and
+automatically normalises the URL before ingestion.
+
 - `url` *(required)* – LiveRC race result URL to ingest. Trailing `.json` is
   optional; the service trims it before reconstructing upstream requests.
 - `includeOutlaps` *(optional)* – set to `true` to include outlaps in lap
