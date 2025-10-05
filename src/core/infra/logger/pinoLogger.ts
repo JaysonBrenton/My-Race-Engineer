@@ -122,7 +122,9 @@ type PinoDestinationFn = (options: {
   append?: boolean;
   sync?: boolean;
 }) => DestinationStream;
-type PinoMultistreamFn = (streams: Array<{ stream: DestinationStream; level?: LogLevel }>) => DestinationStream;
+type PinoMultistreamFn = (
+  streams: Array<{ stream: DestinationStream; level?: LogLevel }>,
+) => DestinationStream;
 
 type PinoExport = {
   (options?: LoggerOptions, destination?: DestinationStream): PinoInstance;
