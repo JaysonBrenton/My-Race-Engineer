@@ -1,3 +1,4 @@
+/* eslint @typescript-eslint/no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 // src/app/api/liverc/import/handlers.ts
 
 import { randomUUID } from 'node:crypto';
