@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createImportRouteHandlers } from '../src/app/api/liverc/import/route';
-import type { ImportRouteDependencies } from '../src/app/api/liverc/import/route';
+import { createImportRouteHandlers } from '../src/app/api/liverc/import/handlers';
+import type { ImportRouteDependencies } from '../src/app/api/liverc/import/handlers';
 import type { Logger, LoggerContext, LogLevel } from '../src/core/app';
 
 type CapturedLog = {
