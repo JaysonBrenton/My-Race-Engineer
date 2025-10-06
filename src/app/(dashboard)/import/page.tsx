@@ -15,8 +15,13 @@ export const metadata: Metadata = {
 };
 
 const enableWizard = process.env.ENABLE_IMPORT_WIZARD === '1';
-const appOrigin = (process.env.NEXT_PUBLIC_APP_ORIGIN ?? '').replace(/\/+$/, '');
-const bookmarkletTarget = appOrigin ? `${appOrigin}/import?src=` : '/import?src=';
+const resolvedAppOrigin =
+  process.env.NEXT_PUBLIC_APP_ORIGIN?.trim() ||
+  process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+  process.env.APP_URL?.trim() ||
+  `http://localhost:${process.env.PORT?.trim() || '3001'}`;
+const appOrigin = resolvedAppOrigin.replace(/\/+$/, '');
+const bookmarkletTarget = `${appOrigin}/import?src=`;
 const sanitizedBookmarkletTarget = bookmarkletTarget.replace(/'/g, "\\'");
 const bookmarkletHref = `javascript:(()=>{var u=encodeURIComponent(location.href);location.href='${sanitizedBookmarkletTarget}'+u;})();`;
 const enableFileImport =
