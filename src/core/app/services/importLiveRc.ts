@@ -18,6 +18,7 @@ import type {
   SessionUpsertInput,
 } from '@core/app';
 import { parseRaceResultPayload, type LiveRcRaceContext } from '../liverc/responseMappers';
+import { buildUploadNamespaceSeed, type UploadNamespaceMetadata } from '../liverc/uploadNamespace';
 
 import {
   LiveRcUrlInvalidReasons,
@@ -101,9 +102,14 @@ const buildLapId = (parts: {
     )
     .digest('hex');
 
+export type UploadImportMetadata = UploadNamespaceMetadata & {
+  namespaceSeed?: string;
+};
+
 export type LiveRcImportOptions = {
   includeOutlaps?: boolean;
   logger?: Logger;
+  uploadMetadata?: UploadImportMetadata;
 };
 
 export type LiveRcImportSummary = {
@@ -220,7 +226,12 @@ export class LiveRcImportService {
     options: LiveRcImportOptions = {},
   ): Promise<LiveRcImportSummary> {
     const includeOutlaps = options.includeOutlaps ?? false;
-    const parsed = parseRaceResultPayload(payload);
+    const namespaceSeed =
+      options.uploadMetadata?.namespaceSeed ?? buildUploadNamespaceSeed(options.uploadMetadata);
+
+    const parsed = parseRaceResultPayload(payload, {
+      ...(namespaceSeed ? { fallbackContext: { uploadNamespace: namespaceSeed } } : {}),
+    });
 
     const hasValidationIssues = parsed.missingIdentifiers.length > 0 || parsed.hasLapData === false;
 
@@ -236,7 +247,11 @@ export class LiveRcImportService {
     }
 
     const entryList = this.buildEntryListFromRaceResult(parsed.raceResult);
-    const sourceUrl = this.buildUploadedSourceUrl(parsed.context);
+    const sourceUrl = this.buildUploadedSourceUrl(
+      parsed.context,
+      options.uploadMetadata,
+      namespaceSeed,
+    );
 
     const logger = options.logger ?? this.logger;
 
@@ -532,15 +547,49 @@ export class LiveRcImportService {
     };
   }
 
-  private buildUploadedSourceUrl(context: LiveRcRaceContext) {
-    const encodedSegments = [
-      context.eventSlug,
-      context.classSlug,
-      context.roundSlug,
-      context.raceSlug,
-    ].map((segment) => encodeURIComponent(segment));
+  private buildUploadedSourceUrl(
+    context: LiveRcRaceContext,
+    metadata?: UploadImportMetadata,
+    namespaceSeed?: string,
+  ) {
+    const pathSegments = [
+      ...(namespaceSeed ? [encodeURIComponent(namespaceSeed)] : []),
+      encodeURIComponent(context.eventSlug),
+      encodeURIComponent(context.classSlug),
+      encodeURIComponent(context.roundSlug),
+      encodeURIComponent(context.raceSlug),
+    ];
 
-    return `uploaded-file://${encodedSegments.join('/')}`;
+    let url = `uploaded-file://${pathSegments.join('/')}`;
+
+    const queryEntries: [string, string][] = [];
+
+    if (metadata?.fileName) {
+      queryEntries.push(['name', metadata.fileName]);
+    }
+
+    if (metadata?.fileHash) {
+      queryEntries.push(['hash', metadata.fileHash]);
+    }
+
+    if (metadata?.fileSizeBytes !== undefined) {
+      queryEntries.push(['size', metadata.fileSizeBytes.toString()]);
+    }
+
+    if (metadata?.uploadedAtEpochMs !== undefined) {
+      queryEntries.push(['uploaded', metadata.uploadedAtEpochMs.toString()]);
+    }
+
+    if (metadata?.lastModifiedEpochMs !== undefined) {
+      queryEntries.push(['modified', metadata.lastModifiedEpochMs.toString()]);
+    }
+
+    if (queryEntries.length > 0) {
+      const params = new URLSearchParams(queryEntries);
+      url = `${url}?${params.toString()}`;
+    }
+
+    return url;
   }
 
   private buildEntryMap(entries: LiveRcEntryListEntry[]) {

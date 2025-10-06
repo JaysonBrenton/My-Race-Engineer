@@ -21,6 +21,7 @@ import {
 } from '@core/app/services/liveRcUrlParser';
 import type { LiveRcImportSummary } from '@core/app/services/importLiveRc';
 import { mapRaceResultResponse, parseRaceResultPayload } from '@core/app/liverc/responseMappers';
+import { buildUploadNamespaceSeed } from '@core/app/liverc/uploadNamespace';
 
 type LiveRcRaceResultResponse = ReturnType<typeof mapRaceResultResponse>;
 
@@ -77,8 +78,25 @@ type BulkImportRow = {
 
 type FileImportPreview = {
   fileName: string;
+  fileSizeBytes: number;
+  lastModifiedEpochMs: number | null;
+  uploadedAtEpochMs: number;
+  fileHash: string;
+  uploadNamespaceSeed?: string;
   raceResult: LiveRcRaceResultResponse;
   rawPayload: unknown;
+};
+
+const computeSha256Hex = async (buffer: ArrayBuffer) => {
+  const cryptoApi = globalThis.crypto;
+
+  if (!cryptoApi || typeof cryptoApi.subtle?.digest !== 'function') {
+    return '';
+  }
+
+  const digest = await cryptoApi.subtle.digest('SHA-256', buffer);
+  const bytes = Array.from(new Uint8Array(digest));
+  return bytes.map((byte) => byte.toString(16).padStart(2, '0')).join('');
 };
 
 const slugToTitle = (slug: string) =>
@@ -555,10 +573,23 @@ export default function ImportForm({
     }
 
     const file = files[0];
+    const uploadedAtEpochMs = Date.now();
+    const lastModifiedEpochMs = Number.isFinite(file.lastModified) ? file.lastModified : null;
+    const fileSizeBytes = file.size;
     let rawPayload: unknown;
+    let fileHash = '';
 
     try {
-      const text = await file.text();
+      const buffer = await file.arrayBuffer();
+
+      try {
+        fileHash = await computeSha256Hex(buffer);
+      } catch {
+        fileHash = '';
+      }
+
+      const decoder = new TextDecoder('utf-8', { fatal: true });
+      const text = decoder.decode(buffer);
       rawPayload = JSON.parse(text) as unknown;
     } catch {
       setFileError('File must contain valid JSON.');
@@ -570,7 +601,17 @@ export default function ImportForm({
       return;
     }
 
-    const parsedPayload = parseRaceResultPayload(rawPayload);
+    const uploadNamespaceSeed = buildUploadNamespaceSeed({
+      fileName: file.name,
+      fileSizeBytes,
+      lastModifiedEpochMs: lastModifiedEpochMs ?? undefined,
+      uploadedAtEpochMs,
+      fileHash: fileHash || undefined,
+    });
+
+    const parsedPayload = parseRaceResultPayload(rawPayload, {
+      ...(uploadNamespaceSeed ? { fallbackContext: { uploadNamespace: uploadNamespaceSeed } } : {}),
+    });
     const issues: string[] = [];
 
     if (parsedPayload.missingIdentifiers.length > 0) {
@@ -607,6 +648,11 @@ export default function ImportForm({
 
     setFilePreview({
       fileName: file.name,
+      fileSizeBytes,
+      lastModifiedEpochMs,
+      uploadedAtEpochMs,
+      fileHash,
+      uploadNamespaceSeed,
       raceResult: parsedPayload.raceResult,
       rawPayload,
     });
@@ -679,7 +725,17 @@ export default function ImportForm({
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(filePreview.rawPayload),
+        body: JSON.stringify({
+          payload: filePreview.rawPayload,
+          metadata: {
+            fileName: filePreview.fileName,
+            fileSizeBytes: filePreview.fileSizeBytes,
+            lastModifiedEpochMs: filePreview.lastModifiedEpochMs ?? undefined,
+            uploadedAtEpochMs: filePreview.uploadedAtEpochMs,
+            fileHash: filePreview.fileHash || undefined,
+            uploadNamespace: filePreview.uploadNamespaceSeed,
+          },
+        }),
       });
 
       const payload: unknown = await response.json().catch(() => null);

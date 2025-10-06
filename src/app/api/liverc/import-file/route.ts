@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { LiveRcImportError } from '@core/app';
+import { buildUploadNamespaceSeed } from '@core/app/liverc/uploadNamespace';
 import { NextResponse } from 'next/server';
 
 import { isPrismaUnavailableError, liveRcImportService } from '@/dependencies/liverc';
@@ -56,9 +57,134 @@ export async function POST(request: Request) {
     );
   }
 
+  if (typeof rawBody !== 'object' || rawBody === null) {
+    logger.warn('LiveRC import file body missing payload object.', {
+      event: 'liverc.importFile.invalid_body',
+      outcome: 'invalid-payload',
+      bodyType: typeof rawBody,
+    });
+    return jsonResponse(
+      400,
+      {
+        error: {
+          code: 'INVALID_PAYLOAD',
+          message: 'Request body must be an object containing a payload field.',
+        },
+        requestId,
+      },
+      requestId,
+    );
+  }
+
+  const container = rawBody as Record<string, unknown>;
+
+  if (!container || !('payload' in container)) {
+    logger.warn('LiveRC import file body missing payload field.', {
+      event: 'liverc.importFile.missing_payload',
+      outcome: 'invalid-payload',
+    });
+    return jsonResponse(
+      400,
+      {
+        error: {
+          code: 'INVALID_PAYLOAD',
+          message: 'Request body must include a payload field with LiveRC race data.',
+        },
+        requestId,
+      },
+      requestId,
+    );
+  }
+
+  const payload = container.payload;
+  const metadataRaw = container.metadata;
+
+  let metadata:
+    | {
+        fileName?: string;
+        fileSizeBytes?: number;
+        lastModifiedEpochMs?: number;
+        uploadedAtEpochMs?: number;
+        fileHash?: string;
+        uploadNamespace?: string;
+      }
+    | undefined;
+
+  if (metadataRaw !== undefined) {
+    if (typeof metadataRaw !== 'object' || metadataRaw === null) {
+      return jsonResponse(
+        400,
+        {
+          error: {
+            code: 'INVALID_METADATA',
+            message: 'metadata must be an object when provided.',
+          },
+          requestId,
+        },
+        requestId,
+      );
+    }
+
+    const metadataRecord = metadataRaw as Record<string, unknown>;
+    metadata = {};
+
+    if (typeof metadataRecord.fileName === 'string') {
+      metadata.fileName = metadataRecord.fileName;
+    }
+
+    if (typeof metadataRecord.fileHash === 'string') {
+      metadata.fileHash = metadataRecord.fileHash;
+    }
+
+    if (typeof metadataRecord.uploadNamespace === 'string') {
+      metadata.uploadNamespace = metadataRecord.uploadNamespace;
+    }
+
+    if (
+      typeof metadataRecord.fileSizeBytes === 'number' &&
+      Number.isFinite(metadataRecord.fileSizeBytes)
+    ) {
+      metadata.fileSizeBytes = metadataRecord.fileSizeBytes;
+    }
+
+    if (
+      typeof metadataRecord.lastModifiedEpochMs === 'number' &&
+      Number.isFinite(metadataRecord.lastModifiedEpochMs)
+    ) {
+      metadata.lastModifiedEpochMs = metadataRecord.lastModifiedEpochMs;
+    }
+
+    if (
+      typeof metadataRecord.uploadedAtEpochMs === 'number' &&
+      Number.isFinite(metadataRecord.uploadedAtEpochMs)
+    ) {
+      metadata.uploadedAtEpochMs = metadataRecord.uploadedAtEpochMs;
+    }
+  }
+
+  const namespaceSeed = buildUploadNamespaceSeed({
+    fileName: metadata?.fileName,
+    fileSizeBytes: metadata?.fileSizeBytes,
+    lastModifiedEpochMs: metadata?.lastModifiedEpochMs,
+    uploadedAtEpochMs: metadata?.uploadedAtEpochMs,
+    fileHash: metadata?.fileHash,
+    explicitNamespace: metadata?.uploadNamespace,
+    requestId,
+  });
+
   try {
-    const result = await liveRcImportService.importFromPayload(rawBody, {
+    const result = await liveRcImportService.importFromPayload(payload, {
       logger,
+      uploadMetadata: {
+        fileName: metadata?.fileName,
+        fileSizeBytes: metadata?.fileSizeBytes,
+        lastModifiedEpochMs: metadata?.lastModifiedEpochMs,
+        uploadedAtEpochMs: metadata?.uploadedAtEpochMs,
+        fileHash: metadata?.fileHash,
+        requestId,
+        explicitNamespace: metadata?.uploadNamespace,
+        namespaceSeed,
+      },
     });
 
     logger.info('LiveRC import file processed.', {
