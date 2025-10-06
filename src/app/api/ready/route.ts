@@ -113,6 +113,8 @@ async function evaluateReadiness(logger: Logger): Promise<ReadinessEvaluation> {
     migrations: { status: 'ok', pending: [] },
   };
 
+  const checkMigrations = (process.env.READY_CHECK_MIGRATIONS ?? 'true') !== 'false';
+
   if (!process.env.DATABASE_URL) {
     checks.database = {
       status: 'error',
@@ -139,6 +141,10 @@ async function evaluateReadiness(logger: Logger): Promise<ReadinessEvaluation> {
     });
 
     return { ok: false, checks };
+  }
+
+  if (!checkMigrations) {
+    return { ok: true, checks };
   }
 
   let expectedMigrations: string[] = [];
@@ -173,19 +179,48 @@ async function evaluateReadiness(logger: Logger): Promise<ReadinessEvaluation> {
 
   try {
     const prisma = getPrismaClient();
-    const appliedMigrations = await prisma.$queryRaw<{ name: string; finished_at: Date | null }[]>`
-      SELECT "name", "finished_at" FROM "_prisma_migrations"
+
+    const tableExists = await prisma.$queryRaw<Array<{ exists: boolean }>>`
+      SELECT EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name   = '_prisma_migrations'
+      ) AS exists
+    `;
+
+    if (!tableExists[0]?.exists) {
+      checks.migrations = {
+        status: 'error',
+        pending: expectedMigrations,
+        details: 'Migrations table is missing.',
+      };
+
+      logger.error('Prisma migrations table is missing.', {
+        event: 'readiness.migrations_table_missing',
+        outcome: 'unhealthy',
+      });
+
+      return { ok: false, checks };
+    }
+
+    const appliedMigrations = await prisma.$queryRaw<
+      Array<{ migration_name: string | null; finished_at: Date | null }>
+    >`
+      SELECT migration_name, finished_at
+      FROM "_prisma_migrations"
+      ORDER BY finished_at DESC NULLS LAST, started_at DESC NULLS LAST
     `;
 
     const finishedMigrations = new Set(
       appliedMigrations
-        .filter((migration) => migration.finished_at !== null)
-        .map((migration) => migration.name),
+        .filter((migration) => migration.finished_at !== null && migration.migration_name)
+        .map((migration) => migration.migration_name as string),
     );
 
     const inProgressMigrations = appliedMigrations
-      .filter((migration) => migration.finished_at === null)
-      .map((migration) => migration.name);
+      .filter((migration) => migration.finished_at === null && migration.migration_name)
+      .map((migration) => migration.migration_name as string);
 
     const pendingMigrations = expectedMigrations.filter(
       (migration) => !finishedMigrations.has(migration),
