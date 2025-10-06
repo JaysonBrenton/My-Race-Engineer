@@ -2,7 +2,6 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import Script from 'next/script';
 
-import { defaultEntrantContext, lapSummaryService } from '@/dependencies/server';
 import {
   absUrl,
   buildOrganizationJsonLd,
@@ -10,17 +9,11 @@ import {
   buildWebsiteJsonLd,
   canonicalFor,
 } from '@/lib/seo';
-
-import { LapSummaryCard } from './components/LapSummaryCard';
 import styles from './page.module.css';
 
 const PAGE_TITLE = 'My Race Engineer (MRE) telemetry insights';
 const PAGE_DESCRIPTION =
   'Baseline lap telemetry dashboards for racing teams, powered by a clean architecture Next.js foundation.';
-
-async function loadLapSummary() {
-  return lapSummaryService.getSummaryForEntrant(defaultEntrantContext.entrant.id);
-}
 
 export function generateMetadata(): Metadata {
   const canonical = canonicalFor('/');
@@ -55,8 +48,7 @@ export function generateMetadata(): Metadata {
   };
 }
 
-export default async function Home() {
-  const summary = await loadLapSummary();
+export default function Home() {
   const canonical = canonicalFor('/');
 
   const structuredData = [
@@ -97,9 +89,6 @@ export default async function Home() {
           </Link>
         </div>
       </header>
-      <div className={styles.cards}>
-        <LapSummaryCard summary={summary} />
-      </div>
     </section>
   );
 }
