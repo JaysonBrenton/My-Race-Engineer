@@ -6,8 +6,9 @@ These guidelines define the default formatting for AI-generated written response
 
 ## Baseline structure
 - **Use Markdown headings** (`##`, `###`, etc.) to organise content into logical sections when responding with more than a couple of sentences.
-- **Lead with a brief summary section** that captures the key outcome or answer in bullet points.
+- **Lead with an enriched summary section** that captures the key outcome or answer in bullet points. When wrapping up a coding task, include what changed, why the change was necessary, how the implementation works, and any notable trade-offs or follow-ups. Summaries should provide enough context for a reviewer to understand the scope without reading the full detail section.
 - **Follow with detail sections** (e.g., "Details", "Rationale", "Next steps") that expand on the summary items.
+- **Close with an explicit reflection** on decisions made (e.g., rationale for chosen approach, rejected alternatives, testing confidence) whenever the interaction involved code changes or complex analysis. This ensures each response leaves a clear record of the reasoning behind the work.
 
 ## Bullets & lists
 - Prefer **bulleted lists** for enumerating ideas, requirements, or steps when the order is not critical.
