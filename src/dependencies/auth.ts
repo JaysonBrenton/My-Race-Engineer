@@ -75,6 +75,9 @@ export const registerUserService = new RegisterUserService(
   mailer,
   registerLogger,
   {
+    // Feature flags toggle post-registration requirements without touching the page or
+    // action logic.  Passing them in via the options object makes the expectations
+    // explicit in tests.
     requireEmailVerification,
     requireAdminApproval,
     baseUrl,
