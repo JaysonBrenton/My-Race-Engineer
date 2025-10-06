@@ -1,4 +1,5 @@
-const DEFAULT_APP_URL = 'http://localhost:3000';
+const defaultPort = process.env.PORT?.trim() || '3001';
+const DEFAULT_APP_URL = `http://localhost:${defaultPort}`;
 
 let cachedAppUrl: URL | null = null;
 

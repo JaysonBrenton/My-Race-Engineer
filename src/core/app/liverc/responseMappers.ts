@@ -56,6 +56,48 @@ const asBoolean = (value: unknown): boolean | undefined => {
   return undefined;
 };
 
+const slugifySegment = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/-{2,}/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+const generateRandomSegment = () => {
+  const global = globalThis as typeof globalThis & { crypto?: Crypto };
+  const cryptoObj = global.crypto;
+  if (cryptoObj) {
+    if (typeof cryptoObj.randomUUID === 'function') {
+      return cryptoObj
+        .randomUUID()
+        .replace(/[^a-z0-9]/gi, '')
+        .toLowerCase();
+    }
+
+    if (typeof cryptoObj.getRandomValues === 'function') {
+      const values = cryptoObj.getRandomValues(new Uint32Array(3));
+      return Array.from(values, (value) => value.toString(36)).join('');
+    }
+  }
+
+  return `${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
+};
+
+const generateUploadNamespace = (seed?: string) => {
+  const seedSegment = seed ? slugifySegment(seed) : '';
+  const timestampSegment = Date.now().toString(36);
+  const randomSegment = slugifySegment(generateRandomSegment());
+  const combined = [seedSegment, timestampSegment, randomSegment]
+    .filter((segment) => segment && segment.length > 0)
+    .join('-');
+
+  if (combined) {
+    return combined;
+  }
+
+  return slugifySegment(`${timestampSegment}-${Math.random().toString(36).slice(2, 10)}`);
+};
+
 export type LiveRcRaceContext = {
   resultsBaseUrl?: string;
   origin?: string;
@@ -219,13 +261,24 @@ const normaliseFallback = (value: string | undefined, fallback: string) => {
 
 export const parseRaceResultPayload = (
   raw: unknown,
-  options?: { fallbackContext?: Partial<LiveRcRaceContext> },
+  options?: { fallbackContext?: Partial<LiveRcRaceContext> & { uploadNamespace?: string } },
 ): RaceResultParseOutcome => {
   const root = asObject(raw);
   const event = asObject(root.event);
   const raceClass = asObject(root.class);
   const round = asObject(root.round);
   const race = asObject(root.race);
+
+  const fallbackNamespaceSource =
+    options?.fallbackContext?.uploadNamespace ??
+    options?.fallbackContext?.eventSlug ??
+    options?.fallbackContext?.classSlug ??
+    options?.fallbackContext?.raceSlug;
+  const uploadNamespace = generateUploadNamespace(fallbackNamespaceSource);
+  const fallbackEventSlug = `upload-${uploadNamespace}-event`;
+  const fallbackClassSlug = `upload-${uploadNamespace}-class`;
+  const fallbackRoundSlug = `upload-${uploadNamespace}-round`;
+  const fallbackRaceSlug = `upload-${uploadNamespace}-race`;
 
   const eventId = asString(
     root.event_id ?? root.eventId ?? event.event_id ?? event.eventId ?? event.id,
@@ -241,10 +294,10 @@ export const parseRaceResultPayload = (
   const context: LiveRcRaceContext = {
     resultsBaseUrl: options?.fallbackContext?.resultsBaseUrl,
     origin: options?.fallbackContext?.origin,
-    eventSlug: normaliseFallback(eventId, options?.fallbackContext?.eventSlug ?? 'uploaded-event'),
-    classSlug: normaliseFallback(classId, options?.fallbackContext?.classSlug ?? 'uploaded-class'),
-    roundSlug: normaliseFallback(roundId, options?.fallbackContext?.roundSlug ?? 'uploaded-round'),
-    raceSlug: normaliseFallback(raceId, options?.fallbackContext?.raceSlug ?? 'uploaded-race'),
+    eventSlug: normaliseFallback(eventId, options?.fallbackContext?.eventSlug ?? fallbackEventSlug),
+    classSlug: normaliseFallback(classId, options?.fallbackContext?.classSlug ?? fallbackClassSlug),
+    roundSlug: normaliseFallback(roundId, options?.fallbackContext?.roundSlug ?? fallbackRoundSlug),
+    raceSlug: normaliseFallback(raceId, options?.fallbackContext?.raceSlug ?? fallbackRaceSlug),
   };
 
   const lapsSource = root.laps ?? root.results ?? root.lap_data;

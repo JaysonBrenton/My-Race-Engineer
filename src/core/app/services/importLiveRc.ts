@@ -307,6 +307,14 @@ export class LiveRcImportService {
         continue;
       }
       if (entry.withdrawn) {
+        skippedEntrantCount += 1;
+        skippedLapCount += laps.length;
+        logger.info('Skipping withdrawn entrant from import.', {
+          event: 'liverc.import.withdrawn_entry',
+          entryId,
+          lapsSkipped: laps.length,
+          outcome: 'skipped',
+        });
         continue;
       }
 
