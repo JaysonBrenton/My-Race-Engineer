@@ -16,6 +16,15 @@ import {
 import { applicationLogger } from '@/dependencies/logger';
 import { Argon2PasswordHasher } from '@/lib/auth/passwordHasher';
 
+// The dependency wiring in this module centralises the concrete implementations used by
+// the authentication flow.  By keeping the configuration in one place we can swap out
+// infrastructure without touching the business logic (e.g. change the mail driver or
+// the persistence layer) and we get strongly typed guarantees from the service
+// constructors.
+
+// Repositories expose the persistence interfaces required by the app-layer services.
+// Each Prisma-backed repository shares the same database connection pool so the
+// services can be treated as stateless singletons.
 const userRepository = new PrismaUserRepository();
 const userSessionRepository = new PrismaUserSessionRepository();
 const emailVerificationTokens = new PrismaUserEmailVerificationTokenRepository();
@@ -27,6 +36,9 @@ const requireAdminApproval = process.env.FEATURE_REQUIRE_ADMIN_APPROVAL?.toLower
 const baseUrl = process.env.APP_URL?.trim() || 'http://localhost:3001';
 const mailerDriver = process.env.MAILER_DRIVER?.toLowerCase() || 'console';
 const mailerLogger = applicationLogger.withContext({ route: 'mailer' });
+// The mailer is resolved lazily so we can validate configuration and select the
+// transport at runtime.  Production deployments can opt into SMTP while local
+// development falls back to the ConsoleMailer for a zero-config experience.
 const mailer = (() => {
   if (mailerDriver === 'smtp' || mailerDriver === 'nodemailer') {
     const connectionUrl = process.env.SMTP_URL?.trim();
@@ -63,12 +75,18 @@ export const registerUserService = new RegisterUserService(
   mailer,
   registerLogger,
   {
+    // Feature flags toggle post-registration requirements without touching the page or
+    // action logic.  Passing them in via the options object makes the expectations
+    // explicit in tests.
     requireEmailVerification,
     requireAdminApproval,
     baseUrl,
   },
 );
 
+// The login service encapsulates the full credential validation workflow plus session
+// creation.  Note how we only pass the dependencies it actually needs; this keeps the
+// constructor honest and the service easy to unit test with fakes.
 export const loginUserService = new LoginUserService(
   userRepository,
   userSessionRepository,

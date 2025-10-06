@@ -36,6 +36,9 @@ const DEFAULT_SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
 const SHORT_SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
 const VERIFICATION_TOKEN_TTL_MS = 1000 * 60 * 60 * 24; // 24 hours
 
+// The server action performs the same password screening, but we repeat the guard here
+// to protect against bypasses and to keep the business rule close to the password
+// policy definition.
 const isPasswordStrong = (password: string) =>
   password.length >= PASSWORD_MIN_LENGTH &&
   /[0-9]/.test(password) &&
@@ -65,8 +68,13 @@ export class RegisterUserService {
   ) {}
 
   async register(input: RegisterUserInput): Promise<RegisterUserResult> {
+    // Track timings so every exit path can log how long the request took.  This mirrors
+    // the approach in other auth services to make observability consistent.
     const requestStartedAt = this.clock();
     if (!isPasswordStrong(input.password)) {
+      // Reject weak passwords before performing any database work.  Returning a
+      // structured result lets the caller render a friendly message without exposing
+      // internals.
       this.logger.warn('Weak password rejected during registration.', {
         event: 'auth.registration.weak_password_rejected',
         outcome: 'rejected',
@@ -78,6 +86,9 @@ export class RegisterUserService {
     const existing = await this.userRepository.findByEmail(input.email);
 
     if (existing) {
+      // We intentionally respond with a generic "email taken" reason rather than
+      // signalling whether the account is active to avoid leaking account existence to
+      // attackers.
       this.logger.info('Registration attempt for existing email rejected.', {
         event: 'auth.registration.email_taken',
         outcome: 'conflict',
@@ -92,6 +103,9 @@ export class RegisterUserService {
     const initialStatus: User['status'] =
       requireAdminApproval || requireEmailVerification ? 'pending' : 'active';
 
+    // Create the user record with the appropriate initial status.  The password hash is
+    // generated through the injected `PasswordHasher` so our cryptography choice is
+    // swappable at the edge of the domain.
     const user = await this.userRepository.create({
       id: randomUUID(),
       name: input.name,
@@ -109,6 +123,8 @@ export class RegisterUserService {
     });
 
     if (requireEmailVerification) {
+      // If verification is required we invalidate any previous tokens to prevent
+      // stacking and then send a fresh message with a signed link.
       await this.emailVerificationTokens.deleteAllForUser(user.id);
 
       const verificationToken = randomBytes(32).toString('base64url');
@@ -145,6 +161,8 @@ export class RegisterUserService {
     }
 
     if (requireAdminApproval) {
+      // Organisations that require admin approval pause the flow after creation.  The
+      // UI will direct the user to wait for an invite from their team owner.
       this.logger.info('Registration awaiting admin approval.', {
         event: 'auth.registration.awaiting_approval',
         outcome: 'pending',
@@ -179,6 +197,9 @@ export class RegisterUserService {
       durationMs: this.clock().getTime() - requestStartedAt.getTime(),
     });
 
+    // When the flow reaches this point the user can be logged in immediately.  The
+    // caller stores the token in a secure cookie and handles redirecting to the
+    // dashboard.
     return {
       ok: true,
       user,

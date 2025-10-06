@@ -13,6 +13,9 @@ const PAGE_DESCRIPTION =
   'Bring your team onboard with secure access to telemetry dashboards and collaboration tools.';
 
 export function generateMetadata(): Metadata {
+  // Registration is SEO-addressable because we link to it from marketing content.  We
+  // compute the canonical URL once so social previews, Open Graph metadata, and search
+  // engines share the same reference.
   const canonical = canonicalFor('/auth/register');
 
   return {
@@ -46,6 +49,8 @@ type StatusMessage = {
   message: string;
 };
 
+// `searchParams` values may be arrays due to repeated query keys.  We take the first
+// entry to keep the UI deterministic and ignore unexpected values.
 const getParam = (value: string | string[] | undefined) => {
   if (Array.isArray(value)) {
     return value[0];
@@ -54,6 +59,9 @@ const getParam = (value: string | string[] | undefined) => {
   return value ?? undefined;
 };
 
+// Translate redirect error codes into human-friendly copy that also drives the visual
+// state of the live region.  Keeping the mapping in one place makes it easy to audit
+// for accessibility.
 const buildStatusMessage = (errorCode: string | undefined): StatusMessage => {
   switch (errorCode) {
     case 'invalid-token':
@@ -95,6 +103,8 @@ const buildStatusMessage = (errorCode: string | undefined): StatusMessage => {
   }
 };
 
+// The tone controls both colour and iconography.  A helper encapsulates the CSS class
+// juggling so the JSX stays readable.
 const getStatusClassName = (tone: StatusTone) => {
   switch (tone) {
     case 'error':
@@ -115,6 +125,9 @@ export default function RegisterPage({ searchParams }: RegisterPageProps) {
   let configurationStatus: StatusMessage | null = null;
 
   try {
+    // We generate a per-request token that the action checks to prevent CSRF.  If the
+    // secret is missing we still render the page but communicate that registration is
+    // unavailable instead of throwing an opaque error.
     formToken = generateAuthFormToken('registration');
   } catch (error) {
     if (error instanceof MissingAuthFormTokenSecretError) {
@@ -123,6 +136,8 @@ export default function RegisterPage({ searchParams }: RegisterPageProps) {
       throw error;
     }
   }
+  // Merge configuration errors with any status returned from the action so the live
+  // region always reflects the highest priority message for the user.
   const errorCode = getParam(searchParams?.error);
   const status = configurationStatus ?? buildStatusMessage(errorCode);
   const namePrefill = getParam(searchParams?.name) ?? '';
@@ -131,6 +146,8 @@ export default function RegisterPage({ searchParams }: RegisterPageProps) {
   const isFormDisabled = !formToken;
 
   return (
+    // The page uses a semantic section/article pairing so screen readers announce the
+    // registration experience as a standalone card.
     <section className={styles.wrapper} aria-labelledby="auth-register-heading">
       <article className={styles.card}>
         <header className={styles.cardHeader}>
