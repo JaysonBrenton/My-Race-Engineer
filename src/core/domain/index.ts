@@ -5,3 +5,5 @@ export * from './raceClass';
 export * from './session';
 export * from './auth/user';
 export * from './auth/userSession';
+export * from './auth/userEmailVerificationToken';
+export * from './auth/passwordResetToken';

@@ -3,6 +3,11 @@ export type UserSession = {
   userId: string;
   sessionToken: string;
   expiresAt: Date;
+  ipAddress: string | null;
+  userAgent: string | null;
+  deviceName: string | null;
+  lastUsedAt: Date | null;
+  revokedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -12,4 +17,7 @@ export type CreateUserSessionInput = {
   userId: string;
   sessionToken: string;
   expiresAt: Date;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+  deviceName?: string | null;
 };
