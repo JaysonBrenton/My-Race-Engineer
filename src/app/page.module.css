@@ -68,12 +68,6 @@
   box-shadow: var(--shadow-elevated);
 }
 
-.cards {
-  display: flex;
-  justify-content: center;
-  width: 100%;
-}
-
 @media (max-width: 48rem) {
   .hero {
     gap: 2rem;
