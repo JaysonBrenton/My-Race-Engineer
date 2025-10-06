@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { MissingAuthFormTokenSecretError, generateAuthFormToken } from '@/lib/auth/formTokens';
 import { canonicalFor } from '@/lib/seo';
 
+import { registerAction } from './actions';
+
 import styles from '../auth.module.css';
 
 const PAGE_TITLE = 'Create your My Race Engineer account';
@@ -69,6 +71,16 @@ const buildStatusMessage = (errorCode: string | undefined): StatusMessage => {
         tone: 'error' as const,
         message: 'An account already exists for that email address. Try signing in instead.',
       };
+    case 'weak-password':
+      return {
+        tone: 'error' as const,
+        message: 'Choose a stronger password that meets the security policy.',
+      };
+    case 'rate-limited':
+      return {
+        tone: 'error' as const,
+        message: 'Too many attempts in a short time. Wait a few minutes before trying again.',
+      };
     case 'server-error':
       return {
         tone: 'error' as const,
@@ -133,7 +145,7 @@ export default function RegisterPage({ searchParams }: RegisterPageProps) {
         <form
           className={styles.form}
           method="post"
-          action="/auth/register/submit"
+          action={registerAction}
           aria-describedby="auth-register-status"
         >
           {formToken ? <input type="hidden" name="formToken" value={formToken} /> : null}

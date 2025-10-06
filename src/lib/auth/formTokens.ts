@@ -1,4 +1,4 @@
-import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 
 import { applicationLogger } from '@/dependencies/logger';
 
@@ -12,7 +12,6 @@ export class MissingAuthFormTokenSecretError extends Error {
 }
 
 const FORM_TOKEN_PREFIX = 'mre.auth';
-let ephemeralSecret: string | null = null;
 
 const FORM_TOKEN_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const logger = applicationLogger.withContext({ route: 'auth/formTokens' });
@@ -26,37 +25,24 @@ const buildMissingSecretError = (reason: 'unset' | 'too-short') =>
 
 const getFormTokenSecret = () => {
   const configuredSecret = process.env.SESSION_SECRET?.trim();
-  const isProduction = process.env.NODE_ENV === 'production';
 
-  if (configuredSecret) {
-    if (configuredSecret.length >= 32) {
-      return configuredSecret;
-    }
-
-    if (isProduction) {
-      throw buildMissingSecretError('too-short');
-    }
-
-    logger.warn(
-      'SESSION_SECRET shorter than recommended length; falling back to ephemeral secret.',
-      {
-        event: 'auth.form_tokens.session_secret_too_short',
-        outcome: 'degraded',
-      },
-    );
-  } else if (isProduction) {
+  if (!configuredSecret) {
+    logger.error('SESSION_SECRET missing — auth forms disabled.', {
+      event: 'auth.form_tokens.session_secret_missing',
+      outcome: 'blocked',
+    });
     throw buildMissingSecretError('unset');
   }
 
-  if (!ephemeralSecret) {
-    ephemeralSecret = randomBytes(32).toString('hex');
-    logger.warn('Generated ephemeral auth form token secret for development use.', {
-      event: 'auth.form_tokens.ephemeral_secret_generated',
-      outcome: 'degraded',
+  if (configuredSecret.length < 32) {
+    logger.error('SESSION_SECRET too short — auth forms disabled.', {
+      event: 'auth.form_tokens.session_secret_too_short',
+      outcome: 'blocked',
     });
+    throw buildMissingSecretError('too-short');
   }
 
-  return ephemeralSecret;
+  return configuredSecret;
 };
 
 export const generateAuthFormToken = (context: AuthFormContext) => {

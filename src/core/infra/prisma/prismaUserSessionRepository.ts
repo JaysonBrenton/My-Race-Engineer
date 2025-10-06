@@ -9,6 +9,11 @@ const toDomain = (session: PrismaUserSession): UserSession => ({
   userId: session.userId,
   sessionToken: session.sessionToken,
   expiresAt: session.expiresAt,
+  ipAddress: session.ipAddress ?? null,
+  userAgent: session.userAgent ?? null,
+  deviceName: session.deviceName ?? null,
+  lastUsedAt: session.lastUsedAt ?? null,
+  revokedAt: session.revokedAt ?? null,
   createdAt: session.createdAt,
   updatedAt: session.updatedAt,
 });
@@ -22,9 +27,20 @@ export class PrismaUserSessionRepository implements UserSessionRepository {
         userId: input.userId,
         sessionToken: input.sessionToken,
         expiresAt: input.expiresAt,
+        ipAddress: input.ipAddress ?? null,
+        userAgent: input.userAgent ?? null,
+        deviceName: input.deviceName ?? null,
       },
     });
 
     return toDomain(session);
+  }
+
+  async revokeAllForUser(userId: string): Promise<void> {
+    const prisma = getPrismaClient();
+    await prisma.userSession.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
   }
 }

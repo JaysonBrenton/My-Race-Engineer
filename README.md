@@ -138,8 +138,9 @@ Dev server listens on `http://localhost:3001/` (also `http://0.0.0.0:3001/`).
 | `SESSION_SECRET` | 32+ random bytes; rotate on compromise |
 | `TRUST_PROXY` | `true` if behind nginx/Caddy/Cloudflare |
 | `ALLOWED_ORIGINS` | Comma-separated origins for CSRF-sensitive routes |
-| `SMTP_HOST`/`SMTP_PORT`/`SMTP_SECURE`/`SMTP_USER`/`SMTP_PASS` | Mail for verification/approvals |
-| `MAIL_FROM`/`MAIL_REPLY_TO` | Email identities |
+| `MAILER_DRIVER` | `console` (default) or `smtp` |
+| `SMTP_URL` | Connection string when `MAILER_DRIVER=smtp` |
+| `MAIL_FROM_EMAIL` / `MAIL_FROM_NAME` | Email identities for outgoing mail |
 | `LOG_LEVEL` | `info` (or `debug`) |
 | `DISABLE_FILE_LOGS` | `false`; set `true` in ephemeral environments without writable disks |
 | `OTEL_*` | Optional OpenTelemetry exporter settings |

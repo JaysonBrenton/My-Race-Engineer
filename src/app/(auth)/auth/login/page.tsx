@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { MissingAuthFormTokenSecretError, generateAuthFormToken } from '@/lib/auth/formTokens';
 import { canonicalFor } from '@/lib/seo';
 
+import { loginAction } from './actions';
+
 import styles from '../auth.module.css';
 
 const PAGE_TITLE = 'Sign in to My Race Engineer';
@@ -63,6 +65,21 @@ const buildStatusMessage = (
     };
   }
 
+  if (statusCode === 'verify-email') {
+    return {
+      tone: 'info' as const,
+      message:
+        'Check your inbox for a verification link. You can sign in after confirming your email.',
+    };
+  }
+
+  if (statusCode === 'awaiting-approval') {
+    return {
+      tone: 'info' as const,
+      message: 'Your account is awaiting administrator approval. We will notify you once ready.',
+    };
+  }
+
   switch (errorCode) {
     case 'invalid-token':
       return {
@@ -89,6 +106,23 @@ const buildStatusMessage = (
       return {
         tone: 'error' as const,
         message: 'We were unable to sign you in. Please try again in a moment.',
+      };
+    case 'account-pending':
+      return {
+        tone: 'error' as const,
+        message:
+          'Your account is pending activation. Verify your email or wait for admin approval.',
+      };
+    case 'account-suspended':
+      return {
+        tone: 'error' as const,
+        message:
+          'This account has been suspended. Contact support if you believe this is an error.',
+      };
+    case 'rate-limited':
+      return {
+        tone: 'error' as const,
+        message: 'Too many sign-in attempts. Wait a few minutes before trying again.',
       };
     default:
       return {
@@ -149,7 +183,7 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
         <form
           className={styles.form}
           method="post"
-          action="/auth/login/submit"
+          action={loginAction}
           aria-describedby="auth-login-status"
         >
           {formToken ? <input type="hidden" name="formToken" value={formToken} /> : null}
