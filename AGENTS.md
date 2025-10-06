@@ -8,6 +8,7 @@
 ## 1) Branching & workflow
 - **Branch per change** (feature, fix, docs, chore). Short-lived; always via PR to `main`.
 - **Small, single-purpose diffs.** Split if >~300 LOC or mixing concerns.
+  - **Exception (owner-authorized only):** When the repo owner, Jayson, explicitly authorizes a larger or multi-purpose change (and the PR summary documents that approval), contributors may follow that directive for the scope of the request. No other exceptions are permitted.
 
 ### 1.1 Branch naming (adopted)
 **Format:** `<type>/<ticket?>-<short-kebab-summary>`  
