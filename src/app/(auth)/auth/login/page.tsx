@@ -4,6 +4,11 @@ import Link from 'next/link';
 import { MissingAuthFormTokenSecretError, generateAuthFormToken } from '@/lib/auth/formTokens';
 import { canonicalFor } from '@/lib/seo';
 
+// The login page is a server component that renders the sign-in form and reacts
+// to status codes passed through query parameters.  Pairing it with the server
+// action keeps sensitive logic off the client while still enabling a fully
+// accessible UI.
+
 import { loginAction } from './actions';
 
 import styles from '../auth.module.css';
@@ -12,6 +17,9 @@ const PAGE_TITLE = 'Sign in to My Race Engineer';
 const PAGE_DESCRIPTION =
   'Access telemetry dashboards and racing insights with your team credentials.';
 
+// Providing metadata keeps the login route discoverable and ensures social
+// shares render a helpful preview when a team member invites someone to the
+// platform.
 export function generateMetadata(): Metadata {
   const canonical = canonicalFor('/auth/login');
 
@@ -46,6 +54,9 @@ type StatusMessage = {
   message: string;
 };
 
+// Utility for normalising Next.js catch-all search parameters.  The login page
+// only cares about a single value per key, so we consistently take the first
+// entry when multiple are supplied.
 const getParam = (value: string | string[] | undefined) => {
   if (Array.isArray(value)) {
     return value[0];
@@ -54,6 +65,9 @@ const getParam = (value: string | string[] | undefined) => {
   return value ?? undefined;
 };
 
+// Converts status and error codes into human-readable strings plus a tone for
+// styling.  Keeping the mapping server-side means we can refine messaging
+// without shipping additional client bundles.
 const buildStatusMessage = (
   statusCode: string | undefined,
   errorCode: string | undefined,
@@ -143,6 +157,8 @@ const getStatusClassName = (tone: StatusTone) => {
   }
 };
 
+// Dedicated helper for configuration issues so we can surface a clearer
+// message when the CSRF secret is missing.
 const buildConfigurationStatusMessage = (): StatusMessage => ({
   tone: 'error',
   message:
@@ -154,6 +170,9 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
   let configurationStatus: StatusMessage | null = null;
 
   try {
+    // Every render attempts to mint a short-lived token used as a CSRF guard for
+    // the server action.  If the secret is missing we fall back to a disabled
+    // form state with an explicit message.
     formToken = generateAuthFormToken('login');
   } catch (error) {
     if (error instanceof MissingAuthFormTokenSecretError) {
@@ -173,6 +192,8 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
     <section className={styles.wrapper} aria-labelledby="auth-login-heading">
       <article className={styles.card}>
         <header className={styles.cardHeader}>
+          {/* Clear heading hierarchy improves screen reader navigation and gives
+              SEO crawlers structured context about the page purpose. */}
           <h1 className={styles.title} id="auth-login-heading">
             Sign in
           </h1>
@@ -186,8 +207,12 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
           action={loginAction}
           aria-describedby="auth-login-status"
         >
+          {/* The hidden form token travels with the POST request so the server can
+              confirm the submission originated from this rendered page. */}
           {formToken ? <input type="hidden" name="formToken" value={formToken} /> : null}
           <div className={styles.field}>
+            {/* Each input gets explicit labels and helper text to meet WCAG 2.2
+                accessibility requirements. */}
             <label className={styles.label} htmlFor="auth-login-email">
               Email address
             </label>
@@ -258,6 +283,8 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
             aria-live="polite"
             aria-atomic="true"
           >
+            {/* Status messages update politely so screen readers announce changes
+                without disrupting the user's current focus. */}
             {status.message}
           </p>
         </form>
