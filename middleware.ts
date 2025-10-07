@@ -3,8 +3,6 @@ import { NextResponse } from 'next/server';
 
 import { getAllowedOrigins } from '@/core/auth/getAllowedOrigins';
 
-const AUTH_POST_PATHS = new Set(['/auth/login', '/auth/register']);
-
 const normalizeOrigin = (value: string | null): string | null => {
   if (!value) {
     return null;
@@ -20,21 +18,25 @@ const normalizeOrigin = (value: string | null): string | null => {
 };
 
 export function middleware(req: NextRequest) {
-  if (req.method !== 'POST') {
+  const { pathname } = req.nextUrl;
+
+  const isLoginSurface = pathname.startsWith('/auth/login');
+  const isRegisterSurface = pathname.startsWith('/auth/register');
+
+  if (!isLoginSurface && !isRegisterSurface) {
     return NextResponse.next();
   }
 
-  const { pathname } = req.nextUrl;
-
-  if (!AUTH_POST_PATHS.has(pathname)) {
+  if (req.method !== 'POST') {
     return NextResponse.next();
   }
 
   const allowedOrigins = getAllowedOrigins();
   const origin = normalizeOrigin(req.headers.get('origin'));
 
+  const surface = isLoginSurface ? '/auth/login' : '/auth/register';
   if (!origin || !allowedOrigins.has(origin)) {
-    const redirectUrl = new URL(`${pathname}?error=invalid-origin`, req.url);
+    const redirectUrl = new URL(`${surface}?error=invalid-origin`, req.url);
     return NextResponse.redirect(redirectUrl, 303);
   }
 
@@ -42,5 +44,10 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/auth/login', '/auth/register'],
+  matcher: [
+    '/auth/login',
+    '/auth/login/:path*',
+    '/auth/register',
+    '/auth/register/:path*',
+  ],
 };
