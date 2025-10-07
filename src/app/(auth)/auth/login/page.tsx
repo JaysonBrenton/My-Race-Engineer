@@ -11,8 +11,6 @@ import { canonicalFor } from '@/lib/seo';
 // action keeps sensitive logic off the client while still enabling a fully
 // accessible UI.
 
-import { loginAction } from './actions';
-
 import styles from '../auth.module.css';
 
 const PAGE_TITLE = 'Sign in to My Race Engineer';
@@ -219,7 +217,7 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
         <form
           className={styles.form}
           method="post"
-          action={loginAction}
+          action="/auth/login"
           aria-describedby="auth-login-status"
         >
           {/* The hidden form token travels with the POST request so the server can

@@ -1,9 +1,17 @@
 /** @type {import('next').NextConfig} */
+const devServerActions =
+  process.env.NODE_ENV !== 'production'
+    ? {
+        allowedOrigins: ['127.0.0.1:3001', '10.211.55.13:3001', 'localhost:3001'],
+      }
+    : undefined;
+
 const nextConfig = {
   reactStrictMode: true,
   experimental: {
     typedRoutes: true,
     serverComponentsExternalPackages: ['pino', 'pino-pretty', 'thread-stream', 'pino-abstract-transport'],
+    ...(devServerActions ? { serverActions: devServerActions } : {}),
   },
   eslint: {
     dirs: ['src'],

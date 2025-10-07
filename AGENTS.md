@@ -50,6 +50,7 @@ Copy code
 - **Source of truth:** `/.env.example` (complete list with placeholders). Codex Environment must mirror it when keys change.
 - **Browser-exposed keys:** must be prefixed **`NEXT_PUBLIC_`** (Next.js only exposes those to the client).
 - **Fail fast:** the app must clearly error at boot if a required key is missing.
+- **Auth origin guard:** Middleware pre-screens POSTs to `/auth/login` and `/auth/register`. Keep `ALLOWED_ORIGINS` (or `APP_URL`) aligned with every legitimate origin or requests will redirect with `?error=invalid-origin` before the route handlers.
 
 ---
 
