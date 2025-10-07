@@ -6,8 +6,6 @@ export const dynamic = 'force-dynamic';
 import { MissingAuthFormTokenSecretError, generateAuthFormToken } from '@/lib/auth/formTokens';
 import { canonicalFor } from '@/lib/seo';
 
-import { registerAction } from './actions';
-
 import styles from '../auth.module.css';
 
 const PAGE_TITLE = 'Create your My Race Engineer account';
@@ -170,7 +168,7 @@ export default function RegisterPage({ searchParams }: RegisterPageProps) {
         <form
           className={styles.form}
           method="post"
-          action={registerAction}
+          action="/auth/register"
           aria-describedby="auth-register-status"
         >
           {formToken ? <input type="hidden" name="formToken" value={formToken} /> : null}
