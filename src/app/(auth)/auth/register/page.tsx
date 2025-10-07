@@ -66,6 +66,12 @@ const getParam = (value: string | string[] | undefined) => {
 // for accessibility.
 const buildStatusMessage = (errorCode: string | undefined): StatusMessage => {
   switch (errorCode) {
+    case 'invalid-origin':
+      return {
+        tone: 'error' as const,
+        message:
+          'This request came from an origin that is not allowed. Update the ALLOWED_ORIGINS environment variable to include this site and refresh the page.',
+      };
     case 'invalid-token':
       return {
         tone: 'error' as const,

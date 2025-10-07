@@ -97,6 +97,12 @@ const buildStatusMessage = (
   }
 
   switch (errorCode) {
+    case 'invalid-origin':
+      return {
+        tone: 'error' as const,
+        message:
+          'Sign in requests from this origin are blocked. Add the site origin to the ALLOWED_ORIGINS environment variable and try again.',
+      };
     case 'invalid-token':
       return {
         tone: 'error' as const,
