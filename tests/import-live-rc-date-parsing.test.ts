@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import type {
   EntrantRepository,
+  EntrantSourceLookup,
   EntrantUpsertInput,
   EventRepository,
   EventUpsertInput,
@@ -129,7 +130,7 @@ class StubEntrantRepository implements EntrantRepository {
     return null;
   }
 
-  async findBySourceEntrantId(): Promise<Entrant | null> {
+  async findBySourceEntrantId(_lookup: EntrantSourceLookup): Promise<Entrant | null> {
     return null;
   }
 

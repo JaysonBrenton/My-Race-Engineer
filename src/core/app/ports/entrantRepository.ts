@@ -10,9 +10,16 @@ export type EntrantUpsertInput = {
   sourceTransponderId?: string | null;
 };
 
+export type EntrantSourceLookup = {
+  eventId: string;
+  raceClassId: string;
+  sessionId: string;
+  sourceEntrantId: string;
+};
+
 export interface EntrantRepository {
   getById(id: string): Promise<Entrant | null>;
-  findBySourceEntrantId(sourceEntrantId: string): Promise<Entrant | null>;
+  findBySourceEntrantId(params: EntrantSourceLookup): Promise<Entrant | null>;
   listBySession(sessionId: string): Promise<Entrant[]>;
   upsertBySource(input: EntrantUpsertInput): Promise<Entrant>;
 }

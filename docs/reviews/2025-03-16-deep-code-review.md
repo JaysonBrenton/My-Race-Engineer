@@ -24,3 +24,7 @@
 - Update `PrismaEntrantRepository` (and supporting schema indexes) so entrant identity is scoped by event/class/session in both the read and write paths.
 - Revisit `replaceForEntrant` once entrants are session-scoped: removing `skipDuplicates` will let Prisma raise on unexpected collisions instead of masking them.
 - Add regression tests that import the same driver across two sessions to ensure both sets of laps persist correctly.
+
+## Resolution summary (2025-03-16)
+- `PrismaEntrantRepository` now scopes lookups and upserts by `eventId`, `raceClassId`, and `sessionId`, and Prisma enforces the same scope via a composite unique constraint.
+- `PrismaLapRepository.replaceForEntrant` clears all laps for an entrant and no longer suppresses duplicate insert errors so data corruption surfaces immediately.

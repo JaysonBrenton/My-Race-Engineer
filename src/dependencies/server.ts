@@ -6,7 +6,7 @@ import {
   isPrismaClientInitializationError,
 } from '@core/infra';
 import type { Entrant } from '@core/domain';
-import type { LapUpsertInput } from '@core/app';
+import type { EntrantSourceLookup, LapUpsertInput } from '@core/app';
 
 import { applicationLogger } from '@/dependencies/logger';
 
@@ -208,13 +208,22 @@ class MockEntrantRepository extends PrismaEntrantRepository {
     return id === DEFAULT_ENTRANT_ID ? createMockEntrant() : null;
   }
 
-  override async findBySourceEntrantId(sourceEntrantId: string) {
-    if (!process.env.DATABASE_URL && sourceEntrantId === DEFAULT_ENTRANT_SOURCE_ID) {
+  override async findBySourceEntrantId(params: EntrantSourceLookup) {
+    const matchesDefaultScope =
+      params.eventId === DEFAULT_EVENT_ID &&
+      params.raceClassId === DEFAULT_RACE_CLASS_ID &&
+      params.sessionId === DEFAULT_SESSION_ID;
+
+    if (
+      !process.env.DATABASE_URL &&
+      matchesDefaultScope &&
+      params.sourceEntrantId === DEFAULT_ENTRANT_SOURCE_ID
+    ) {
       return createMockEntrant();
     }
 
     try {
-      const entrant = await super.findBySourceEntrantId(sourceEntrantId);
+      const entrant = await super.findBySourceEntrantId(params);
       if (entrant) {
         return entrant;
       }
@@ -223,22 +232,28 @@ class MockEntrantRepository extends PrismaEntrantRepository {
         logger.warn('Prisma client unavailable. Falling back to mock entrant data.', {
           event: 'dependencies.entrants.find.prisma_unavailable',
           outcome: 'fallback',
-          sourceEntrantId,
+          ...params,
           error,
         });
-        return sourceEntrantId === DEFAULT_ENTRANT_SOURCE_ID ? createMockEntrant() : null;
+        return matchesDefaultScope && params.sourceEntrantId === DEFAULT_ENTRANT_SOURCE_ID
+          ? createMockEntrant()
+          : null;
       }
 
       logger.warn('Unexpected error when looking up entrant by source ID.', {
         event: 'dependencies.entrants.find.unexpected_fallback',
         outcome: 'fallback',
-        sourceEntrantId,
+        ...params,
         error,
       });
-      return sourceEntrantId === DEFAULT_ENTRANT_SOURCE_ID ? createMockEntrant() : null;
+      return matchesDefaultScope && params.sourceEntrantId === DEFAULT_ENTRANT_SOURCE_ID
+        ? createMockEntrant()
+        : null;
     }
 
-    return sourceEntrantId === DEFAULT_ENTRANT_SOURCE_ID ? createMockEntrant() : null;
+    return matchesDefaultScope && params.sourceEntrantId === DEFAULT_ENTRANT_SOURCE_ID
+      ? createMockEntrant()
+      : null;
   }
 
   override async listBySession(sessionId: string) {
