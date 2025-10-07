@@ -12,7 +12,7 @@ import styles from './page.module.css';
 
 const PAGE_TITLE = 'My Race Engineer telemetry insights';
 const PAGE_DESCRIPTION =
-  'Baseline lap telemetry dashboards for racing teams, powered by a clean architecture Next.js foundation.';
+  'Baseline lap telemetry dashboards for racing teams.';
 
 export function generateMetadata(): Metadata {
   const canonical = canonicalFor('/');
