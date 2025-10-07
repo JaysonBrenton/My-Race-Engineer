@@ -63,7 +63,7 @@ export const loginAction = async (formData: FormData) => {
     () =>
       redirect(
         buildRedirectUrl('/auth/login', {
-          error: 'invalid-token',
+          error: 'invalid-origin',
         }),
       ),
     {

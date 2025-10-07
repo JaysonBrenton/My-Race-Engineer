@@ -84,7 +84,7 @@ export const registerAction = async (formData: FormData) => {
     () =>
       redirect(
         buildRedirectUrl('/auth/register', {
-          error: 'invalid-token',
+          error: 'invalid-origin',
         }),
       ),
     {
