@@ -11,8 +11,7 @@ import {
 import styles from './page.module.css';
 
 const PAGE_TITLE = 'My Race Engineer telemetry insights';
-const PAGE_DESCRIPTION =
-  'Baseline lap telemetry dashboards for racing teams.';
+const PAGE_DESCRIPTION = 'Baseline lap telemetry dashboards for racing teams.';
 
 export function generateMetadata(): Metadata {
   const canonical = canonicalFor('/');

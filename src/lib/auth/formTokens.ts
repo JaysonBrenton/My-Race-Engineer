@@ -2,7 +2,11 @@ import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 
 import { applicationLogger } from '@/dependencies/logger';
 
-export type AuthFormContext = 'login' | 'registration' | 'password-reset';
+export type AuthFormContext =
+  | 'login'
+  | 'registration'
+  | 'password-reset'
+  | 'password-reset-confirm';
 
 export class MissingAuthFormTokenSecretError extends Error {
   constructor(message: string) {

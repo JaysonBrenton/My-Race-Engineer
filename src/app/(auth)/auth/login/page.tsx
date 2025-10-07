@@ -96,6 +96,13 @@ const buildStatusMessage = (
     };
   }
 
+  if (statusCode === 'password-reset-confirmed') {
+    return {
+      tone: 'success' as const,
+      message: 'Password updated successfully. Sign in with your new credentials.',
+    };
+  }
+
   switch (errorCode) {
     case 'invalid-origin':
       return {
