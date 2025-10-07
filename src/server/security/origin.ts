@@ -2,7 +2,7 @@ import type { Logger } from '@core/app';
 
 import { applicationLogger } from '@/dependencies/logger';
 
-import { getAllowedOrigins } from '../runtime';
+import { getAllowedOrigins } from '@/core/auth/getAllowedOrigins';
 
 type HeaderGetter = Pick<Headers, 'get'>;
 
@@ -28,7 +28,7 @@ export const validateOrigin = (headers: HeaderGetter): OriginValidationResult =>
       return 'mismatch';
     }
 
-    return allowedOrigins.includes(normalizedOrigin) ? 'ok' : 'mismatch';
+    return allowedOrigins.has(normalizedOrigin) ? 'ok' : 'mismatch';
   }
 
   const refererHeader = headers.get('referer')?.trim();
@@ -43,7 +43,7 @@ export const validateOrigin = (headers: HeaderGetter): OriginValidationResult =>
     return 'mismatch';
   }
 
-  return allowedOrigins.includes(normalizedReferer) ? 'ok' : 'mismatch';
+  return allowedOrigins.has(normalizedReferer) ? 'ok' : 'mismatch';
 };
 
 export const guardAuthPostOrigin = (

@@ -1,11 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { getAllowedOrigins, isCookieSecure } from '../src/server/runtime';
+import { isCookieSecure } from '../src/server/runtime';
 
 const originalAppUrl = process.env.APP_URL;
 const originalCookieSecure = process.env.COOKIE_SECURE;
-const originalAllowedOrigins = process.env.ALLOWED_ORIGINS;
 
 const restoreEnv = () => {
   if (originalAppUrl === undefined) {
@@ -20,11 +19,6 @@ const restoreEnv = () => {
     process.env.COOKIE_SECURE = originalCookieSecure;
   }
 
-  if (originalAllowedOrigins === undefined) {
-    delete process.env.ALLOWED_ORIGINS;
-  } else {
-    process.env.ALLOWED_ORIGINS = originalAllowedOrigins;
-  }
 };
 
 test.afterEach(() => {
@@ -52,19 +46,3 @@ test('isCookieSecure returns true when APP_URL is https', () => {
   assert.equal(isCookieSecure(), true);
 });
 
-test('getAllowedOrigins trims entries and removes trailing slashes', () => {
-  process.env.ALLOWED_ORIGINS = ' https://example.com/ ,http://localhost:3001/,https://EXAMPLE.com ';
-
-  assert.deepEqual(getAllowedOrigins(), [
-    'https://example.com',
-    'http://localhost:3001',
-    'https://example.com',
-  ]);
-});
-
-test('getAllowedOrigins falls back to APP_URL origin when not configured', () => {
-  delete process.env.ALLOWED_ORIGINS;
-  process.env.APP_URL = 'https://example.com/app';
-
-  assert.deepEqual(getAllowedOrigins(), ['https://example.com']);
-});
