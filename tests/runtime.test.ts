@@ -61,3 +61,10 @@ test('getAllowedOrigins trims entries and removes trailing slashes', () => {
     'https://example.com',
   ]);
 });
+
+test('getAllowedOrigins falls back to APP_URL origin when not configured', () => {
+  delete process.env.ALLOWED_ORIGINS;
+  process.env.APP_URL = 'https://example.com/app';
+
+  assert.deepEqual(getAllowedOrigins(), ['https://example.com']);
+});

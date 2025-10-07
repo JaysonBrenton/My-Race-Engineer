@@ -30,17 +30,33 @@ export const isCookieSecure = (): boolean => {
   return getAppUrl().protocol === 'https:';
 };
 
+const normalizeOrigin = (value: string): string | null => {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const origin = new URL(normalizeTrailingSlash(value)).origin.toLowerCase();
+    return origin;
+  } catch {
+    return null;
+  }
+};
+
 export const getAllowedOrigins = (): string[] => {
   const raw = process.env.ALLOWED_ORIGINS;
 
-  if (!raw) {
-    return [];
+  const configuredOrigins = raw
+    ?.split(',')
+    .map((value) => normalizeOrigin(value.trim()))
+    .filter((origin): origin is string => Boolean(origin));
+
+  if (configuredOrigins && configuredOrigins.length > 0) {
+    return configuredOrigins;
   }
 
-  return raw
-    .split(',')
-    .map((value) => value.trim())
-    .filter(Boolean)
-    .map((value) => normalizeTrailingSlash(value).toLowerCase())
-    .filter(Boolean);
+  const fallbackAppUrl = process.env.APP_URL?.trim();
+  const fallbackOrigin = normalizeOrigin(fallbackAppUrl ?? '');
+
+  return fallbackOrigin ? [fallbackOrigin] : [];
 };
