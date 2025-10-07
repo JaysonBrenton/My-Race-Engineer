@@ -28,13 +28,13 @@ export class PrismaLapRepository implements LapRepository {
 
   async replaceForEntrant(
     entrantId: string,
-    sessionId: string,
+    _sessionId: string,
     laps: ReadonlyArray<LapUpsertInput>,
   ): Promise<void> {
     const prisma = getPrismaClient();
 
     await prisma.$transaction(async (tx) => {
-      await tx.lap.deleteMany({ where: { entrantId, sessionId } });
+      await tx.lap.deleteMany({ where: { entrantId } });
 
       if (laps.length === 0) {
         return;
@@ -48,7 +48,6 @@ export class PrismaLapRepository implements LapRepository {
           lapNumber: lap.lapNumber,
           lapTimeMs: lap.lapTimeMs,
         })),
-        skipDuplicates: true,
       });
     });
   }

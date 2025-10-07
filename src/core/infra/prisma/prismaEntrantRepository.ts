@@ -1,4 +1,4 @@
-import type { EntrantRepository, EntrantUpsertInput } from '@core/app';
+import type { EntrantRepository, EntrantSourceLookup, EntrantUpsertInput } from '@core/app';
 import type { Entrant } from '@core/domain';
 import type { Entrant as PrismaEntrant } from '@prisma/client';
 
@@ -27,9 +27,16 @@ export class PrismaEntrantRepository implements EntrantRepository {
     return entrant ? toDomain(entrant) : null;
   }
 
-  async findBySourceEntrantId(sourceEntrantId: string): Promise<Entrant | null> {
+  async findBySourceEntrantId({
+    eventId,
+    raceClassId,
+    sessionId,
+    sourceEntrantId,
+  }: EntrantSourceLookup): Promise<Entrant | null> {
     const prisma = getPrismaClient();
-    const entrant = await prisma.entrant.findFirst({ where: { sourceEntrantId } });
+    const entrant = await prisma.entrant.findFirst({
+      where: { eventId, raceClassId, sessionId, sourceEntrantId },
+    });
 
     return entrant ? toDomain(entrant) : null;
   }
@@ -48,7 +55,14 @@ export class PrismaEntrantRepository implements EntrantRepository {
     const prisma = getPrismaClient();
 
     const existing = input.sourceEntrantId
-      ? await prisma.entrant.findFirst({ where: { sourceEntrantId: input.sourceEntrantId } })
+      ? await prisma.entrant.findFirst({
+          where: {
+            eventId: input.eventId,
+            raceClassId: input.raceClassId,
+            sessionId: input.sessionId,
+            sourceEntrantId: input.sourceEntrantId,
+          },
+        })
       : await prisma.entrant.findFirst({
           where: {
             sessionId: input.sessionId,

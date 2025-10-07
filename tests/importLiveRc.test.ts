@@ -5,6 +5,7 @@ import test from 'node:test';
 import {
   LiveRcImportService,
   type EntrantRepository,
+  type EntrantSourceLookup,
   type EntrantUpsertInput,
   type EventRepository,
   type EventUpsertInput,
@@ -163,7 +164,7 @@ test('orphan laps without entry list rows are skipped and reported', async () =>
     async getById() {
       return null;
     },
-    async findBySourceEntrantId() {
+    async findBySourceEntrantId(_lookup: EntrantSourceLookup) {
       return null;
     },
     async listBySession() {
@@ -316,7 +317,7 @@ test('importFromPayload hydrates repositories from raw race result', async () =>
     async getById() {
       return null;
     },
-    async findBySourceEntrantId() {
+    async findBySourceEntrantId(_lookup: EntrantSourceLookup) {
       return null;
     },
     async listBySession() {

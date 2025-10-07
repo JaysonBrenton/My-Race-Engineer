@@ -77,6 +77,7 @@ model Entrant {
   laps      Lap[]
 
   @@unique([sessionId, displayName])
+  @@unique([eventId, raceClassId, sessionId, sourceEntrantId])
   @@index([sourceEntrantId])
 }
 

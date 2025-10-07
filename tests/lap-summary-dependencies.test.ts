@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import type { Entrant } from '../src/core/domain';
-import type { EntrantRepository } from '../src/core/app/ports/entrantRepository';
+import type {
+  EntrantRepository,
+  EntrantSourceLookup,
+} from '../src/core/app/ports/entrantRepository';
 import { LapSummaryService } from '../src/core/app/services/getLapSummary';
 import { MockLapRepository, defaultEntrantContext } from '../src/dependencies/server';
 
@@ -13,7 +16,7 @@ class InMemoryEntrantRepository implements EntrantRepository {
     return this.entrants.get(id) ?? null;
   }
 
-  async findBySourceEntrantId() {
+  async findBySourceEntrantId(_lookup: EntrantSourceLookup) {
     return null;
   }
 
