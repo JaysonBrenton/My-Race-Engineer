@@ -8,6 +8,8 @@ import { registerUserService } from '@/dependencies/auth';
 import { validateAuthFormToken } from '@/lib/auth/formTokens';
 import { checkRegisterRateLimit } from '@/lib/rateLimit/authRateLimiter';
 import { extractClientIdentifier } from '@/lib/request/clientIdentifier';
+import { guardAuthPostOrigin } from '@/server/security/origin';
+import { isCookieSecure } from '@/server/runtime';
 
 // The server action owns the full registration happy-path orchestration, so we keep
 // the validation rules alongside it.  This schema mirrors the policy enforced at the
@@ -77,6 +79,18 @@ export const registerAction = async (formData: FormData) => {
   // Rate limiting and the client identifier check run before any heavy work so abusive
   // attempts short-circuit without touching downstream dependencies.
   const headersList = headers();
+  guardAuthPostOrigin(
+    headersList,
+    () =>
+      redirect(
+        buildRedirectUrl('/auth/register', {
+          error: 'invalid-token',
+        }),
+      ),
+    {
+      route: 'auth/register',
+    },
+  );
   const identifier = extractClientIdentifier(headersList);
   const rateLimit = checkRegisterRateLimit(identifier);
 
@@ -178,7 +192,7 @@ export const registerAction = async (formData: FormData) => {
           value: result.session.token,
           httpOnly: true,
           sameSite: 'lax',
-          secure: process.env.NODE_ENV === 'production',
+          secure: isCookieSecure(),
           path: '/',
           expires: expiresAt,
           maxAge,
