@@ -8,6 +8,8 @@ import { loginUserService } from '@/dependencies/auth';
 import { validateAuthFormToken } from '@/lib/auth/formTokens';
 import { checkLoginRateLimit } from '@/lib/rateLimit/authRateLimiter';
 import { extractClientIdentifier } from '@/lib/request/clientIdentifier';
+import { guardAuthPostOrigin } from '@/server/security/origin';
+import { isCookieSecure } from '@/server/runtime';
 
 // This server action executes the full login flow: it validates inputs, enforces
 // rate limits, delegates credential checks to the domain service, and finally
@@ -56,6 +58,18 @@ export const loginAction = async (formData: FormData) => {
   // can throttle burst attempts without locking out legitimate users sharing an
   // address (e.g. team pit wall).
   const headersList = headers();
+  guardAuthPostOrigin(
+    headersList,
+    () =>
+      redirect(
+        buildRedirectUrl('/auth/login', {
+          error: 'invalid-token',
+        }),
+      ),
+    {
+      route: 'auth/login',
+    },
+  );
   const identifier = extractClientIdentifier(headersList);
   const rateLimit = checkLoginRateLimit(identifier);
 
@@ -136,7 +150,7 @@ export const loginAction = async (formData: FormData) => {
     value: result.sessionToken,
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure: isCookieSecure(),
     path: '/',
     expires: expiresAt,
     maxAge,
