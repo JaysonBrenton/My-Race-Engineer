@@ -188,16 +188,41 @@ export const registerAction = async (formData: FormData) => {
 
   // Delegate business logic to the app-layer service.  It coordinates persistence,
   // password hashing, and any follow-up actions such as verification emails.
-  const result = await registerUserService.register({
-    name,
-    email,
-    password,
-    rememberSession: true,
-    sessionContext: {
-      ipAddress: identifier === 'unknown' ? null : identifier,
-      userAgent,
-    },
-  });
+  let result: Awaited<ReturnType<typeof registerUserService.register>>;
+  try {
+    result = await registerUserService.register({
+      name,
+      email,
+      password,
+      rememberSession: true,
+      sessionContext: {
+        ipAddress: identifier === 'unknown' ? null : identifier,
+        userAgent,
+      },
+    });
+  } catch (error) {
+    const errorPayload =
+      error instanceof Error
+        ? { name: error.name, message: error.message, stack: error.stack }
+        : { name: 'UnknownError', message: 'Non-error value thrown during registration.' };
+
+    logger.error('Registration failed due to unexpected error.', {
+      event: 'auth.register.unhandled_error',
+      outcome: 'error',
+      clientFingerprint,
+      emailFingerprint,
+      error: errorPayload,
+      durationMs: Date.now() - requestStartedAt,
+    });
+
+    redirect(
+      buildRedirectUrl('/auth/register', {
+        error: 'server-error',
+        name,
+        email,
+      }),
+    );
+  }
 
   if (!result.ok) {
     logger.info('Registration attempt rejected by domain service.', {
