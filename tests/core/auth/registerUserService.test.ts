@@ -12,8 +12,8 @@ import type {
   UserEmailVerificationTokenRepository,
   UserRepository,
   UserSessionRepository,
-} from '@core/app';
-import { RegisterUserService } from '@core/app/services/auth/registerUser';
+} from '../../../src/core/app';
+import { RegisterUserService } from '../../../src/core/app/services/auth/registerUser';
 import type {
   CreateUserEmailVerificationTokenInput,
   CreateUserInput,
@@ -21,7 +21,7 @@ import type {
   User,
   UserEmailVerificationToken,
   UserSession,
-} from '@core/domain';
+} from '../../../src/core/domain';
 
 const fixedNow = new Date('2025-01-01T00:00:00.000Z');
 const clock = () => new Date(fixedNow);
