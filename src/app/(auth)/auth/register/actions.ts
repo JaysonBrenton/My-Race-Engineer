@@ -1,11 +1,15 @@
 'use server';
 
+import { randomUUID } from 'node:crypto';
+
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
 import { registerUserService } from '@/dependencies/auth';
+import { getRequestLogger } from '@/dependencies/logger';
 import { validateAuthFormToken } from '@/lib/auth/formTokens';
+import { createLogFingerprint } from '@/lib/logging/fingerprint';
 import { checkRegisterRateLimit } from '@/lib/rateLimit/authRateLimiter';
 import { extractClientIdentifier } from '@/lib/request/clientIdentifier';
 import { guardAuthPostOrigin } from '@/server/security/origin';
@@ -76,9 +80,15 @@ const getFormValue = (data: FormData, key: string) => {
 };
 
 export const registerAction = async (formData: FormData) => {
+  const requestStartedAt = Date.now();
   // Rate limiting and the client identifier check run before any heavy work so abusive
   // attempts short-circuit without touching downstream dependencies.
   const headersList = headers();
+  const requestId = headersList.get('x-request-id') ?? randomUUID();
+  const logger = getRequestLogger({
+    requestId,
+    route: 'auth/register',
+  });
   guardAuthPostOrigin(
     headersList,
     () =>
@@ -89,12 +99,25 @@ export const registerAction = async (formData: FormData) => {
       ),
     {
       route: 'auth/register',
+      logger,
     },
   );
   const identifier = extractClientIdentifier(headersList);
+  const clientFingerprint = identifier === 'unknown' ? undefined : createLogFingerprint(identifier);
+  logger.info('Processing registration submission.', {
+    event: 'auth.register.submission_received',
+    outcome: 'processing',
+    clientFingerprint,
+  });
   const rateLimit = checkRegisterRateLimit(identifier);
-
   if (!rateLimit.ok) {
+    logger.warn('Registration blocked by rate limiter.', {
+      event: 'auth.register.rate_limited',
+      outcome: 'blocked',
+      clientFingerprint,
+      retryAfterMs: rateLimit.retryAfterMs,
+      durationMs: Date.now() - requestStartedAt,
+    });
     redirect(
       buildRedirectUrl('/auth/register', {
         error: 'rate-limited',
@@ -108,6 +131,12 @@ export const registerAction = async (formData: FormData) => {
   const tokenValidation = validateAuthFormToken(token ?? null, 'registration');
 
   if (!tokenValidation.ok) {
+    logger.warn('Registration rejected due to invalid form token.', {
+      event: 'auth.register.invalid_token',
+      outcome: 'rejected',
+      clientFingerprint,
+      durationMs: Date.now() - requestStartedAt,
+    });
     redirect(
       buildRedirectUrl('/auth/register', {
         error: 'invalid-token',
@@ -125,6 +154,18 @@ export const registerAction = async (formData: FormData) => {
   });
 
   if (!parseResult.success) {
+    const issues = parseResult.error.issues.map((issue) => ({
+      path: issue.path.map((segment) => segment.toString()).join('.') || 'root',
+      code: issue.code,
+      message: issue.message,
+    }));
+    logger.warn('Registration rejected due to validation errors.', {
+      event: 'auth.register.validation_failed',
+      outcome: 'rejected',
+      clientFingerprint,
+      validationIssues: issues,
+      durationMs: Date.now() - requestStartedAt,
+    });
     redirect(
       buildRedirectUrl('/auth/register', {
         error: 'validation',
@@ -136,21 +177,61 @@ export const registerAction = async (formData: FormData) => {
 
   const { name, email, password } = parseResult.data;
   const userAgent = headersList.get('user-agent');
+  const emailFingerprint = createLogFingerprint(email);
+
+  logger.info('Registration payload validated.', {
+    event: 'auth.register.payload_validated',
+    outcome: 'processing',
+    clientFingerprint,
+    emailFingerprint,
+  });
 
   // Delegate business logic to the app-layer service.  It coordinates persistence,
   // password hashing, and any follow-up actions such as verification emails.
-  const result = await registerUserService.register({
-    name,
-    email,
-    password,
-    rememberSession: true,
-    sessionContext: {
-      ipAddress: identifier === 'unknown' ? null : identifier,
-      userAgent,
-    },
-  });
+  let result: Awaited<ReturnType<typeof registerUserService.register>>;
+  try {
+    result = await registerUserService.register({
+      name,
+      email,
+      password,
+      rememberSession: true,
+      sessionContext: {
+        ipAddress: identifier === 'unknown' ? null : identifier,
+        userAgent,
+      },
+    });
+  } catch (error) {
+    const errorPayload =
+      error instanceof Error
+        ? { name: error.name, message: error.message, stack: error.stack }
+        : { name: 'UnknownError', message: 'Non-error value thrown during registration.' };
+
+    logger.error('Registration failed due to unexpected error.', {
+      event: 'auth.register.unhandled_error',
+      outcome: 'error',
+      clientFingerprint,
+      emailFingerprint,
+      error: errorPayload,
+      durationMs: Date.now() - requestStartedAt,
+    });
+
+    redirect(
+      buildRedirectUrl('/auth/register', {
+        error: 'server-error',
+        name,
+        email,
+      }),
+    );
+  }
 
   if (!result.ok) {
+    logger.info('Registration attempt rejected by domain service.', {
+      event: `auth.register.${result.reason.replace(/-/g, '_')}`,
+      outcome: 'rejected',
+      clientFingerprint,
+      emailFingerprint,
+      durationMs: Date.now() - requestStartedAt,
+    });
     redirect(
       buildRedirectUrl('/auth/register', {
         error: result.reason,
@@ -164,6 +245,13 @@ export const registerAction = async (formData: FormData) => {
   // the next action in the onboarding flow.
   switch (result.nextStep) {
     case 'verify-email':
+      logger.info('Registration complete; verification required.', {
+        event: 'auth.register.next_step.verify_email',
+        outcome: 'pending',
+        clientFingerprint,
+        emailFingerprint,
+        durationMs: Date.now() - requestStartedAt,
+      });
       redirect(
         buildRedirectUrl('/auth/login', {
           status: 'verify-email',
@@ -172,6 +260,13 @@ export const registerAction = async (formData: FormData) => {
       );
       break;
     case 'await-approval':
+      logger.info('Registration complete; awaiting admin approval.', {
+        event: 'auth.register.next_step.awaiting_approval',
+        outcome: 'pending',
+        clientFingerprint,
+        emailFingerprint,
+        durationMs: Date.now() - requestStartedAt,
+      });
       redirect(
         buildRedirectUrl('/auth/login', {
           status: 'awaiting-approval',
@@ -198,10 +293,27 @@ export const registerAction = async (formData: FormData) => {
           maxAge,
         });
       }
+      logger.info('Registration succeeded with active session.', {
+        event: 'auth.register.next_step.session_created',
+        outcome: 'success',
+        clientFingerprint,
+        emailFingerprint,
+        sessionIssued: Boolean(result.session),
+        sessionExpiresAt: result.session?.expiresAt.toISOString(),
+        durationMs: Date.now() - requestStartedAt,
+      });
       redirect('/dashboard');
       break;
     }
     default:
+      logger.error('Registration returned unexpected next step.', {
+        event: 'auth.register.next_step.unknown',
+        outcome: 'error',
+        clientFingerprint,
+        emailFingerprint,
+        nextStep: result.nextStep,
+        durationMs: Date.now() - requestStartedAt,
+      });
       redirect('/auth/login');
   }
 };
