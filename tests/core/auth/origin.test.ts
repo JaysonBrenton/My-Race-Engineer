@@ -1,23 +1,38 @@
+/**
+ * Author: Jayson Brenton
+ * Date: 2025-03-12
+ * Purpose: Verify auth origin parsing and guard behaviour.
+ * License: MIT
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { getAllowedOrigins } from '../../../src/core/auth/getAllowedOrigins';
-import { guardAuthPostOrigin } from '../../../src/core/auth/guardAuthPostOrigin';
+import { guardAuthPostOrigin, normalizeOrigin, parseAllowedOrigins } from '../../../src/core/security/origin';
 
-const originalAppUrl = process.env.APP_URL;
-const originalAllowedOrigins = process.env.ALLOWED_ORIGINS;
+const originalEnv = {
+  APP_URL: process.env.APP_URL,
+  ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS,
+  DEV_TRUST_LOCAL_ORIGINS: process.env.DEV_TRUST_LOCAL_ORIGINS,
+};
 
 const restoreEnv = () => {
-  if (originalAppUrl === undefined) {
+  if (originalEnv.APP_URL === undefined) {
     delete process.env.APP_URL;
   } else {
-    process.env.APP_URL = originalAppUrl;
+    process.env.APP_URL = originalEnv.APP_URL;
   }
 
-  if (originalAllowedOrigins === undefined) {
+  if (originalEnv.ALLOWED_ORIGINS === undefined) {
     delete process.env.ALLOWED_ORIGINS;
   } else {
-    process.env.ALLOWED_ORIGINS = originalAllowedOrigins;
+    process.env.ALLOWED_ORIGINS = originalEnv.ALLOWED_ORIGINS;
+  }
+
+  if (originalEnv.DEV_TRUST_LOCAL_ORIGINS === undefined) {
+    delete process.env.DEV_TRUST_LOCAL_ORIGINS;
+  } else {
+    process.env.DEV_TRUST_LOCAL_ORIGINS = originalEnv.DEV_TRUST_LOCAL_ORIGINS;
   }
 };
 
@@ -25,29 +40,36 @@ test.afterEach(() => {
   restoreEnv();
 });
 
-test('getAllowedOrigins normalises entries and removes duplicates', () => {
+void test('normalizeOrigin lowercases scheme/host and strips trailing slashes', () => {
+  assert.equal(normalizeOrigin('HTTPS://Example.com:3001///'), 'https://example.com:3001');
+});
+
+void test('parseAllowedOrigins prioritises ALLOWED_ORIGINS and deduplicates entries', () => {
   process.env.ALLOWED_ORIGINS = ' https://example.com/ ,http://localhost:3001/,https://EXAMPLE.com ';
 
-  const allowed = getAllowedOrigins();
+  const allowed = parseAllowedOrigins(process.env);
 
-  assert.equal(allowed.size, 2);
-  assert(allowed.has('https://example.com'));
-  assert(allowed.has('http://localhost:3001'));
+  assert.deepEqual(allowed, ['https://example.com', 'http://localhost:3001']);
 });
 
-test('getAllowedOrigins falls back to APP_URL when explicit origins are missing', () => {
+void test('parseAllowedOrigins falls back to APP_URL and appends dev defaults', () => {
   delete process.env.ALLOWED_ORIGINS;
   process.env.APP_URL = 'https://example.com/app';
+  process.env.DEV_TRUST_LOCAL_ORIGINS = 'true';
 
-  const allowed = getAllowedOrigins();
+  const allowed = parseAllowedOrigins(process.env);
 
-  assert.equal(allowed.size, 1);
-  assert(allowed.has('https://example.com'));
+  assert.deepEqual(allowed, [
+    'https://example.com',
+    'http://localhost:3001',
+    'http://127.0.0.1:3001',
+    'http://10.211.55.13:3001',
+  ]);
 });
 
-test('guardAuthPostOrigin allows configured origins', () => {
+void test('guardAuthPostOrigin allows configured origins', () => {
   process.env.ALLOWED_ORIGINS = 'https://example.com';
-
+  const allowed = parseAllowedOrigins(process.env);
   const request = new Request('https://app.local/auth/login', {
     method: 'POST',
     headers: {
@@ -55,14 +77,14 @@ test('guardAuthPostOrigin allows configured origins', () => {
     },
   });
 
-  const result = guardAuthPostOrigin(request, '/auth/login');
+  const result = guardAuthPostOrigin(request, allowed);
 
-  assert.equal(result, null);
+  assert.equal(result.ok, true);
 });
 
-test('guardAuthPostOrigin redirects mismatched origins', () => {
+void test('guardAuthPostOrigin reports mismatched origins', () => {
   process.env.ALLOWED_ORIGINS = 'https://example.com';
-
+  const allowed = parseAllowedOrigins(process.env);
   const request = new Request('https://app.local/auth/login', {
     method: 'POST',
     headers: {
@@ -70,23 +92,23 @@ test('guardAuthPostOrigin redirects mismatched origins', () => {
     },
   });
 
-  const result = guardAuthPostOrigin(request, '/auth/login');
+  const result = guardAuthPostOrigin(request, allowed);
 
-  assert(result instanceof Response);
-  assert.equal(result.status, 303);
-  assert.equal(result.headers.get('location'), 'https://app.local/auth/login?error=invalid-origin');
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'mismatch');
+  assert.equal(result.redirectTo, 'https://app.local/auth/login?error=invalid-origin');
 });
 
-test('guardAuthPostOrigin redirects when origin header is missing', () => {
+void test('guardAuthPostOrigin reports missing origins when headers are absent', () => {
   process.env.ALLOWED_ORIGINS = 'https://example.com';
-
+  const allowed = parseAllowedOrigins(process.env);
   const request = new Request('https://app.local/auth/register', {
     method: 'POST',
   });
 
-  const result = guardAuthPostOrigin(request, '/auth/register');
+  const result = guardAuthPostOrigin(request, allowed);
 
-  assert(result instanceof Response);
-  assert.equal(result.status, 303);
-  assert.equal(result.headers.get('location'), 'https://app.local/auth/register?error=invalid-origin');
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'missing');
+  assert.equal(result.redirectTo, 'https://app.local/auth/register?error=invalid-origin');
 });

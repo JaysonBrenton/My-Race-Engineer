@@ -1,20 +1,47 @@
+/**
+ * Author: Jayson Brenton
+ * Date: 2025-03-12
+ * Purpose: Enforce origin allow-listing for authentication POST requests.
+ * License: MIT
+ */
+
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
-import { getAllowedOrigins } from '@/core/auth/getAllowedOrigins';
+import { effectiveRequestOrigin, guardAuthPostOrigin, parseAllowedOrigins } from '@/core/security/origin';
 
-const normalizeOrigin = (value: string | null): string | null => {
-  if (!value) {
-    return null;
+const isAuthPath = (pathname: string) =>
+  pathname.startsWith('/auth/login') || pathname.startsWith('/auth/register');
+
+const shouldLogDiagnostics = () => process.env.NODE_ENV !== 'production';
+
+const logDevDiagnostics = (params: {
+  pathname: string;
+  reason: 'mismatch' | 'missing' | 'invalid';
+  allowed: string[];
+  effectiveOrigin: string | null;
+  forwardedProto: string | null;
+  forwardedHost: string | null;
+  forwardedFor: string | null;
+}) => {
+  if (!shouldLogDiagnostics()) {
+    return;
   }
 
-  const trimmed = value.trim().replace(/\/$/, '');
+  const payload = {
+    event: 'auth.origin_guard.blocked',
+    route: params.pathname,
+    reason: params.reason,
+    allowedOrigins: params.allowed,
+    effectiveOrigin: params.effectiveOrigin,
+    forwarded: {
+      proto: params.forwardedProto,
+      host: params.forwardedHost,
+      for: params.forwardedFor,
+    },
+  };
 
-  try {
-    return new URL(trimmed).origin.toLowerCase();
-  } catch {
-    return null;
-  }
+  console.warn('[auth-origin-guard] blocked request', payload);
 };
 
 export function middleware(req: NextRequest) {
@@ -22,37 +49,40 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  const pathname = req.nextUrl.pathname;
-  const isLoginSurface = pathname.startsWith('/auth/login');
-  const isRegisterSurface = pathname.startsWith('/auth/register');
-
-  if (!isLoginSurface && !isRegisterSurface) {
+  if (!isAuthPath(req.nextUrl.pathname)) {
     return NextResponse.next();
   }
 
-  const allowedOrigins = getAllowedOrigins();
-  const origin = normalizeOrigin(req.headers.get('origin'));
+  const allowedOrigins = parseAllowedOrigins(process.env);
+  const result = guardAuthPostOrigin(req, allowedOrigins);
 
-  const surface = isLoginSurface ? '/auth/login' : '/auth/register';
-  if (!origin || !allowedOrigins.has(origin)) {
-    const redirectUrl = new URL(`${surface}?error=invalid-origin`, req.url);
-    const response = NextResponse.redirect(redirectUrl, 303);
+  if (!result.ok) {
+    logDevDiagnostics({
+      pathname: req.nextUrl.pathname,
+      reason: result.reason,
+      allowed: allowedOrigins,
+      effectiveOrigin: effectiveRequestOrigin(req),
+      forwardedProto: req.headers.get('x-forwarded-proto'),
+      forwardedHost: req.headers.get('x-forwarded-host'),
+      forwardedFor: req.headers.get('x-forwarded-for'),
+    });
+
+    const response = NextResponse.redirect(result.redirectTo, 303);
     response.headers.set('x-auth-origin-guard', 'mismatch');
+    response.headers.set('x-allowed-origins', allowedOrigins.join(','));
     return response;
   }
 
-  return NextResponse.next({
-    headers: {
-      'x-auth-origin-guard': 'hit',
-    },
-  });
+  const response = NextResponse.next();
+  response.headers.set('x-auth-origin-guard', 'ok');
+  return response;
 }
 
 export const config = {
   matcher: [
-    "/auth/login",
-    "/auth/login/:path*",
-    "/auth/register",
-    "/auth/register/:path*",
+    '/auth/login',
+    '/auth/login/:path*',
+    '/auth/register',
+    '/auth/register/:path*',
   ],
 };

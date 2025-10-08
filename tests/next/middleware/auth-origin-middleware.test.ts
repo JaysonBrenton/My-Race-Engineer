@@ -1,3 +1,10 @@
+/**
+ * Author: Jayson Brenton
+ * Date: 2025-03-12
+ * Purpose: Validate middleware origin guard handling for auth POST requests.
+ * License: MIT
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -16,20 +23,29 @@ const createRequest = (url: string, init?: RequestInit): NextRequest => {
   } as unknown as NextRequest;
 };
 
-const originalAppUrl = process.env.APP_URL;
-const originalAllowedOrigins = process.env.ALLOWED_ORIGINS;
+const originalEnv = {
+  APP_URL: process.env.APP_URL,
+  ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS,
+  DEV_TRUST_LOCAL_ORIGINS: process.env.DEV_TRUST_LOCAL_ORIGINS,
+};
 
 const restoreEnv = () => {
-  if (originalAppUrl === undefined) {
+  if (originalEnv.APP_URL === undefined) {
     delete process.env.APP_URL;
   } else {
-    process.env.APP_URL = originalAppUrl;
+    process.env.APP_URL = originalEnv.APP_URL;
   }
 
-  if (originalAllowedOrigins === undefined) {
+  if (originalEnv.ALLOWED_ORIGINS === undefined) {
     delete process.env.ALLOWED_ORIGINS;
   } else {
-    process.env.ALLOWED_ORIGINS = originalAllowedOrigins;
+    process.env.ALLOWED_ORIGINS = originalEnv.ALLOWED_ORIGINS;
+  }
+
+  if (originalEnv.DEV_TRUST_LOCAL_ORIGINS === undefined) {
+    delete process.env.DEV_TRUST_LOCAL_ORIGINS;
+  } else {
+    process.env.DEV_TRUST_LOCAL_ORIGINS = originalEnv.DEV_TRUST_LOCAL_ORIGINS;
   }
 };
 
@@ -51,6 +67,7 @@ test('middleware allows POSTs from configured origins', () => {
 
   assert.equal(response?.status, 200);
   assert.equal(response?.headers.get('location'), null);
+  assert.equal(response?.headers.get('x-auth-origin-guard'), 'ok');
 });
 
 test('middleware redirects login POSTs with mismatched origins', () => {
@@ -68,6 +85,8 @@ test('middleware redirects login POSTs with mismatched origins', () => {
   assert(response);
   assert.equal(response.status, 303);
   assert.equal(response.headers.get('location'), 'https://app.local:3001/auth/login?error=invalid-origin');
+  assert.equal(response.headers.get('x-auth-origin-guard'), 'mismatch');
+  assert.equal(response.headers.get('x-allowed-origins'), 'https://app.local:3001');
 });
 
 test('middleware redirects register POSTs when origin header is missing', () => {
@@ -82,4 +101,6 @@ test('middleware redirects register POSTs when origin header is missing', () => 
   assert(response);
   assert.equal(response.status, 303);
   assert.equal(response.headers.get('location'), 'https://app.local:3001/auth/register?error=invalid-origin');
+  assert.equal(response.headers.get('x-auth-origin-guard'), 'mismatch');
+  assert.equal(response.headers.get('x-allowed-origins'), 'https://app.local:3001');
 });
