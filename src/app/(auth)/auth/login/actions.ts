@@ -1,11 +1,15 @@
 'use server';
 
+import { randomUUID } from 'node:crypto';
+
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
 import { loginUserService } from '@/dependencies/auth';
+import { getRequestLogger } from '@/dependencies/logger';
 import { validateAuthFormToken } from '@/lib/auth/formTokens';
+import { createLogFingerprint } from '@/lib/logging/fingerprint';
 import { checkLoginRateLimit } from '@/lib/rateLimit/authRateLimiter';
 import { extractClientIdentifier } from '@/lib/request/clientIdentifier';
 import { guardAuthPostOrigin } from '@/server/security/origin';
@@ -54,10 +58,16 @@ const getFormValue = (data: FormData, key: string) => {
 };
 
 export const loginAction = async (formData: FormData) => {
+  const requestStartedAt = Date.now();
   // The client identifier combines IP and user-agent hints so the rate limiter
   // can throttle burst attempts without locking out legitimate users sharing an
   // address (e.g. team pit wall).
   const headersList = headers();
+  const requestId = headersList.get('x-request-id') ?? randomUUID();
+  const logger = getRequestLogger({
+    requestId,
+    route: 'auth/login',
+  });
   guardAuthPostOrigin(
     headersList,
     () =>
@@ -68,15 +78,28 @@ export const loginAction = async (formData: FormData) => {
       ),
     {
       route: 'auth/login',
+      logger,
     },
   );
   const identifier = extractClientIdentifier(headersList);
+  const clientFingerprint = identifier === 'unknown' ? undefined : createLogFingerprint(identifier);
+  logger.info('Processing login submission.', {
+    event: 'auth.login.submission_received',
+    outcome: 'processing',
+    clientFingerprint,
+  });
   const rateLimit = checkLoginRateLimit(identifier);
-
   if (!rateLimit.ok) {
     // When the rate limiter trips we short-circuit to the login page with a
     // dedicated error code.  The redirect prevents timing attacks that could
     // differentiate between throttled and rejected credentials.
+    logger.warn('Login blocked by rate limiter.', {
+      event: 'auth.login.rate_limited',
+      outcome: 'blocked',
+      clientFingerprint,
+      retryAfterMs: rateLimit.retryAfterMs,
+      durationMs: Date.now() - requestStartedAt,
+    });
     redirect(
       buildRedirectUrl('/auth/login', {
         error: 'rate-limited',
@@ -90,6 +113,12 @@ export const loginAction = async (formData: FormData) => {
   if (!tokenValidation.ok) {
     // Missing or stale CSRF tokens are treated as an invalid session.  The UI
     // invites the user to refresh so they pick up a fresh token value.
+    logger.warn('Login rejected due to invalid form token.', {
+      event: 'auth.login.invalid_token',
+      outcome: 'rejected',
+      clientFingerprint,
+      durationMs: Date.now() - requestStartedAt,
+    });
     redirect(
       buildRedirectUrl('/auth/login', {
         error: 'invalid-token',
@@ -106,6 +135,18 @@ export const loginAction = async (formData: FormData) => {
   if (!parseResult.success) {
     // Validation failures flow back with the email preserved so the user does
     // not have to re-type it, reducing friction for simple typos.
+    const issues = parseResult.error.issues.map((issue) => ({
+      path: issue.path.map((segment) => segment.toString()).join('.') || 'root',
+      code: issue.code,
+      message: issue.message,
+    }));
+    logger.warn('Login rejected due to validation errors.', {
+      event: 'auth.login.validation_failed',
+      outcome: 'rejected',
+      clientFingerprint,
+      validationIssues: issues,
+      durationMs: Date.now() - requestStartedAt,
+    });
     redirect(
       buildRedirectUrl('/auth/login', {
         error: 'validation',
@@ -116,11 +157,21 @@ export const loginAction = async (formData: FormData) => {
 
   const { email, password, remember } = parseResult.data;
   const userAgent = headersList.get('user-agent');
+  const emailFingerprint = createLogFingerprint(email);
+  const rememberSession = remember === 'true';
+
+  logger.info('Login payload validated.', {
+    event: 'auth.login.payload_validated',
+    outcome: 'processing',
+    clientFingerprint,
+    emailFingerprint,
+    rememberSession,
+  });
 
   const result = await loginUserService.login({
     email,
     password,
-    rememberSession: remember === 'true',
+    rememberSession,
     sessionContext: {
       ipAddress: identifier === 'unknown' ? null : identifier,
       userAgent,
@@ -131,6 +182,13 @@ export const loginAction = async (formData: FormData) => {
     // Domain-level errors (unverified email, suspended account, etc.) are
     // surfaced to the page so we can display precise guidance without leaking
     // sensitive details to the attacker.
+    logger.info('Login attempt failed in domain service.', {
+      event: `auth.login.${result.reason.replace(/-/g, '_')}`,
+      outcome: 'rejected',
+      clientFingerprint,
+      emailFingerprint,
+      durationMs: Date.now() - requestStartedAt,
+    });
     redirect(
       buildRedirectUrl('/auth/login', {
         error: result.reason,
@@ -154,6 +212,16 @@ export const loginAction = async (formData: FormData) => {
     path: '/',
     expires: expiresAt,
     maxAge,
+  });
+
+  logger.info('Login succeeded; session cookie issued.', {
+    event: 'auth.login.success',
+    outcome: 'success',
+    clientFingerprint,
+    emailFingerprint,
+    rememberSession,
+    sessionExpiresAt: result.expiresAt.toISOString(),
+    durationMs: Date.now() - requestStartedAt,
   });
 
   redirect('/dashboard');
