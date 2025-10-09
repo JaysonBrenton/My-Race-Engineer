@@ -90,4 +90,9 @@ export async function POST(req: Request): Promise<Response> {
 
     throw error;
   }
+
+  const response = NextResponse.redirect(new URL('/auth/register', req.url), { status: 303 });
+  response.headers.set('Cache-Control', 'no-store');
+  response.headers.set('x-auth-origin-guard', 'ok');
+  return response;
 }

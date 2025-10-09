@@ -89,35 +89,30 @@ const getFormValue = (data: FormData, key: string) => {
   return typeof value === 'string' ? value : undefined;
 };
 
-class OriginMismatchError extends Error {
-  constructor() {
-    super('auth-origin-mismatch');
+type RegistrationPrefillInput = {
+  name?: string | null | undefined;
+  email?: string | null | undefined;
+};
+
+// Registration prefills only rehydrate display-safe fields so that passwords are never
+// echoed back to the client.  Values are trimmed to avoid leaking leading/trailing spaces.
+const buildPrefillParam = (prefill: RegistrationPrefillInput): string | undefined => {
+  const safeEntries = Object.entries(prefill)
+    .filter(([, value]) => typeof value === 'string' && value.trim().length > 0)
+    .map(([key, value]) => [key, (value as string).trim()]);
+
+  if (safeEntries.length === 0) {
+    return undefined;
   }
-}
 
-const buildState = (
-  errorCode: RegisterErrorCode,
-  values: RegistrationPrefillInput,
-  fieldErrors?: Array<{ field: string; message: string }>,
-): RegisterActionState => ({
-  status: buildStatusMessage(errorCode),
-  errorCode,
-  values: {
-    name: (values.name ?? '').trim(),
-    email: (values.email ?? '').trim(),
-  },
-  fieldErrors,
-});
+  try {
+    return JSON.stringify(Object.fromEntries(safeEntries));
+  } catch {
+    return undefined;
+  }
+};
 
-const extractPrefillValues = (formData: FormData) => ({
-  name: getFormValue(formData, 'name') ?? '',
-  email: getFormValue(formData, 'email') ?? '',
-});
-
-export const registerAction = async (
-  _prevState: RegisterActionState,
-  formData: FormData,
-): Promise<RegisterActionState> => {
+export const registerAction = async (formData: FormData) => {
   const requestStartedAt = Date.now();
   // Rate limiting and the client identifier check run before any heavy work so abusive
   // attempts short-circuit without touching downstream dependencies.
@@ -202,7 +197,15 @@ export const registerAction = async (
       validationIssues: issues,
       durationMs: Date.now() - requestStartedAt,
     });
-    return buildState('validation', extractPrefillValues(formData), issues);
+    redirect(
+      buildRedirectUrl('/auth/register', {
+        error: 'validation',
+        prefill: buildPrefillParam({
+          name: getFormValue(formData, 'name'),
+          email: getFormValue(formData, 'email'),
+        }),
+      }),
+    );
   }
 
   const { name, email, password } = parseResult.data;
@@ -245,7 +248,12 @@ export const registerAction = async (
       durationMs: Date.now() - requestStartedAt,
     });
 
-    return buildState('server-error', { name, email });
+    redirect(
+      buildRedirectUrl('/auth/register', {
+        error: 'server-error',
+        prefill: buildPrefillParam({ name, email }),
+      }),
+    );
   }
 
   if (!result.ok) {
@@ -256,9 +264,12 @@ export const registerAction = async (
       emailFingerprint,
       durationMs: Date.now() - requestStartedAt,
     });
-    const failureCode: RegisterErrorCode =
-      result.reason === 'email-taken' ? 'email-taken' : 'weak-password';
-    return buildState(failureCode, { name, email });
+    redirect(
+      buildRedirectUrl('/auth/register', {
+        error: result.reason,
+        prefill: buildPrefillParam({ name, email }),
+      }),
+    );
   }
 
   // Map the service outcome to the correct redirect so the UI can guide the user to

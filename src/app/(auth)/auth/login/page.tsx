@@ -82,6 +82,32 @@ const buildPrefill = (raw: string | undefined) => {
   };
 };
 
+type LoginPrefill = {
+  email?: string;
+};
+
+const parsePrefillParam = (raw: string | undefined): LoginPrefill => {
+  if (!raw) {
+    return {};
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null) {
+      return {};
+    }
+
+    const parsedRecord = parsed as Record<string, unknown>;
+    const email = typeof parsedRecord.email === 'string' ? parsedRecord.email : undefined;
+
+    return {
+      email,
+    };
+  } catch {
+    return {};
+  }
+};
+
 // Converts status and error codes into human-readable strings plus a tone for
 // styling.  Keeping the mapping server-side means we can refine messaging
 // without shipping additional client bundles.
@@ -216,7 +242,12 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
   const status = configurationStatus ?? buildStatusMessage(statusCode, errorCode);
   const parsedPrefill = buildPrefill(firstParamValue(searchParams?.prefill));
   const fallbackEmail = asOptionalTrimmedString(firstParamValue(searchParams?.email));
-  const emailPrefill = parsedPrefill.email ?? fallbackEmail ?? '';
+  //const emailPrefill = parsedPrefill.email ?? fallbackEmail ?? '';
+
+  const rawPrefill = parsePrefillParam(getParam(searchParams?.prefill));
+  const fallbackEmail = getParam(searchParams?.email);
+  const emailPrefill = (rawPrefill.email ?? fallbackEmail ?? '').trim();
+
   const inlineBannerCandidate = errorCode ? buildStatusMessage(undefined, errorCode) : null;
   const inlineBannerMessage =
     inlineBannerCandidate && inlineBannerCandidate.tone === 'error'
