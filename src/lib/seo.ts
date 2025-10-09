@@ -36,7 +36,7 @@ export function getAppUrl(): URL {
     cachedAppUrl = computeAppUrl();
   }
 
-  return new URL(cachedAppUrl.toString());
+  return cachedAppUrl;
 }
 
 export function absUrl(pathname: string | URL): string {
