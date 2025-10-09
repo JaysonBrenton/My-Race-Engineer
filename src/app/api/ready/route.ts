@@ -259,7 +259,10 @@ async function evaluateReadiness(logger: Logger): Promise<ReadinessEvaluation> {
     );
 
     const orphanMigrations = Array.from(migrationStatuses.entries())
-      .filter(([migration, status]) => !normalizedExpectedMigrations.includes(migration) && status !== 'applied')
+      .filter(
+        ([migration, status]) =>
+          !normalizedExpectedMigrations.includes(migration) && status !== 'applied',
+      )
       .map(([migration]) => migration);
 
     const outstandingMigrations = [
