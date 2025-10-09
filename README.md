@@ -11,6 +11,7 @@ Next.js (App Router) + TypeScript + Prisma/PostgreSQL with clean layering, stric
 - [Architecture at a glance](#architecture-at-a-glance)
 - [Local quickstart](#local-quickstart)
 - [Environment variables](#environment-variables)
+- [Authentication](#authentication)
 - [Scripts](#scripts)
 - [Error handling & logging](#error-handling--logging)
 - [Performance budgets](#performance-budgets)
@@ -122,7 +123,7 @@ Dev server listens on `http://localhost:3001/` (also `http://0.0.0.0:3001/`).
 ---
 
 ## Environment variables
-> **Source of truth:** `/.env.example` (keep it complete and current).  
+> **Source of truth:** `/.env.example` (keep it complete and current).
 > **Browser-safe keys** must be prefixed `NEXT_PUBLIC_` (Next.js only exposes those to the client).
 
 | Key | Purpose |
@@ -189,8 +190,16 @@ Expect a `303` redirect to `/auth/login?error=invalid-origin` and `x-auth-origin
 
 ---
 
+## Authentication
+- Auth forms are rendered dynamically (`force-dynamic`, `noStore()`) to keep tokens fresh and avoid silent resets.
+- Middleware guards only the `/auth/login` and `/auth/register` POST flows; `/api/**` endpoints remain unaffected.
+- Session cookies stay `httpOnly`, `sameSite='lax'`, and only use `secure` in production to prevent dev cookie drops.
+- See also: [Auth runtime & origin guard runbook](docs/guides/auth-runtime-and-origin-guard.md).
+
+---
+
 ## Scripts
-- `npm run dev` — start Next in dev on `:3001`  
+- `npm run dev` — start Next in dev on `:3001`
 - `npm run build` — typecheck + build  
 - `npm run start` — start production build (`.next/`)  
 - `npm run lint` — ESLint (with Prettier)  
