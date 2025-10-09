@@ -28,6 +28,18 @@ export type EnvDoctorOutcome = EnvDoctorReport & {
   isHealthy: boolean;
 };
 
+const TRUE_FLAG_VALUES = new Set(['1', 'true', 'yes', 'y', 'on']);
+const FALSE_FLAG_VALUES = new Set(['0', 'false', 'no', 'n', 'off']);
+
+const FEATURE_BOOLEAN_KEYS = new Set([
+  'FEATURE_REQUIRE_EMAIL_VERIFICATION',
+  'FEATURE_REQUIRE_ADMIN_APPROVAL',
+  'ENABLE_IMPORT_WIZARD',
+  'ENABLE_LIVERC_RESOLVER',
+  'ENABLE_IMPORT_FILE',
+  'ENABLE_LIVERC_FIXTURE_PROXY',
+]);
+
 export async function loadEnvExample(examplePath = '.env.example'): Promise<EnvExample> {
   const absolutePath = resolve(examplePath);
   const content = await readFile(absolutePath, 'utf8');
@@ -135,7 +147,10 @@ export function parseEnvKeyValue(line: string): { key: string; value: string } |
 }
 
 export function stripWrappingQuotes(value: string): string {
-  if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
     return value.slice(1, -1);
   }
   return value;
@@ -188,6 +203,28 @@ export function splitCsv(value: string): string[] {
     .filter((part) => part.length > 0);
 }
 
+export function parseBooleanFlagValue(value: string): boolean | null {
+  const normalised = value.trim().toLowerCase();
+
+  if (normalised.length === 0) {
+    return null;
+  }
+
+  if (TRUE_FLAG_VALUES.has(normalised)) {
+    return true;
+  }
+
+  if (FALSE_FLAG_VALUES.has(normalised)) {
+    return false;
+  }
+
+  return null;
+}
+
+export function isBooleanFlagValue(value: string): boolean {
+  return parseBooleanFlagValue(value) !== null;
+}
+
 export function evaluateEnvironment(options: {
   example: EnvExample;
   actual: Record<string, string | undefined>;
@@ -220,13 +257,53 @@ export function evaluateEnvironment(options: {
     }
 
     if (variable.key === 'SESSION_SECRET' && !looksLikeSessionSecret(trimmedValue)) {
-      invalidKeys.push({ key: variable.key, message: 'SESSION_SECRET must be at least 32 characters long.' });
+      invalidKeys.push({
+        key: variable.key,
+        message: 'SESSION_SECRET must be at least 32 characters long.',
+      });
     }
 
     if (variable.key === 'ALLOWED_ORIGINS') {
       const origins = splitCsv(trimmedValue);
       if (origins.length === 0) {
-        invalidKeys.push({ key: variable.key, message: 'ALLOWED_ORIGINS must list at least one origin.' });
+        invalidKeys.push({
+          key: variable.key,
+          message: 'ALLOWED_ORIGINS must list at least one origin.',
+        });
+      }
+
+      if (origins.some((origin) => canonicaliseOrigin(origin) === null)) {
+        invalidKeys.push({
+          key: variable.key,
+          message: 'ALLOWED_ORIGINS must contain valid HTTP(S) origins.',
+        });
+      }
+    }
+
+    if (variable.key === 'TRUST_PROXY') {
+      if (parseBooleanFlagValue(trimmedValue) === null) {
+        invalidKeys.push({
+          key: variable.key,
+          message: 'TRUST_PROXY must be set to "true" or "false".',
+        });
+      }
+    }
+
+    if (variable.key === 'NEXT_PUBLIC_BASE_URL' && trimmedValue.length > 0) {
+      if (!isAbsoluteUrl(trimmedValue)) {
+        invalidKeys.push({
+          key: variable.key,
+          message: 'NEXT_PUBLIC_BASE_URL must be an absolute HTTP(S) URL.',
+        });
+      }
+    }
+
+    if (FEATURE_BOOLEAN_KEYS.has(variable.key)) {
+      if (parseBooleanFlagValue(trimmedValue) === null) {
+        invalidKeys.push({
+          key: variable.key,
+          message: `${variable.key} must be set to "true" or "false".`,
+        });
       }
     }
   }
@@ -270,4 +347,3 @@ function dedupeIssues(issues: EnvIssue[]): EnvIssue[] {
 
   return Array.from(seen.values());
 }
-
