@@ -18,7 +18,7 @@ const isAuthPost = (request: NextRequest) =>
 
 const buildRedirectLocation = (request: NextRequest) => {
   const targetPath = request.nextUrl.pathname.startsWith('/auth/register') ? '/auth/register' : '/auth/login';
-  const redirectUrl = request.nextUrl.clone();
+  const redirectUrl = new URL(request.url);
   redirectUrl.pathname = targetPath;
   redirectUrl.search = '';
   redirectUrl.searchParams.set('error', 'invalid-origin');
@@ -48,7 +48,9 @@ export function middleware(request: NextRequest) {
 
   const result = isAllowedOrigin(request);
 
-  if (!result.allowed) {
+  const shouldRedirect = !result.allowed || result.reason === 'no-origin-header';
+
+  if (shouldRedirect) {
     const requestId = request.headers.get('x-request-id') ?? globalThis.crypto.randomUUID();
     logSecurityEvent('warn', 'auth.origin.mismatch', {
       requestId,
