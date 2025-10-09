@@ -18,8 +18,8 @@ import { createLogFingerprint } from '@/lib/logging/fingerprint';
 import { withSpan, type SpanAdapter, type WithSpan } from '@/lib/observability/tracing';
 import { checkRegisterRateLimit } from '@/lib/rateLimit/authRateLimiter';
 import { extractClientIdentifier } from '@/lib/request/clientIdentifier';
+import { computeCookieSecure, type CookieSecureStrategy } from '@/server/runtime/cookies';
 import { guardAuthPostOrigin } from '@/server/security/origin';
-import { isCookieSecure } from '@/server/runtime';
 
 import {
   buildPrefillParam,
@@ -126,7 +126,7 @@ export type RegisterActionDependencies = {
   withSpan: WithSpan;
   getAuthRequestLogger: typeof getAuthRequestLogger;
   registerUserService: RegisterService;
-  isCookieSecure: typeof isCookieSecure;
+  computeCookieSecure: typeof computeCookieSecure;
 };
 
 const defaultRegisterActionDependencies: RegisterActionDependencies = {
@@ -141,8 +141,21 @@ const defaultRegisterActionDependencies: RegisterActionDependencies = {
   withSpan,
   getAuthRequestLogger,
   registerUserService,
-  isCookieSecure,
+  computeCookieSecure,
 };
+
+const parseCookieSecureStrategy = (value: string | undefined): CookieSecureStrategy | undefined => {
+  if (value === 'auto' || value === 'always' || value === 'never') {
+    return value;
+  }
+
+  return undefined;
+};
+
+const resolveCookieSecureStrategy = (): CookieSecureStrategy =>
+  parseCookieSecureStrategy(
+    process.env.COOKIE_SECURE_STRATEGY as CookieSecureStrategy | undefined,
+  ) ?? (process.env.NODE_ENV === 'production' ? 'auto' : 'never');
 
 export type RegisterAction = (
   previousState: RegisterActionState,
@@ -362,12 +375,18 @@ export const createRegisterAction = (
               const cookieJar = deps.cookies();
               const expiresAt = result.session.expiresAt;
               const maxAge = Math.max(Math.floor((expiresAt.getTime() - Date.now()) / 1000), 1);
+              const secure = deps.computeCookieSecure({
+                strategy: resolveCookieSecureStrategy(),
+                trustProxy: process.env.TRUST_PROXY === 'true',
+                appUrl: process.env.APP_URL ?? null,
+                forwardedProto: headersList.get('x-forwarded-proto'),
+              });
               cookieJar.set({
                 name: 'mre_session',
                 value: result.session.token,
                 httpOnly: true,
                 sameSite: 'lax',
-                secure: deps.isCookieSecure(),
+                secure,
                 path: '/',
                 expires: expiresAt,
                 maxAge,
