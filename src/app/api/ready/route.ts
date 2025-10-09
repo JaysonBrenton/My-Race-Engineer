@@ -205,28 +205,66 @@ async function evaluateReadiness(logger: Logger): Promise<ReadinessEvaluation> {
     }
 
     const appliedMigrations = await prisma.$queryRaw<
-      Array<{ migration_name: string | null; finished_at: Date | null }>
+      Array<{
+        migration_name: string | null;
+        finished_at: Date | null;
+        rolled_back_at: Date | null;
+        started_at: Date | null;
+      }>
     >`
-      SELECT migration_name, finished_at
+      SELECT migration_name, finished_at, rolled_back_at, started_at
       FROM "_prisma_migrations"
-      ORDER BY finished_at DESC NULLS LAST, started_at DESC NULLS LAST
+      ORDER BY started_at DESC NULLS LAST, finished_at DESC NULLS LAST
     `;
 
-    const finishedMigrations = new Set(
-      appliedMigrations
-        .filter((migration) => migration.finished_at !== null && migration.migration_name)
-        .map((migration) => migration.migration_name as string),
+    const normalizeMigrationName = (migration: string) => migration.trim();
+
+    const migrationStatuses = new Map<string, 'applied' | 'in_progress' | 'rolled_back'>();
+
+    for (const migration of appliedMigrations) {
+      if (!migration.migration_name) {
+        continue;
+      }
+
+      const name = normalizeMigrationName(migration.migration_name);
+
+      if (migrationStatuses.has(name)) {
+        continue;
+      }
+
+      if (migration.rolled_back_at !== null) {
+        migrationStatuses.set(name, 'rolled_back');
+        continue;
+      }
+
+      if (migration.finished_at !== null) {
+        migrationStatuses.set(name, 'applied');
+        continue;
+      }
+
+      migrationStatuses.set(name, 'in_progress');
+    }
+
+    const normalizedExpectedMigrations = expectedMigrations.map((migration) =>
+      normalizeMigrationName(migration),
     );
 
-    const inProgressMigrations = appliedMigrations
-      .filter((migration) => migration.finished_at === null && migration.migration_name)
-      .map((migration) => migration.migration_name as string);
+    const pendingMigrations = normalizedExpectedMigrations.filter((migration) => {
+      const status = migrationStatuses.get(migration);
+      return !status || status === 'rolled_back';
+    });
 
-    const pendingMigrations = expectedMigrations.filter(
-      (migration) => !finishedMigrations.has(migration),
+    const inProgressMigrations = normalizedExpectedMigrations.filter(
+      (migration) => migrationStatuses.get(migration) === 'in_progress',
     );
 
-    const outstandingMigrations = [...new Set([...pendingMigrations, ...inProgressMigrations])];
+    const orphanMigrations = Array.from(migrationStatuses.entries())
+      .filter(([migration, status]) => !normalizedExpectedMigrations.includes(migration) && status !== 'applied')
+      .map(([migration]) => migration);
+
+    const outstandingMigrations = [
+      ...new Set([...pendingMigrations, ...inProgressMigrations, ...orphanMigrations]),
+    ];
 
     if (outstandingMigrations.length > 0) {
       checks.migrations = {
