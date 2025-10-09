@@ -8,20 +8,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import type { NextRequest } from 'next/server';
-
 import { middleware } from '../../../middleware';
 
-const createRequest = (url: string, init?: RequestInit): NextRequest => {
-  const request = new Request(url, init);
-
-  return {
-    headers: request.headers,
-    method: request.method,
-    nextUrl: new URL(url),
-    url,
-  } as unknown as NextRequest;
-};
+const createRequest = (url: string, init?: RequestInit): Request => new Request(url, init);
 
 const originalEnv = {
   APP_URL: process.env.APP_URL,
@@ -68,6 +57,7 @@ test('middleware allows POSTs from configured origins', () => {
   assert.equal(response?.status, 200);
   assert.equal(response?.headers.get('location'), null);
   assert.equal(response?.headers.get('x-auth-origin-guard'), 'ok');
+  assert.equal(response?.headers.get('x-auth-origin'), 'https://app.local:3001');
 });
 
 test('middleware redirects login POSTs with mismatched origins', () => {
@@ -89,7 +79,7 @@ test('middleware redirects login POSTs with mismatched origins', () => {
   assert.equal(response.headers.get('x-allowed-origins'), 'https://app.local:3001');
 });
 
-test('middleware redirects register POSTs when origin header is missing', () => {
+test('middleware allows register POSTs when origin header is missing', () => {
   process.env.ALLOWED_ORIGINS = 'https://app.local:3001';
 
   const request = createRequest('https://app.local:3001/auth/register', {
@@ -99,8 +89,8 @@ test('middleware redirects register POSTs when origin header is missing', () => 
   const response = middleware(request);
 
   assert(response);
-  assert.equal(response.status, 303);
-  assert.equal(response.headers.get('location'), 'https://app.local:3001/auth/register?error=invalid-origin');
-  assert.equal(response.headers.get('x-auth-origin-guard'), 'mismatch');
-  assert.equal(response.headers.get('x-allowed-origins'), 'https://app.local:3001');
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('location'), null);
+  assert.equal(response.headers.get('x-auth-origin-guard'), 'ok');
+  assert.equal(response.headers.get('x-auth-origin'), null);
 });
