@@ -17,7 +17,9 @@
     "env:sync": "tsx tools/env-sync.ts",
     "test:seo": "tsx --test tests/seo.test.ts",
     "test:auth": "tsx --test tests/core/auth/*.test.ts",
-    "test:auth:e2e": "tsx --test tests/core/auth/auth-flow.e2e.test.ts"
+    "test:auth:e2e": "tsx --test tests/core/auth/auth-flow.e2e.test.ts",
+    "test:cookie:unit": "tsx --test tests/server/runtime/cookies.strategy.test.ts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",
@@ -39,6 +41,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.0",
     "@types/node": "^20.14.8",
     "@types/nodemailer": "^7.0.2",
     "@types/react": "^18.3.3",

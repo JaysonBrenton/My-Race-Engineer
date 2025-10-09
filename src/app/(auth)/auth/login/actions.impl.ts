@@ -18,8 +18,8 @@ import { createLogFingerprint } from '@/lib/logging/fingerprint';
 import { withSpan, type SpanAdapter, type WithSpan } from '@/lib/observability/tracing';
 import { checkLoginRateLimit } from '@/lib/rateLimit/authRateLimiter';
 import { extractClientIdentifier } from '@/lib/request/clientIdentifier';
+import { computeCookieSecure, type CookieSecureStrategy } from '@/server/runtime/cookies';
 import { guardAuthPostOrigin } from '@/server/security/origin';
-import { isCookieSecure } from '@/server/runtime';
 
 // This server action executes the full login flow: it validates inputs, enforces
 // rate limits, delegates credential checks to the domain service, and finally
@@ -95,7 +95,7 @@ export type LoginActionDependencies = {
   withSpan: WithSpan;
   getAuthRequestLogger: typeof getAuthRequestLogger;
   loginUserService: LoginService;
-  isCookieSecure: typeof isCookieSecure;
+  computeCookieSecure: typeof computeCookieSecure;
 };
 
 const defaultLoginActionDependencies: LoginActionDependencies = {
@@ -110,8 +110,21 @@ const defaultLoginActionDependencies: LoginActionDependencies = {
   withSpan,
   getAuthRequestLogger,
   loginUserService,
-  isCookieSecure,
+  computeCookieSecure,
 };
+
+const parseCookieSecureStrategy = (value: string | undefined): CookieSecureStrategy | undefined => {
+  if (value === 'auto' || value === 'always' || value === 'never') {
+    return value;
+  }
+
+  return undefined;
+};
+
+const resolveCookieSecureStrategy = (): CookieSecureStrategy =>
+  parseCookieSecureStrategy(
+    process.env.COOKIE_SECURE_STRATEGY as CookieSecureStrategy | undefined,
+  ) ?? (process.env.NODE_ENV === 'production' ? 'auto' : 'never');
 
 export type LoginAction = (formData: FormData) => Promise<void>;
 
@@ -290,12 +303,19 @@ export const createLoginAction = (
         // The session cookie is httpOnly and same-site lax so it is resilient against
         // XSS and CSRF while still allowing multi-tab usage.  We rely on the TTL
         // returned by the service to synchronise browser and database expirations.
+        const secure = deps.computeCookieSecure({
+          strategy: resolveCookieSecureStrategy(),
+          trustProxy: process.env.TRUST_PROXY === 'true',
+          appUrl: process.env.APP_URL ?? null,
+          forwardedProto: headersList.get('x-forwarded-proto'),
+        });
+
         cookieJar.set({
           name: 'mre_session',
           value: result.sessionToken,
           httpOnly: true,
           sameSite: 'lax',
-          secure: deps.isCookieSecure(),
+          secure,
           path: '/',
           expires: expiresAt,
           maxAge,
