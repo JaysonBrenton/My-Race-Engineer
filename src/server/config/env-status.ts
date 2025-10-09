@@ -22,6 +22,8 @@ export type EnvDoctorReport = {
   missingKeys: string[];
   extraKeys: string[];
   invalidKeys: EnvIssue[];
+  warnings: EnvIssue[];
+  appliedDefaults: string[];
 };
 
 export type EnvDoctorOutcome = EnvDoctorReport & {
@@ -39,6 +41,58 @@ const FEATURE_BOOLEAN_KEYS = new Set([
   'ENABLE_IMPORT_FILE',
   'ENABLE_LIVERC_FIXTURE_PROXY',
 ]);
+
+const LIVERC_FLAG_KEYS = [
+  'ENABLE_IMPORT_WIZARD',
+  'ENABLE_LIVERC_RESOLVER',
+  'ENABLE_IMPORT_FILE',
+  'ENABLE_LIVERC_FIXTURE_PROXY',
+] as const;
+
+const COOKIE_SECURE_STRATEGY_VALUES = new Set(['auto', 'always', 'never']);
+
+const MAILER_DRIVERS = new Set(['console', 'smtp']);
+
+const LEGACY_SMTP_KEYS = new Set([
+  'SMTP_HOST',
+  'SMTP_PORT',
+  'SMTP_SECURE',
+  'SMTP_USER',
+  'SMTP_PASS',
+  'MAIL_FROM',
+  'MAIL_REPLY_TO',
+  'NEXTAUTH_URL',
+]);
+
+function looksLikeEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function isPositiveInteger(value: string): boolean {
+  return /^\d+$/.test(value) && Number(value) > 0;
+}
+
+function isValidSmtpUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    const protocol = parsed.protocol.toLowerCase();
+    if (protocol !== 'smtp:' && protocol !== 'smtps:') {
+      return false;
+    }
+
+    if (!parsed.hostname) {
+      return false;
+    }
+
+    if (!parsed.username || !parsed.password) {
+      return false;
+    }
+
+    return parsed.port !== '';
+  } catch (error) {
+    return false;
+  }
+}
 
 export async function loadEnvExample(examplePath = '.env.example'): Promise<EnvExample> {
   const absolutePath = resolve(examplePath);
@@ -232,107 +286,317 @@ export function evaluateEnvironment(options: {
 }): EnvDoctorOutcome {
   const { example, actual } = options;
   const actualKeys = new Set(options.actualKeys ?? Object.keys(actual));
+  const exampleKeys = new Set(example.variables.map((variable) => variable.key));
 
-  const missingKeys: string[] = [];
-  const invalidKeys: EnvIssue[] = [];
+  const missing = new Set<string>();
+  const invalid: EnvIssue[] = [];
+  const warnings: EnvIssue[] = [];
+  const appliedDefaults: string[] = [];
 
-  const exampleKeys = new Set<string>();
+  const readValue = (key: string) => {
+    const raw = actual[key];
+    return { raw, trimmed: raw === undefined ? '' : raw.trim() };
+  };
 
-  for (const variable of example.variables) {
-    exampleKeys.add(variable.key);
-    const actualValue = actual[variable.key];
-    if (actualValue === undefined) {
-      missingKeys.push(variable.key);
-      continue;
+  const { raw: appUrlRaw, trimmed: appUrlTrimmed } = readValue('APP_URL');
+  let appUrl: string | null = null;
+  if (appUrlRaw === undefined) {
+    missing.add('APP_URL');
+  } else if (appUrlTrimmed.length === 0) {
+    invalid.push({ key: 'APP_URL', message: 'APP_URL cannot be empty.' });
+  } else if (!isAbsoluteUrl(appUrlTrimmed)) {
+    invalid.push({ key: 'APP_URL', message: 'APP_URL must be an absolute HTTP(S) URL.' });
+  } else {
+    appUrl = appUrlTrimmed;
+  }
+
+  const { raw: sessionSecretRaw, trimmed: sessionSecretTrimmed } = readValue('SESSION_SECRET');
+  if (sessionSecretRaw === undefined) {
+    missing.add('SESSION_SECRET');
+  } else if (sessionSecretTrimmed.length === 0) {
+    invalid.push({ key: 'SESSION_SECRET', message: 'SESSION_SECRET cannot be empty.' });
+  } else if (!looksLikeSessionSecret(sessionSecretTrimmed)) {
+    invalid.push({
+      key: 'SESSION_SECRET',
+      message: 'SESSION_SECRET must be at least 32 characters long.',
+    });
+  }
+
+  const { raw: cookieStrategyRaw, trimmed: cookieStrategyTrimmed } = readValue('COOKIE_SECURE_STRATEGY');
+  if (cookieStrategyRaw === undefined) {
+    missing.add('COOKIE_SECURE_STRATEGY');
+  } else if (cookieStrategyTrimmed.length === 0) {
+    invalid.push({ key: 'COOKIE_SECURE_STRATEGY', message: 'COOKIE_SECURE_STRATEGY cannot be empty.' });
+  } else if (!COOKIE_SECURE_STRATEGY_VALUES.has(cookieStrategyTrimmed)) {
+    invalid.push({
+      key: 'COOKIE_SECURE_STRATEGY',
+      message: 'COOKIE_SECURE_STRATEGY must be one of auto, always, never.',
+    });
+  }
+
+  const { raw: trustProxyRaw, trimmed: trustProxyTrimmed } = readValue('TRUST_PROXY');
+  if (trustProxyRaw === undefined) {
+    missing.add('TRUST_PROXY');
+  } else if (trustProxyTrimmed.length === 0) {
+    invalid.push({ key: 'TRUST_PROXY', message: 'TRUST_PROXY cannot be empty.' });
+  } else if (parseBooleanFlagValue(trustProxyTrimmed) === null) {
+    invalid.push({ key: 'TRUST_PROXY', message: 'TRUST_PROXY must be set to "true" or "false".' });
+  }
+
+  const { raw: allowedOriginsRaw, trimmed: allowedOriginsTrimmed } = readValue('ALLOWED_ORIGINS');
+  let canonicalAllowedOrigins: string[] = [];
+  if (allowedOriginsRaw === undefined) {
+    missing.add('ALLOWED_ORIGINS');
+  } else if (allowedOriginsTrimmed.length === 0) {
+    invalid.push({ key: 'ALLOWED_ORIGINS', message: 'ALLOWED_ORIGINS must list at least one origin.' });
+  } else {
+    const parsedOrigins = splitCsv(allowedOriginsTrimmed);
+    if (parsedOrigins.length === 0) {
+      invalid.push({ key: 'ALLOWED_ORIGINS', message: 'ALLOWED_ORIGINS must list at least one origin.' });
+    } else {
+      const canonicalised = parsedOrigins.map(canonicaliseOrigin);
+      const invalidOriginPresent = canonicalised.some((origin) => origin === null);
+      if (invalidOriginPresent) {
+        invalid.push({
+          key: 'ALLOWED_ORIGINS',
+          message: 'ALLOWED_ORIGINS must contain valid HTTP(S) origins.',
+        });
+      } else {
+        canonicalAllowedOrigins = canonicalised as string[];
+      }
     }
+  }
 
-    const trimmedValue = actualValue.trim();
-    if (trimmedValue.length === 0) {
-      invalidKeys.push({ key: variable.key, message: 'Value is empty.' });
-      continue;
+  const { raw: publicOriginRaw, trimmed: publicOriginTrimmed } = readValue('NEXT_PUBLIC_APP_ORIGIN');
+  if (publicOriginRaw === undefined) {
+    missing.add('NEXT_PUBLIC_APP_ORIGIN');
+  } else if (publicOriginTrimmed.length === 0) {
+    if (appUrl) {
+      warnings.push({
+        key: 'NEXT_PUBLIC_APP_ORIGIN',
+        message: 'NEXT_PUBLIC_APP_ORIGIN is empty; defaulting to APP_URL.',
+      });
+      appliedDefaults.push('NEXT_PUBLIC_APP_ORIGIN=APP_URL');
+    } else {
+      invalid.push({
+        key: 'NEXT_PUBLIC_APP_ORIGIN',
+        message: 'NEXT_PUBLIC_APP_ORIGIN cannot be empty until APP_URL is configured.',
+      });
     }
+  } else if (!isAbsoluteUrl(publicOriginTrimmed)) {
+    invalid.push({
+      key: 'NEXT_PUBLIC_APP_ORIGIN',
+      message: 'NEXT_PUBLIC_APP_ORIGIN must be an absolute HTTP(S) URL.',
+    });
+  }
 
-    if (variable.key === 'APP_URL' && !isAbsoluteUrl(trimmedValue)) {
-      invalidKeys.push({ key: variable.key, message: 'APP_URL must be an absolute HTTP(S) URL.' });
+  const canonicalAppOrigin = appUrl ? canonicaliseOrigin(appUrl) : null;
+  if (canonicalAppOrigin && canonicalAllowedOrigins.length > 0) {
+    if (!canonicalAllowedOrigins.includes(canonicalAppOrigin)) {
+      invalid.push({
+        key: 'ALLOWED_ORIGINS',
+        message: 'ALLOWED_ORIGINS should include APP_URL origin.',
+      });
     }
+  }
 
-    if (variable.key === 'SESSION_SECRET' && !looksLikeSessionSecret(trimmedValue)) {
-      invalidKeys.push({
-        key: variable.key,
-        message: 'SESSION_SECRET must be at least 32 characters long.',
+  const { raw: tracingRaw, trimmed: tracingTrimmed } = readValue('TRACING_ENABLED');
+  let tracingEnabled = false;
+  if (tracingRaw === undefined || tracingTrimmed.length === 0) {
+    warnings.push({
+      key: 'TRACING_ENABLED',
+      message: 'TRACING_ENABLED is not set; defaulting to false.',
+    });
+    appliedDefaults.push('TRACING_ENABLED=false');
+  } else {
+    const parsed = parseBooleanFlagValue(tracingTrimmed);
+    if (parsed === null) {
+      invalid.push({ key: 'TRACING_ENABLED', message: 'TRACING_ENABLED must be "true" or "false".' });
+    } else {
+      tracingEnabled = parsed;
+    }
+  }
+
+  if (tracingEnabled) {
+    const { raw: otelEndpointRaw, trimmed: otelEndpointTrimmed } = readValue('OTEL_EXPORTER_OTLP_ENDPOINT');
+    if (otelEndpointRaw === undefined) {
+      missing.add('OTEL_EXPORTER_OTLP_ENDPOINT');
+    } else if (otelEndpointTrimmed.length === 0) {
+      invalid.push({
+        key: 'OTEL_EXPORTER_OTLP_ENDPOINT',
+        message: 'OTEL_EXPORTER_OTLP_ENDPOINT cannot be empty when tracing is enabled.',
+      });
+    } else if (!isAbsoluteUrl(otelEndpointTrimmed)) {
+      invalid.push({
+        key: 'OTEL_EXPORTER_OTLP_ENDPOINT',
+        message: 'OTEL_EXPORTER_OTLP_ENDPOINT must be an absolute HTTP(S) URL.',
       });
     }
 
-    if (variable.key === 'ALLOWED_ORIGINS') {
-      const origins = splitCsv(trimmedValue);
-      if (origins.length === 0) {
-        invalidKeys.push({
-          key: variable.key,
-          message: 'ALLOWED_ORIGINS must list at least one origin.',
-        });
-      }
-
-      if (origins.some((origin) => canonicaliseOrigin(origin) === null)) {
-        invalidKeys.push({
-          key: variable.key,
-          message: 'ALLOWED_ORIGINS must contain valid HTTP(S) origins.',
-        });
-      }
+    const { raw: otelServiceNameRaw, trimmed: otelServiceNameTrimmed } = readValue('OTEL_SERVICE_NAME');
+    if (otelServiceNameRaw === undefined) {
+      missing.add('OTEL_SERVICE_NAME');
+    } else if (otelServiceNameTrimmed.length === 0) {
+      invalid.push({
+        key: 'OTEL_SERVICE_NAME',
+        message: 'OTEL_SERVICE_NAME cannot be empty when tracing is enabled.',
+      });
     }
 
-    if (variable.key === 'TRUST_PROXY') {
-      if (parseBooleanFlagValue(trimmedValue) === null) {
-        invalidKeys.push({
-          key: variable.key,
-          message: 'TRUST_PROXY must be set to "true" or "false".',
-        });
-      }
-    }
-
-    if (variable.key === 'NEXT_PUBLIC_BASE_URL' && trimmedValue.length > 0) {
-      if (!isAbsoluteUrl(trimmedValue)) {
-        invalidKeys.push({
-          key: variable.key,
-          message: 'NEXT_PUBLIC_BASE_URL must be an absolute HTTP(S) URL.',
-        });
-      }
-    }
-
-    if (FEATURE_BOOLEAN_KEYS.has(variable.key)) {
-      if (parseBooleanFlagValue(trimmedValue) === null) {
-        invalidKeys.push({
-          key: variable.key,
-          message: `${variable.key} must be set to "true" or "false".`,
-        });
-      }
+    const { raw: otelHeadersRaw, trimmed: otelHeadersTrimmed } = readValue('OTEL_EXPORTER_OTLP_HEADERS');
+    if (otelHeadersRaw !== undefined && otelHeadersTrimmed.length === 0) {
+      warnings.push({
+        key: 'OTEL_EXPORTER_OTLP_HEADERS',
+        message: 'OTEL_EXPORTER_OTLP_HEADERS is empty; remove it or provide comma-separated header pairs.',
+      });
     }
   }
 
-  const extraKeys = Array.from(actualKeys).filter((key) => !exampleKeys.has(key));
+  const { raw: rateWindowRaw, trimmed: rateWindowTrimmed } = readValue('INGEST_RATE_LIMIT_WINDOW_MS');
+  const { raw: rateMaxRaw, trimmed: rateMaxTrimmed } = readValue('INGEST_RATE_LIMIT_MAX_REQUESTS');
+  const hasRateWindow = rateWindowRaw !== undefined && rateWindowTrimmed.length > 0;
+  const hasRateMax = rateMaxRaw !== undefined && rateMaxTrimmed.length > 0;
+  if (hasRateWindow || hasRateMax) {
+    if (!hasRateWindow) {
+      invalid.push({
+        key: 'INGEST_RATE_LIMIT_WINDOW_MS',
+        message: 'Provide INGEST_RATE_LIMIT_WINDOW_MS when enabling rate limiting.',
+      });
+    } else if (!isPositiveInteger(rateWindowTrimmed)) {
+      invalid.push({
+        key: 'INGEST_RATE_LIMIT_WINDOW_MS',
+        message: 'INGEST_RATE_LIMIT_WINDOW_MS must be a positive integer (milliseconds).',
+      });
+    }
 
-  const actualAppUrl = actual.APP_URL ?? '';
-  const canonicalAppOrigin = canonicaliseOrigin(actualAppUrl);
-  if (canonicalAppOrigin) {
-    const allowedOriginsRaw = actual.ALLOWED_ORIGINS;
-    if (allowedOriginsRaw !== undefined) {
-      const allowedOrigins = splitCsv(allowedOriginsRaw)
-        .map(canonicaliseOrigin)
-        .filter((origin): origin is string => origin !== null);
-      if (!allowedOrigins.includes(canonicalAppOrigin)) {
-        invalidKeys.push({
-          key: 'ALLOWED_ORIGINS',
-          message: 'ALLOWED_ORIGINS should include APP_URL origin.',
-        });
-      }
+    if (!hasRateMax) {
+      invalid.push({
+        key: 'INGEST_RATE_LIMIT_MAX_REQUESTS',
+        message: 'Provide INGEST_RATE_LIMIT_MAX_REQUESTS when enabling rate limiting.',
+      });
+    } else if (!isPositiveInteger(rateMaxTrimmed)) {
+      invalid.push({
+        key: 'INGEST_RATE_LIMIT_MAX_REQUESTS',
+        message: 'INGEST_RATE_LIMIT_MAX_REQUESTS must be a positive integer.',
+      });
     }
   }
 
-  const normalizedInvalid = dedupeIssues(invalidKeys);
+  const { raw: mailerDriverRaw, trimmed: mailerDriverTrimmed } = readValue('MAILER_DRIVER');
+  let mailerDriver = 'console';
+  if (mailerDriverRaw === undefined || mailerDriverTrimmed.length === 0) {
+    warnings.push({
+      key: 'MAILER_DRIVER',
+      message: 'MAILER_DRIVER is not set; defaulting to console.',
+    });
+    appliedDefaults.push('MAILER_DRIVER=console');
+  } else {
+    const driverCandidate = mailerDriverTrimmed.toLowerCase();
+    if (!MAILER_DRIVERS.has(driverCandidate)) {
+      invalid.push({
+        key: 'MAILER_DRIVER',
+        message: 'MAILER_DRIVER must be one of console, smtp.',
+      });
+    } else {
+      mailerDriver = driverCandidate;
+    }
+  }
+
+  if (mailerDriver === 'smtp') {
+    const { raw: smtpUrlRaw, trimmed: smtpUrlTrimmed } = readValue('SMTP_URL');
+    if (smtpUrlRaw === undefined) {
+      missing.add('SMTP_URL');
+    } else if (smtpUrlTrimmed.length === 0) {
+      invalid.push({ key: 'SMTP_URL', message: 'SMTP_URL cannot be empty when MAILER_DRIVER=smtp.' });
+    } else if (!isValidSmtpUrl(smtpUrlTrimmed)) {
+      invalid.push({
+        key: 'SMTP_URL',
+        message: 'SMTP_URL must look like smtp://user:pass@host:port or smtps://…',
+      });
+    }
+
+    const { raw: mailFromEmailRaw, trimmed: mailFromEmailTrimmed } = readValue('MAIL_FROM_EMAIL');
+    if (mailFromEmailRaw === undefined) {
+      missing.add('MAIL_FROM_EMAIL');
+    } else if (mailFromEmailTrimmed.length === 0) {
+      invalid.push({ key: 'MAIL_FROM_EMAIL', message: 'MAIL_FROM_EMAIL cannot be empty when MAILER_DRIVER=smtp.' });
+    } else if (!looksLikeEmail(mailFromEmailTrimmed)) {
+      invalid.push({ key: 'MAIL_FROM_EMAIL', message: 'MAIL_FROM_EMAIL must look like an email address.' });
+    }
+
+    const { raw: mailFromNameRaw, trimmed: mailFromNameTrimmed } = readValue('MAIL_FROM_NAME');
+    if (mailFromNameRaw === undefined) {
+      missing.add('MAIL_FROM_NAME');
+    } else if (mailFromNameTrimmed.length === 0) {
+      invalid.push({ key: 'MAIL_FROM_NAME', message: 'MAIL_FROM_NAME cannot be empty when MAILER_DRIVER=smtp.' });
+    }
+  }
+
+  const liveRcEnabled = LIVERC_FLAG_KEYS.some((key) => {
+    const { raw, trimmed } = readValue(key);
+    if (raw === undefined || trimmed.length === 0) {
+      return false;
+    }
+    const parsed = parseBooleanFlagValue(trimmed);
+    if (parsed === null) {
+      invalid.push({ key, message: `${key} must be set to "true" or "false".` });
+      return false;
+    }
+    return parsed;
+  });
+
+  const { raw: liveRcBaseRaw, trimmed: liveRcBaseTrimmed } = readValue('LIVERC_HTTP_BASE');
+  if (liveRcEnabled) {
+    if (liveRcBaseRaw === undefined) {
+      missing.add('LIVERC_HTTP_BASE');
+    } else if (liveRcBaseTrimmed.length === 0) {
+      invalid.push({ key: 'LIVERC_HTTP_BASE', message: 'LIVERC_HTTP_BASE cannot be empty when LiveRC features are enabled.' });
+    } else if (!isAbsoluteUrl(liveRcBaseTrimmed)) {
+      invalid.push({ key: 'LIVERC_HTTP_BASE', message: 'LIVERC_HTTP_BASE must be an absolute HTTP(S) URL.' });
+    }
+  }
+
+  const { raw: publicBaseRaw, trimmed: publicBaseTrimmed } = readValue('NEXT_PUBLIC_BASE_URL');
+  if (publicBaseRaw !== undefined && publicBaseTrimmed.length > 0 && !isAbsoluteUrl(publicBaseTrimmed)) {
+    invalid.push({
+      key: 'NEXT_PUBLIC_BASE_URL',
+      message: 'NEXT_PUBLIC_BASE_URL must be an absolute HTTP(S) URL.',
+    });
+  }
+
+  for (const key of FEATURE_BOOLEAN_KEYS) {
+    const { raw, trimmed } = readValue(key);
+    if (raw === undefined || trimmed.length === 0) {
+      continue;
+    }
+    if (parseBooleanFlagValue(trimmed) === null) {
+      invalid.push({ key, message: `${key} must be set to "true" or "false".` });
+    }
+  }
+
+  for (const key of LEGACY_SMTP_KEYS) {
+    if (actual[key] !== undefined) {
+      warnings.push({
+        key,
+        message: `${key} is deprecated; migrate to SMTP_URL / MAIL_FROM_* when using smtp.`,
+      });
+    }
+  }
+
+  const extraKeys = Array.from(actualKeys).filter(
+    (key) => !exampleKeys.has(key) && !LEGACY_SMTP_KEYS.has(key),
+  );
+
+  const normalizedInvalid = dedupeIssues(invalid);
+  const normalizedWarnings = dedupeIssues(warnings);
+  const missingKeys = Array.from(missing);
 
   return {
     missingKeys,
     extraKeys,
     invalidKeys: normalizedInvalid,
+    warnings: normalizedWarnings,
+    appliedDefaults,
     isHealthy: missingKeys.length === 0 && normalizedInvalid.length === 0,
   };
 }

@@ -126,7 +126,7 @@ Dev server listens on `http://localhost:3001/` (also `http://0.0.0.0:3001/`).
 ## Configuration
 
 - After every `git pull`, run `npm run env:doctor` to diff `.env` against `.env.example` and catch missing or invalid keys early.
-- When `env:doctor` reports missing keys, run `npm run env:sync` to append placeholders safely, then open `.env` to provide real values.
+- When `env:doctor` reports missing keys, run `npm run env:sync` to append required placeholders safely (add `-- --all` to include every optional key), then open `.env` to provide real values.
 - Pulling code never edits your `.env` automatically—new secrets must always be filled in by hand.
 
 ---
@@ -134,6 +134,7 @@ Dev server listens on `http://localhost:3001/` (also `http://0.0.0.0:3001/`).
 ## Environment variables
 > **Source of truth:** `/.env.example` (keep it complete and current).
 > **Browser-safe keys** must be prefixed `NEXT_PUBLIC_` (Next.js only exposes those to the client).
+> Optional feature keys can remain empty — `npm run env:doctor` only fails them when the relevant feature is enabled.
 
 | Key | Purpose |
 |---|---|
@@ -163,10 +164,21 @@ Dev server listens on `http://localhost:3001/` (also `http://0.0.0.0:3001/`).
 | `NEXT_PUBLIC_APP_NAME` | Public app name |
 | `NEXT_PUBLIC_ENV` | `development` / `production` (UI only) |
 | `NEXT_PUBLIC_BASE_URL` | Same as `APP_URL` for client code |
+| `NEXT_PUBLIC_APP_ORIGIN` | Browser-visible origin (match `APP_URL` for single-origin setups) |
 
 > ⚠️ Authentication forms are disabled when `SESSION_SECRET` is missing or shorter than 32 characters. Always set a strong value in production so registration, sign-in, and password reset flows function correctly.
 >
 > ℹ️ POSTs to `/auth/login` and `/auth/register` are pre-screened in middleware. Keep `ALLOWED_ORIGINS` (or `APP_URL`) aligned with the browser origin or requests will be redirected with `?error=invalid-origin` before they reach the route handlers.
+
+### Feature-aware env keys
+
+| Feature | Keys | Required when |
+| --- | --- | --- |
+| Always-on | `APP_URL`, `NEXT_PUBLIC_APP_ORIGIN` (defaults to `APP_URL` when blank), `ALLOWED_ORIGINS`, `SESSION_SECRET`, `COOKIE_SECURE_STRATEGY`, `TRUST_PROXY` | Always required for auth/session safety |
+| Tracing | `TRACING_ENABLED`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`, `OTEL_EXPORTER_OTLP_HEADERS` | Set `TRACING_ENABLED=true` to enable tracing; endpoint + service name become mandatory (headers optional) |
+| Rate limiting | `INGEST_RATE_LIMIT_WINDOW_MS`, `INGEST_RATE_LIMIT_MAX_REQUESTS` | Provide both as positive integers to enable ingestion throttling |
+| Mailer (SMTP) | `MAILER_DRIVER`, `SMTP_URL`, `MAIL_FROM_EMAIL`, `MAIL_FROM_NAME` | `MAILER_DRIVER` defaults to `console`; switch to `smtp` to require the SMTP URL and identities |
+| LiveRC | `ENABLE_IMPORT_WIZARD`, `ENABLE_LIVERC_RESOLVER`, `ENABLE_IMPORT_FILE`, `ENABLE_LIVERC_FIXTURE_PROXY`, `LIVERC_HTTP_BASE` | When any toggle is truthy (`1`/`true`), configure `LIVERC_HTTP_BASE` to a valid HTTP(S) endpoint |
 
 ---
 

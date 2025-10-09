@@ -328,14 +328,26 @@ function methodNotAllowedResponse() {
 
 function buildEnvHint(report: EnvDoctorOutcome): EnvHint {
   const keysNeedingAttention = Array.from(
-    new Set([...report.missingKeys, ...report.invalidKeys.map((issue) => issue.key)]),
+    new Set([
+      ...report.missingKeys,
+      ...report.invalidKeys.map((issue) => issue.key),
+      ...report.warnings.map((issue) => issue.key),
+    ]),
   ).sort();
 
-  if (report.isHealthy) {
+  if (report.isHealthy && report.warnings.length === 0) {
     return {
       status: 'ok',
       missingKeys: [],
       message: 'Environment configuration looks complete.',
+    };
+  }
+
+  if (report.isHealthy) {
+    return {
+      status: 'warn',
+      missingKeys: keysNeedingAttention,
+      message: 'Environment defaults applied; review warnings from env:doctor to keep values intentional.',
     };
   }
 
