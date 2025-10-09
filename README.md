@@ -304,6 +304,7 @@ Use **semantic colour tokens** instead of hard-coding hex in components.
 ### Guardrails & environment references
 - [`docs/guardrails/product-guardrails.md`](docs/guardrails/product-guardrails.md) — MVP scope, success measures, and non-goals.
 - [`docs/guardrails/qa-network-access.md`](docs/guardrails/qa-network-access.md) — sandbox networking limits for QA validation.
+- [`docs/guides/app-url-build-failure.md`](docs/guides/app-url-build-failure.md) — explains the historical APP_URL build crash and the current fallback strategy.
 
 ### UX principles
 - [`docs/ux-principles.md`](docs/ux-principles.md) — layout, spacing, accessibility, and microcopy standards for authentication flows.
