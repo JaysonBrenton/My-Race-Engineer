@@ -78,8 +78,6 @@ const authLogger = authFileLogger
 
 const createAuthFlowLogger = (route: string) => authLogger.withContext({ route });
 
-export const getAuthRequestLogger = (context: LoggerContext) => authLogger.withContext(context);
-
 const registerLogger = createAuthFlowLogger('auth/register');
 const loginLogger = createAuthFlowLogger('auth/login');
 const verifyEmailLogger = createAuthFlowLogger('auth/verify-email');

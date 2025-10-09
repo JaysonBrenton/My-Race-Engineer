@@ -98,7 +98,7 @@ export const loginAction = async (formData: FormData) => {
       'http.route': 'auth/login',
     },
     async (span) => {
-      const logger = getAuthRequestLogger({
+      const logger = getRequestLogger({
         requestId,
         route: 'auth/login',
       });

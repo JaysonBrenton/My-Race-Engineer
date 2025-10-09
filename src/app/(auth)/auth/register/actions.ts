@@ -129,7 +129,7 @@ export const registerAction = async (
       'http.route': 'auth/register',
     },
     async (span) => {
-      const logger = getAuthRequestLogger({
+      const logger = getRequestLogger({
         requestId,
         route: 'auth/register',
       });
