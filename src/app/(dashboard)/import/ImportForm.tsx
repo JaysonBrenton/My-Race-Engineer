@@ -76,6 +76,8 @@ type BulkImportRow = {
   requestId?: string;
 };
 
+const BULK_IMPORT_CONCURRENCY = 4;
+
 type FileImportPreview = {
   fileName: string;
   fileSizeBytes: number;
@@ -189,70 +191,98 @@ const isImportSummary = (value: unknown): value is LiveRcImportSummary => {
   );
 };
 
-const parseBulkInput = (value: string): BulkImportRow[] => {
+type CachedBulkParseResult = {
+  host: string;
+  type: BulkImportRowType;
+  slugs?: [string, string, string, string];
+  canonicalAbsoluteJsonUrl?: string;
+  statusMessage?: string;
+};
+
+const parseBulkLine = (
+  line: string,
+  cache: Map<string, CachedBulkParseResult>,
+): CachedBulkParseResult => {
+  const cached = cache.get(line);
+  if (cached) {
+    return cached;
+  }
+
+  let parsedUrl: URL | null = null;
+
+  try {
+    parsedUrl = new URL(line);
+  } catch {
+    parsedUrl = null;
+  }
+
+  let result: LiveRcUrlParseResult;
+  try {
+    result = parseLiveRcUrl(line);
+  } catch {
+    const fallback: CachedBulkParseResult = {
+      host: parsedUrl ? parsedUrl.host : '',
+      type: 'invalid',
+      statusMessage: LiveRcUrlInvalidReasons.INVALID_ABSOLUTE_URL,
+    };
+    cache.set(line, fallback);
+    return fallback;
+  }
+
+  if (result.type === 'json') {
+    const canonicalAbsoluteJsonUrl = parsedUrl
+      ? new URL(result.canonicalJsonPath, parsedUrl.origin).toString()
+      : line;
+
+    const parsed: CachedBulkParseResult = {
+      host: parsedUrl ? parsedUrl.host : '',
+      type: 'json',
+      slugs: result.slugs,
+      canonicalAbsoluteJsonUrl,
+    };
+    cache.set(line, parsed);
+    return parsed;
+  }
+
+  if (result.type === 'html') {
+    const parsed: CachedBulkParseResult = {
+      host: parsedUrl ? parsedUrl.host : '',
+      type: 'html',
+      statusMessage: 'Needs JSON',
+    };
+    cache.set(line, parsed);
+    return parsed;
+  }
+
+  const parsed: CachedBulkParseResult = {
+    host: parsedUrl ? parsedUrl.host : '',
+    type: 'invalid',
+    statusMessage: result.reasonIfInvalid,
+  };
+  cache.set(line, parsed);
+  return parsed;
+};
+
+const parseBulkInput = (
+  value: string,
+  cache: Map<string, CachedBulkParseResult>,
+): BulkImportRow[] => {
   const lines = value
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
 
   return lines.map((line, index) => {
-    const id = `${index}-${line}`;
-    let parsedUrl: URL | null = null;
-
-    try {
-      parsedUrl = new URL(line);
-    } catch {
-      parsedUrl = null;
-    }
-
-    let result: LiveRcUrlParseResult;
-    try {
-      result = parseLiveRcUrl(line);
-    } catch {
-      return {
-        id,
-        input: line,
-        host: parsedUrl ? parsedUrl.host : '',
-        type: 'invalid',
-        status: 'idle',
-        statusMessage: LiveRcUrlInvalidReasons.INVALID_ABSOLUTE_URL,
-      };
-    }
-
-    if (result.type === 'json') {
-      const canonicalAbsoluteJsonUrl = parsedUrl
-        ? new URL(result.canonicalJsonPath, parsedUrl.origin).toString()
-        : line;
-
-      return {
-        id,
-        input: line,
-        host: parsedUrl ? parsedUrl.host : '',
-        type: 'json',
-        slugs: result.slugs,
-        canonicalAbsoluteJsonUrl,
-        status: 'idle',
-      } satisfies BulkImportRow;
-    }
-
-    if (result.type === 'html') {
-      return {
-        id,
-        input: line,
-        host: parsedUrl ? parsedUrl.host : '',
-        type: 'html',
-        status: 'idle',
-        statusMessage: 'Needs JSON',
-      } satisfies BulkImportRow;
-    }
-
+    const parsed = parseBulkLine(line, cache);
     return {
-      id,
+      id: `${index}-${line}`,
       input: line,
-      host: parsedUrl ? parsedUrl.host : '',
-      type: 'invalid',
+      host: parsed.host,
+      type: parsed.type,
+      slugs: parsed.slugs,
+      canonicalAbsoluteJsonUrl: parsed.canonicalAbsoluteJsonUrl,
       status: 'idle',
-      statusMessage: result.reasonIfInvalid,
+      statusMessage: parsed.statusMessage,
     } satisfies BulkImportRow;
   });
 };
@@ -325,6 +355,7 @@ const BulkImportTab = ({
   const [bulkInput, setBulkInput] = useState('');
   const [rows, setRows] = useState<BulkImportRow[]>([]);
   const [isImporting, setIsImporting] = useState(false);
+  const parseCacheRef = useRef<Map<string, CachedBulkParseResult>>(new Map());
 
   const readyRows = useMemo(
     () =>
@@ -335,11 +366,54 @@ const BulkImportTab = ({
     [rows],
   );
 
+  const applyRowUpdates = useCallback(
+    (updates: Array<{ id: string; patch: Partial<BulkImportRow> }>) => {
+      if (updates.length === 0) {
+        return;
+      }
+
+      setRows((previous) => {
+        const updateMap = new Map(updates.map(({ id, patch }) => [id, patch]));
+        let hasChange = false;
+
+        const next = previous.map((row) => {
+          const patch = updateMap.get(row.id);
+          if (!patch) {
+            return row;
+          }
+
+          if (!hasChange) {
+            for (const key of Object.keys(patch) as Array<keyof BulkImportRow>) {
+              if (row[key] !== patch[key]) {
+                hasChange = true;
+                break;
+              }
+            }
+          }
+
+          return { ...row, ...patch } satisfies BulkImportRow;
+        });
+
+        return hasChange ? next : previous;
+      });
+    },
+    [],
+  );
+
   const handleBulkInputChange = useCallback((event: ChangeEvent<HTMLTextAreaElement>) => {
     const nextValue = event.target.value;
     setBulkInput(nextValue);
-    setRows(parseBulkInput(nextValue));
   }, []);
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      setRows(parseBulkInput(bulkInput, parseCacheRef.current));
+    }, 200);
+
+    return () => {
+      window.clearTimeout(handle);
+    };
+  }, [bulkInput]);
 
   const handleImportAll = useCallback(async () => {
     if (isImporting || readyRows.length === 0) {
@@ -347,93 +421,105 @@ const BulkImportTab = ({
     }
 
     setIsImporting(true);
-    setRows((previous) =>
-      previous.map((row) =>
-        row.type === 'json'
-          ? { ...row, status: 'queued', statusMessage: undefined, requestId: undefined }
-          : row,
-      ),
+    const rowsToImport = [...readyRows];
+
+    applyRowUpdates(
+      rowsToImport.map((row) => ({
+        id: row.id,
+        patch: { status: 'queued', statusMessage: undefined, requestId: undefined },
+      })),
+    );
+
+    const concurrencyLimit = Math.min(BULK_IMPORT_CONCURRENCY, rowsToImport.length);
+    let nextIndex = 0;
+
+    const workers = Array.from({ length: concurrencyLimit }, () =>
+      (async () => {
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          const currentIndex = nextIndex;
+          nextIndex += 1;
+          if (currentIndex >= rowsToImport.length) {
+            break;
+          }
+
+          const row = rowsToImport[currentIndex];
+
+          applyRowUpdates([
+            {
+              id: row.id,
+              patch: { status: 'importing', statusMessage: undefined, requestId: undefined },
+            },
+          ]);
+
+          try {
+            const response = await fetch('/api/liverc/import', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                url: row.canonicalAbsoluteJsonUrl,
+                includeOutlaps: false,
+              }),
+            });
+
+            const payload: unknown = await response.json().catch(() => null);
+            const requestId =
+              isRecord(payload) && typeof payload.requestId === 'string'
+                ? payload.requestId
+                : undefined;
+
+            if (response.ok) {
+              applyRowUpdates([
+                {
+                  id: row.id,
+                  patch: {
+                    status: 'done',
+                    statusMessage: requestId ? `Request ${requestId}` : undefined,
+                    requestId,
+                  },
+                },
+              ]);
+              continue;
+            }
+
+            let errorPayload: unknown = payload;
+            if (isRecord(payload) && 'error' in payload) {
+              errorPayload = payload.error;
+            }
+
+            applyRowUpdates([
+              {
+                id: row.id,
+                patch: {
+                  status: 'error',
+                  statusMessage: formatError(errorPayload),
+                  requestId,
+                },
+              },
+            ]);
+          } catch (error) {
+            applyRowUpdates([
+              {
+                id: row.id,
+                patch: {
+                  status: 'error',
+                  statusMessage: formatError(error),
+                },
+              },
+            ]);
+          }
+        }
+      })(),
     );
 
     try {
-      for (const row of readyRows) {
-        setRows((previous) =>
-          previous.map((current) =>
-            current.id === row.id
-              ? { ...current, status: 'importing', statusMessage: undefined, requestId: undefined }
-              : current,
-          ),
-        );
-
-        try {
-          const response = await fetch('/api/liverc/import', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              url: row.canonicalAbsoluteJsonUrl,
-              includeOutlaps: false,
-            }),
-          });
-
-          const payload: unknown = await response.json().catch(() => null);
-          const requestId =
-            isRecord(payload) && typeof payload.requestId === 'string'
-              ? payload.requestId
-              : undefined;
-
-          if (response.ok) {
-            setRows((previous) =>
-              previous.map((current) =>
-                current.id === row.id
-                  ? {
-                      ...current,
-                      status: 'done',
-                      statusMessage: requestId ? `Request ${requestId}` : undefined,
-                      requestId,
-                    }
-                  : current,
-              ),
-            );
-            continue;
-          }
-
-          let errorPayload: unknown = payload;
-          if (isRecord(payload) && 'error' in payload) {
-            errorPayload = payload.error;
-          }
-
-          setRows((previous) =>
-            previous.map((current) =>
-              current.id === row.id
-                ? {
-                    ...current,
-                    status: 'error',
-                    statusMessage: formatError(errorPayload),
-                    requestId,
-                  }
-                : current,
-            ),
-          );
-        } catch (error) {
-          setRows((previous) =>
-            previous.map((current) =>
-              current.id === row.id
-                ? {
-                    ...current,
-                    status: 'error',
-                    statusMessage: formatError(error),
-                  }
-                : current,
-            ),
-          );
-        }
-      }
+      await Promise.all(workers);
     } finally {
       setIsImporting(false);
     }
-  }, [isImporting, readyRows]);
+  }, [applyRowUpdates, isImporting, readyRows]);
 
   const toneClassMap: Record<StatusTone, string> = {
     default: styles.statusToneDefault,
@@ -525,7 +611,7 @@ const BulkImportTab = ({
         <p className={styles.helper}>
           {readyRows.length === 0
             ? 'Add LiveRC JSON links above to enable bulk import.'
-            : `Queued imports run one at a time (${readyRows.length} ready).`}
+            : `Queued imports run in parallel (up to ${BULK_IMPORT_CONCURRENCY} at a time, ${readyRows.length} ready).`}
         </p>
       </div>
     </section>
