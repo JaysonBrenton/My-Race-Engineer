@@ -1,12 +1,30 @@
+/**
+ * Filename: src/app/(auth)/auth/register/page.tsx
+ * Purpose: Render the registration form with safe prefills, inline error states, and cache disabling.
+ * Author: Jayson Brenton
+ * Date: 2025-03-18
+ * License: MIT License
+ */
+
 import type { Metadata } from 'next';
-import Link from 'next/link';
+import { unstable_noStore as noStore } from 'next/cache';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 import { MissingAuthFormTokenSecretError, generateAuthFormToken } from '@/lib/auth/formTokens';
 import { canonicalFor } from '@/lib/seo';
 
 import styles from '../auth.module.css';
+import { registerAction } from './actions';
+import {
+  INITIAL_REGISTER_STATE,
+  buildStatusMessage,
+  type RegisterActionState,
+  type RegisterErrorCode,
+  type StatusMessage,
+} from './state';
+import { RegisterForm } from './register-form';
 
 const PAGE_TITLE = 'Create your My Race Engineer account';
 const PAGE_DESCRIPTION =
@@ -42,13 +60,6 @@ type RegisterPageProps = {
   searchParams?: Record<string, string | string[] | undefined>;
 };
 
-type StatusTone = 'info' | 'error';
-
-type StatusMessage = {
-  tone: StatusTone;
-  message: string;
-};
-
 // `searchParams` values may be arrays due to repeated query keys.  We take the first
 // entry to keep the UI deterministic and ignore unexpected values.
 const getParam = (value: string | string[] | undefined) => {
@@ -59,64 +70,29 @@ const getParam = (value: string | string[] | undefined) => {
   return value ?? undefined;
 };
 
-// Translate redirect error codes into human-friendly copy that also drives the visual
-// state of the live region.  Keeping the mapping in one place makes it easy to audit
-// for accessibility.
-const buildStatusMessage = (errorCode: string | undefined): StatusMessage => {
-  switch (errorCode) {
-    case 'invalid-origin':
-      return {
-        tone: 'error' as const,
-        message:
-          'This request came from an origin that is not allowed. Update the ALLOWED_ORIGINS environment variable to include this site and refresh the page.',
-      };
-    case 'invalid-token':
-      return {
-        tone: 'error' as const,
-        message: 'Your session expired. Refresh the page and try again.',
-      };
-    case 'validation':
-      return {
-        tone: 'error' as const,
-        message: 'Check the highlighted fields and try submitting again.',
-      };
-    case 'email-taken':
-      return {
-        tone: 'error' as const,
-        message: 'An account already exists for that email address. Try signing in instead.',
-      };
-    case 'weak-password':
-      return {
-        tone: 'error' as const,
-        message: 'Choose a stronger password that meets the security policy.',
-      };
-    case 'rate-limited':
-      return {
-        tone: 'error' as const,
-        message: 'Too many attempts in a short time. Wait a few minutes before trying again.',
-      };
-    case 'server-error':
-      return {
-        tone: 'error' as const,
-        message:
-          'We hit an unexpected error while creating your account. Please try again shortly.',
-      };
-    default:
-      return {
-        tone: 'info' as const,
-        message: 'We will send you a verification email after submission.',
-      };
-  }
+type RegisterPrefill = {
+  name?: string;
+  email?: string;
 };
 
-// The tone controls both colour and iconography.  A helper encapsulates the CSS class
-// juggling so the JSX stays readable.
-const getStatusClassName = (tone: StatusTone) => {
-  switch (tone) {
-    case 'error':
-      return `${styles.statusRegion} ${styles.statusError}`;
-    default:
-      return `${styles.statusRegion} ${styles.statusInfo}`;
+const parsePrefillParam = (raw: string | undefined): RegisterPrefill => {
+  if (!raw) {
+    return {};
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null) {
+      return {};
+    }
+
+    const shape = parsed as Record<string, unknown>;
+    const name = typeof shape.name === 'string' ? shape.name : undefined;
+    const email = typeof shape.email === 'string' ? shape.email : undefined;
+
+    return { name, email };
+  } catch {
+    return {};
   }
 };
 
@@ -127,6 +103,7 @@ const buildConfigurationErrorStatus = (): StatusMessage => ({
 });
 
 export default function RegisterPage({ searchParams }: RegisterPageProps) {
+  noStore();
   let formToken: string | null = null;
   let configurationStatus: StatusMessage | null = null;
 
@@ -145,11 +122,22 @@ export default function RegisterPage({ searchParams }: RegisterPageProps) {
   // Merge configuration errors with any status returned from the action so the live
   // region always reflects the highest priority message for the user.
   const errorCode = getParam(searchParams?.error);
-  const status = configurationStatus ?? buildStatusMessage(errorCode);
-  const namePrefill = getParam(searchParams?.name) ?? '';
-  const emailPrefill = getParam(searchParams?.email) ?? '';
-  const statusClassName = getStatusClassName(status.tone);
-  const isFormDisabled = !formToken;
+  const normalizedErrorCode = (errorCode ?? undefined) as RegisterErrorCode | undefined;
+  const status = configurationStatus ?? buildStatusMessage(normalizedErrorCode);
+  const parsedPrefill = parsePrefillParam(getParam(searchParams?.prefill));
+  const fallbackName = getParam(searchParams?.name);
+  const fallbackEmail = getParam(searchParams?.email);
+  const namePrefill = (parsedPrefill.name ?? fallbackName ?? '').trim();
+  const emailPrefill = (parsedPrefill.email ?? fallbackEmail ?? '').trim();
+  const initialState: RegisterActionState = {
+    ...INITIAL_REGISTER_STATE,
+    status,
+    errorCode: normalizedErrorCode,
+    values: {
+      name: namePrefill,
+      email: emailPrefill,
+    },
+  };
 
   return (
     // The page uses a semantic section/article pairing so screen readers announce the
@@ -165,109 +153,7 @@ export default function RegisterPage({ searchParams }: RegisterPageProps) {
             tools.
           </p>
         </header>
-        <form
-          className={styles.form}
-          method="post"
-          action="/auth/register"
-          aria-describedby="auth-register-status"
-        >
-          {formToken ? <input type="hidden" name="formToken" value={formToken} /> : null}
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="auth-register-name">
-              Full name
-            </label>
-            <input
-              id="auth-register-name"
-              name="name"
-              type="text"
-              autoComplete="name"
-              required
-              aria-required="true"
-              className={styles.input}
-              aria-describedby="auth-register-name-help auth-register-status"
-              defaultValue={namePrefill}
-              disabled={isFormDisabled}
-            />
-            <p className={styles.helpText} id="auth-register-name-help">
-              This name is displayed in dashboards and team rosters.
-            </p>
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="auth-register-email">
-              Work email
-            </label>
-            <input
-              id="auth-register-email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              inputMode="email"
-              required
-              aria-required="true"
-              className={styles.input}
-              aria-describedby="auth-register-email-help auth-register-status"
-              defaultValue={emailPrefill}
-              disabled={isFormDisabled}
-            />
-            <p className={styles.helpText} id="auth-register-email-help">
-              We use this email to verify your identity and send race updates.
-            </p>
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="auth-register-password">
-              Password
-            </label>
-            <input
-              id="auth-register-password"
-              name="password"
-              type="password"
-              autoComplete="new-password"
-              required
-              aria-required="true"
-              className={styles.input}
-              aria-describedby="auth-register-password-rules auth-register-status"
-              disabled={isFormDisabled}
-            />
-            <ul className={styles.requirements} id="auth-register-password-rules">
-              <li>At least 12 characters</li>
-              <li>Contains one number and one symbol</li>
-              <li>Includes upper and lower case letters</li>
-            </ul>
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="auth-register-confirm-password">
-              Confirm password
-            </label>
-            <input
-              id="auth-register-confirm-password"
-              name="confirmPassword"
-              type="password"
-              autoComplete="new-password"
-              required
-              aria-required="true"
-              className={styles.input}
-              aria-describedby="auth-register-status"
-              disabled={isFormDisabled}
-            />
-          </div>
-          <div className={styles.actions}>
-            <button type="submit" className={styles.primaryButton} disabled={isFormDisabled}>
-              Create account
-            </button>
-            <Link className={styles.secondaryLink} href="/auth/login">
-              Already have an account? Sign in
-            </Link>
-          </div>
-          <p
-            className={statusClassName}
-            id="auth-register-status"
-            role="status"
-            aria-live="polite"
-            aria-atomic="true"
-          >
-            {status.message}
-          </p>
-        </form>
+        <RegisterForm action={registerAction} initialState={initialState} formToken={formToken} />
       </article>
     </section>
   );

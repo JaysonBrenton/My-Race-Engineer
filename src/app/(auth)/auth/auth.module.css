@@ -1,3 +1,11 @@
+/*
+ * Filename: src/app/(auth)/auth/auth.module.css
+ * Purpose: Shared styling for authentication forms, including inline error banners.
+ * Author: Jayson Brenton
+ * Date: 2025-03-18
+ * License: MIT License
+ */
+
 .wrapper {
   width: min(100%, 26.25rem);
   display: flex;
@@ -174,6 +182,22 @@
   min-height: 1.25rem;
   margin: 0;
   font-size: 0.85rem;
+}
+
+.inlineBanner {
+  margin-bottom: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-overlay);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.inlineBannerError {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 12%, var(--color-surface-overlay));
 }
 
 .statusInfo {
