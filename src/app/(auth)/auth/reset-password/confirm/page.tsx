@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
+import { unstable_noStore as noStore } from 'next/cache';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 import { MissingAuthFormTokenSecretError, generateAuthFormToken } from '@/lib/auth/formTokens';
 import { canonicalFor } from '@/lib/seo';
@@ -118,6 +120,7 @@ const buildConfigurationStatus = (): StatusMessage => ({
 });
 
 export default function ResetPasswordConfirmPage({ searchParams }: ResetConfirmPageProps) {
+  noStore();
   const resetToken = getParam(searchParams?.token);
   const errorCode = getParam(searchParams?.error);
   let formToken: string | null = null;
