@@ -7,6 +7,14 @@
 
 import { NextResponse } from 'next/server';
 
+import type { ResponseCookies } from 'next/dist/server/web/spec-extension/cookies';
+import {
+  getRedirectStatusCodeFromError,
+  getURLFromRedirectError,
+  isRedirectError,
+} from 'next/dist/client/components/redirect';
+import { appendMutableCookies } from 'next/dist/server/web/spec-extension/adapters/request-cookies';
+
 import { applicationLogger } from '@/dependencies/logger';
 import {
   effectiveRequestOrigin,
@@ -42,7 +50,32 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   const formData = await req.formData();
-  await registerAction(formData);
+
+  try {
+    await registerAction(formData);
+  } catch (error) {
+    if (isRedirectError(error)) {
+      const location = getURLFromRedirectError(error);
+      const statusCode = getRedirectStatusCodeFromError(error);
+
+      if (!location) {
+        throw error;
+      }
+
+      const response = NextResponse.redirect(location, statusCode);
+      response.headers.set('x-auth-origin-guard', 'ok');
+
+      // Ensure cookies mutated within the server action propagate to the caller.
+      const mutableCookies = (error as { mutableCookies?: ResponseCookies }).mutableCookies;
+      if (mutableCookies) {
+        appendMutableCookies(response.headers, mutableCookies);
+      }
+
+      return response;
+    }
+
+    throw error;
+  }
 
   const response = NextResponse.redirect(new URL('/auth/register', req.url), { status: 303 });
   response.headers.set('x-auth-origin-guard', 'ok');
