@@ -23,8 +23,7 @@ export type CreatePinoLoggerOptions = {
   fileNamePrefix?: string;
 };
 
-const padNumber = (value: number, length = 2): string =>
-  value.toString().padStart(length, '0');
+const padNumber = (value: number, length = 2): string => value.toString().padStart(length, '0');
 
 const formatTimestamp = (): string => {
   const now = new Date();
@@ -184,10 +183,7 @@ export const createPinoLogger = (options: CreatePinoLoggerOptions = {}): Logger 
     streams.push(
       fileStream(join(logDirectory, `${fileNamePrefix}.log`)),
       fileStream(
-        join(
-          logDirectory,
-          fileNamePrefix === 'app' ? 'error.log' : `${fileNamePrefix}-error.log`,
-        ),
+        join(logDirectory, fileNamePrefix === 'app' ? 'error.log' : `${fileNamePrefix}-error.log`),
         'warn',
       ),
     );
