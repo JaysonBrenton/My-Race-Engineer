@@ -27,7 +27,7 @@ const buildRedirectLocation = (request: NextRequest) => {
 
 const readAllowedOrigins = () => parseAllowedOrigins(process.env);
 
-export const isAllowedOrigin = (request: NextRequest) => {
+export const isAllowedOrigin = (request: NextRequest | Request) => {
   const allowedList = readAllowedOrigins();
   const decision = evaluateOriginHeader(request.headers.get('origin'), allowedList);
 
@@ -39,13 +39,14 @@ export const isAllowedOrigin = (request: NextRequest) => {
   };
 };
 
-export function middleware(request: NextRequest) {
+export function middleware(request: NextRequest | Request) {
   if (!isAuthPost(request)) {
     const response = NextResponse.next();
     response.headers.set('Cache-Control', 'no-store');
     return response;
   }
 
+  const { pathname } = new URL(request.url);
   const result = isAllowedOrigin(request);
 
   const shouldRedirect = !result.allowed || result.reason === 'no-origin-header';
@@ -54,14 +55,15 @@ export function middleware(request: NextRequest) {
     const requestId = request.headers.get('x-request-id') ?? globalThis.crypto.randomUUID();
     logSecurityEvent('warn', 'auth.origin.mismatch', {
       requestId,
-      path: request.nextUrl.pathname,
+      path: pathname,
       method: request.method,
       origin: result.origin,
       allowedList: result.allowedList,
       reason: result.reason,
     });
 
-    const redirectUrl = buildRedirectLocation(request);
+    const redirectTarget = resolveAuthRedirectTarget(pathname);
+    const redirectUrl = buildRedirectLocation(request.url, redirectTarget);
     const response = NextResponse.redirect(redirectUrl, 303);
     response.headers.set('Cache-Control', 'no-store');
     response.headers.set('x-auth-origin-guard', 'mismatch');
