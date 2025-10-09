@@ -4,6 +4,7 @@ import {
   RegisterUserService,
   StartPasswordResetService,
   VerifyEmailService,
+  type Logger,
   type LoggerContext,
 } from '@core/app';
 import {
@@ -77,6 +78,9 @@ const authLogger = authFileLogger
   : applicationLogger;
 
 const createAuthFlowLogger = (route: string) => authLogger.withContext({ route });
+
+export const getAuthRequestLogger = (context: LoggerContext): Logger =>
+  createAuthFlowLogger(context.route ?? 'auth').withContext(context);
 
 const registerLogger = createAuthFlowLogger('auth/register');
 const loginLogger = createAuthFlowLogger('auth/login');
