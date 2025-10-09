@@ -155,7 +155,7 @@ const createRegisterDeps = (
         },
       }),
     },
-    isCookieSecure: () => true,
+    computeCookieSecure: () => true,
   };
 
   return {
@@ -212,7 +212,7 @@ const createLoginDeps = (overrides: Partial<LoginActionDependencies> = {}): Logi
         },
       }),
     },
-    isCookieSecure: () => true,
+    computeCookieSecure: () => true,
   };
 
   return {
@@ -337,7 +337,7 @@ test('registerAction issues a session cookie and redirects on successful registr
         };
       },
     },
-    isCookieSecure: () => false,
+    computeCookieSecure: () => false,
   });
   const registerAction = createRegisterAction(deps);
   const formData = new FormData();
@@ -439,7 +439,7 @@ test('loginAction mints a session cookie and redirects to the dashboard on succe
         };
       },
     },
-    isCookieSecure: () => false,
+    computeCookieSecure: () => false,
   });
   const loginAction = createLoginAction(deps);
   const formData = new FormData();
