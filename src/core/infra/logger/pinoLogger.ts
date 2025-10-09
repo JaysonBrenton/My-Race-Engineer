@@ -18,7 +18,30 @@ const isBuildPhase = process.env.NEXT_PHASE === 'phase-production-build';
 export type CreatePinoLoggerOptions = {
   level?: string;
   disableFileLogs?: boolean;
+  disableConsoleLogs?: boolean;
   logDirectory?: string;
+  fileNamePrefix?: string;
+};
+
+const padNumber = (value: number, length = 2): string =>
+  value.toString().padStart(length, '0');
+
+const formatTimestamp = (): string => {
+  const now = new Date();
+  const tzOffsetMinutes = now.getTimezoneOffset();
+  const absoluteOffset = Math.abs(tzOffsetMinutes);
+  const offsetHours = padNumber(Math.floor(absoluteOffset / 60));
+  const offsetMinutes = padNumber(absoluteOffset % 60);
+  const zone =
+    tzOffsetMinutes === 0
+      ? 'UTC'
+      : `${tzOffsetMinutes > 0 ? '-' : '+'}${offsetHours}:${offsetMinutes}`;
+
+  return `${now.getFullYear()}-${padNumber(now.getMonth() + 1)}-${padNumber(
+    now.getDate(),
+  )} ${padNumber(now.getHours())}:${padNumber(now.getMinutes())}:${padNumber(
+    now.getSeconds(),
+  )}.${padNumber(now.getMilliseconds(), 3)} ${zone}`;
 };
 
 const serializeError = (value: unknown): Record<string, unknown> | undefined => {
@@ -145,26 +168,46 @@ const fileStream = (
 export const createPinoLogger = (options: CreatePinoLoggerOptions = {}): Logger => {
   const level = options.level ?? DEFAULT_LOG_LEVEL;
   const disableFileLogs = (options.disableFileLogs ?? false) || isBuildPhase;
+  const disableConsoleLogs = options.disableConsoleLogs ?? false;
   const logDirectory = options.logDirectory ?? DEFAULT_LOG_DIRECTORY;
+  const fileNamePrefix = options.fileNamePrefix ?? 'app';
 
-  const streams: Array<{ stream: DestinationStream; level?: LogLevel }> = [
-    { stream: pinoExport.destination({ dest: 1, sync: false }) },
-  ];
+  const streams: Array<{ stream: DestinationStream; level?: LogLevel }> = [];
+
+  if (!disableConsoleLogs) {
+    streams.push({ stream: pinoExport.destination({ dest: 1, sync: false }) });
+  }
 
   if (!disableFileLogs) {
     mkdirSync(logDirectory, { recursive: true });
 
     streams.push(
-      fileStream(join(logDirectory, 'app.log')),
-      fileStream(join(logDirectory, 'error.log'), 'warn'),
+      fileStream(join(logDirectory, `${fileNamePrefix}.log`)),
+      fileStream(
+        join(
+          logDirectory,
+          fileNamePrefix === 'app' ? 'error.log' : `${fileNamePrefix}-error.log`,
+        ),
+        'warn',
+      ),
     );
+  }
+
+  if (streams.length === 0) {
+    streams.push({ stream: pinoExport.destination({ dest: 1, sync: false }) });
   }
 
   const instance = pinoExport(
     {
       level,
       base: undefined,
-      timestamp: () => `,"timestamp":"${new Date().toISOString()}"`,
+      timestamp: false,
+      formatters: {
+        level: (_label, number) => ({
+          timestamp: formatTimestamp(),
+          level: number,
+        }),
+      },
     },
     pinoExport.multistream(streams),
   );

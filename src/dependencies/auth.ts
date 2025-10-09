@@ -11,9 +11,11 @@ import {
   PrismaUserEmailVerificationTokenRepository,
   PrismaUserRepository,
   PrismaUserSessionRepository,
+  createCompositeLogger,
   createNodemailerMailer,
+  createPinoLogger,
 } from '@core/infra';
-import { applicationLogger } from '@/dependencies/logger';
+import { applicationLogger, loggerEnvironmentConfig } from '@/dependencies/logger';
 import { Argon2PasswordHasher } from '@/lib/auth/passwordHasher';
 
 // The dependency wiring in this module centralises the concrete implementations used by
@@ -61,8 +63,22 @@ const mailer = (() => {
   return new ConsoleMailer(mailerLogger);
 })();
 
-const registerLogger = applicationLogger.withContext({ route: 'auth/register' });
-const loginLogger = applicationLogger.withContext({ route: 'auth/login' });
+const createAuthFlowLogger = (route: string, fileNamePrefix: string) => {
+  if (loggerEnvironmentConfig.disableFileLogs) {
+    return applicationLogger.withContext({ route });
+  }
+
+  const auditLogger = createPinoLogger({
+    ...loggerEnvironmentConfig,
+    disableConsoleLogs: true,
+    fileNamePrefix,
+  });
+
+  return createCompositeLogger(applicationLogger, auditLogger).withContext({ route });
+};
+
+const registerLogger = createAuthFlowLogger('auth/register', 'auth-register');
+const loginLogger = createAuthFlowLogger('auth/login', 'auth-login');
 const verifyEmailLogger = applicationLogger.withContext({ route: 'auth/verify-email' });
 const passwordResetStartLogger = applicationLogger.withContext({ route: 'auth/reset/start' });
 const passwordResetConfirmLogger = applicationLogger.withContext({ route: 'auth/reset/confirm' });
