@@ -1,0 +1,107 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import {
+  createAuthTestEnvironment,
+  createFixedClock,
+} from './__fixtures__/inMemoryAuthAdapters';
+
+const fixedNow = new Date('2025-01-01T00:00:00.000Z');
+
+const buildClock = () => createFixedClock(fixedNow);
+
+test('registration requires verification before login succeeds when enabled', async () => {
+  const env = createAuthTestEnvironment({
+    clock: buildClock(),
+    register: { requireEmailVerification: true },
+  });
+
+  const registerResult = await env.registerService.register({
+    name: 'Flow User',
+    email: 'flow-user@example.com',
+    password: 'Str0ngPassword!23',
+  });
+
+  assert.equal(registerResult.ok, true);
+  if (!registerResult.ok) {
+    return;
+  }
+
+  assert.equal(registerResult.nextStep, 'verify-email');
+  assert.equal(env.registerMailer.sent.length, 1);
+  assert.equal(env.verificationTokens.tokens.length, 1);
+
+  const loginBeforeVerification = await env.loginService.login({
+    email: 'flow-user@example.com',
+    password: 'Str0ngPassword!23',
+  });
+
+  assert.deepEqual(loginBeforeVerification, { ok: false, reason: 'email-not-verified' });
+
+  const verifiedAt = new Date(fixedNow.getTime() + 5 * 60 * 1000);
+  await env.userRepository.updateEmailVerification(registerResult.user.id, verifiedAt);
+  await env.userRepository.updateStatus(registerResult.user.id, 'active');
+
+  const loginAfterVerification = await env.loginService.login({
+    email: 'flow-user@example.com',
+    password: 'Str0ngPassword!23',
+    rememberSession: true,
+    sessionContext: { ipAddress: '203.0.113.42', userAgent: 'node:test' },
+  });
+
+  assert.equal(loginAfterVerification.ok, true);
+  if (loginAfterVerification.ok) {
+    assert.equal(loginAfterVerification.user.id, registerResult.user.id);
+    assert.equal(env.sessionRepository.createdSessions.length, 1);
+    const session = env.sessionRepository.createdSessions[0];
+    assert.equal(session.userId, registerResult.user.id);
+    assert.equal(session.ipAddress, '203.0.113.42');
+    assert.equal(session.sessionToken, loginAfterVerification.sessionToken);
+    assert.equal(session.expiresAt.getTime(), loginAfterVerification.expiresAt.getTime());
+  }
+});
+
+test('admin approval blocks login until status becomes active', async () => {
+  const env = createAuthTestEnvironment({
+    clock: buildClock(),
+    register: { requireAdminApproval: true },
+    login: { requireEmailVerification: false },
+  });
+
+  const registerResult = await env.registerService.register({
+    name: 'Pending User',
+    email: 'pending-user@example.com',
+    password: 'An0therStrongPass!9',
+  });
+
+  assert.equal(registerResult.ok, true);
+  if (!registerResult.ok) {
+    return;
+  }
+
+  assert.equal(registerResult.nextStep, 'await-approval');
+  assert.equal(env.sessionRepository.createdSessions.length, 0);
+
+  const loginWhilePending = await env.loginService.login({
+    email: 'pending-user@example.com',
+    password: 'An0therStrongPass!9',
+  });
+
+  assert.deepEqual(loginWhilePending, { ok: false, reason: 'account-pending' });
+
+  await env.userRepository.updateStatus(registerResult.user.id, 'active');
+
+  const loginAfterApproval = await env.loginService.login({
+    email: 'pending-user@example.com',
+    password: 'An0therStrongPass!9',
+    sessionContext: { ipAddress: '198.51.100.24' },
+  });
+
+  assert.equal(loginAfterApproval.ok, true);
+  if (loginAfterApproval.ok) {
+    assert.equal(env.sessionRepository.createdSessions.length, 1);
+    const [session] = env.sessionRepository.createdSessions;
+    assert.equal(session.userId, registerResult.user.id);
+    assert.equal(session.ipAddress, '198.51.100.24');
+  }
+});
