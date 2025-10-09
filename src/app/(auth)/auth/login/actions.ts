@@ -14,10 +14,10 @@ import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
-import { loginUserService } from '@/dependencies/auth';
-import { getRequestLogger } from '@/dependencies/logger';
+import { getAuthRequestLogger, loginUserService } from '@/dependencies/auth';
 import { validateAuthFormToken } from '@/lib/auth/formTokens';
 import { createLogFingerprint } from '@/lib/logging/fingerprint';
+import { withSpan } from '@/lib/observability/tracing';
 import { checkLoginRateLimit } from '@/lib/rateLimit/authRateLimiter';
 import { extractClientIdentifier } from '@/lib/request/clientIdentifier';
 import { guardAuthPostOrigin } from '@/server/security/origin';
@@ -90,165 +90,195 @@ export const loginAction = async (formData: FormData) => {
   // address (e.g. team pit wall).
   const headersList = headers();
   const requestId = headersList.get('x-request-id') ?? randomUUID();
-  const logger = getRequestLogger({
-    requestId,
-    route: 'auth/login',
-  });
-  guardAuthPostOrigin(
-    headersList,
-    () =>
-      redirect(
-        buildRedirectUrl('/auth/login', {
-          error: 'invalid-origin',
-        }),
-      ),
+
+  await withSpan(
+    'auth.login',
     {
-      route: 'auth/login',
-      logger,
+      'mre.request_id': requestId,
+      'http.route': 'auth/login',
+    },
+    async (span) => {
+      const logger = getAuthRequestLogger({
+        requestId,
+        route: 'auth/login',
+      });
+
+      guardAuthPostOrigin(
+        headersList,
+        () =>
+          redirect(
+            buildRedirectUrl('/auth/login', {
+              error: 'invalid-origin',
+            }),
+          ),
+        {
+          route: 'auth/login',
+          logger,
+        },
+      );
+
+      const identifier = extractClientIdentifier(headersList);
+      const clientFingerprint = identifier === 'unknown' ? undefined : createLogFingerprint(identifier);
+      if (clientFingerprint) {
+        span.setAttribute('mre.auth.client_fingerprint', clientFingerprint);
+      }
+
+      logger.info('Processing login submission.', {
+        event: 'auth.login.submission_received',
+        outcome: 'processing',
+        clientFingerprint,
+      });
+
+      const rateLimit = checkLoginRateLimit(identifier);
+      if (!rateLimit.ok) {
+        span.setAttribute('mre.auth.outcome', 'rate_limited');
+        span.setAttribute('mre.auth.retry_after_ms', rateLimit.retryAfterMs);
+        // When the rate limiter trips we short-circuit to the login page with a
+        // dedicated error code.  The redirect prevents timing attacks that could
+        // differentiate between throttled and rejected credentials.
+        logger.warn('Login blocked by rate limiter.', {
+          event: 'auth.login.rate_limited',
+          outcome: 'blocked',
+          clientFingerprint,
+          retryAfterMs: rateLimit.retryAfterMs,
+          durationMs: Date.now() - requestStartedAt,
+        });
+        redirect(
+          buildRedirectUrl('/auth/login', {
+            error: 'rate-limited',
+          }),
+        );
+      }
+
+      const token = getFormValue(formData, 'formToken');
+      const tokenValidation = validateAuthFormToken(token ?? null, 'login');
+
+      if (!tokenValidation.ok) {
+        span.setAttribute('mre.auth.outcome', 'invalid_token');
+        // Missing or stale CSRF tokens are treated as an invalid session.  The UI
+        // invites the user to refresh so they pick up a fresh token value.
+        logger.warn('Login rejected due to invalid form token.', {
+          event: 'auth.login.invalid_token',
+          outcome: 'rejected',
+          clientFingerprint,
+          durationMs: Date.now() - requestStartedAt,
+        });
+        redirect(
+          buildRedirectUrl('/auth/login', {
+            error: 'invalid-token',
+          }),
+        );
+      }
+
+      const parseResult = loginSchema.safeParse({
+        email: getFormValue(formData, 'email'),
+        password: getFormValue(formData, 'password'),
+        remember: getFormValue(formData, 'remember'),
+      });
+
+      if (!parseResult.success) {
+        span.setAttribute('mre.auth.outcome', 'validation_failed');
+        // Validation failures flow back with the email preserved so the user does
+        // not have to re-type it, reducing friction for simple typos.
+        const issues = parseResult.error.issues.map((issue) => ({
+          path: issue.path.map((segment) => segment.toString()).join('.') || 'root',
+          code: issue.code,
+          message: issue.message,
+        }));
+        logger.warn('Login rejected due to validation errors.', {
+          event: 'auth.login.validation_failed',
+          outcome: 'rejected',
+          clientFingerprint,
+          validationIssues: issues,
+          durationMs: Date.now() - requestStartedAt,
+        });
+        redirect(
+          buildRedirectUrl('/auth/login', {
+            error: 'validation',
+            prefill: buildPrefillParam({ email: getFormValue(formData, 'email') }),
+          }),
+        );
+      }
+
+      const { email, password, remember } = parseResult.data;
+      const userAgent = headersList.get('user-agent');
+      const emailFingerprint = createLogFingerprint(email);
+      const rememberSession = remember === 'true';
+
+      if (emailFingerprint) {
+        span.setAttribute('mre.auth.email_fingerprint', emailFingerprint);
+      }
+      span.setAttribute('mre.auth.remember_session', rememberSession);
+
+      logger.info('Login payload validated.', {
+        event: 'auth.login.payload_validated',
+        outcome: 'processing',
+        clientFingerprint,
+        emailFingerprint,
+        rememberSession,
+      });
+
+      const result = await loginUserService.login({
+        email,
+        password,
+        rememberSession,
+        sessionContext: {
+          ipAddress: identifier === 'unknown' ? null : identifier,
+          userAgent,
+        },
+      });
+
+      if (!result.ok) {
+        // Domain-level errors (unverified email, suspended account, etc.) are
+        // surfaced to the page so we can display precise guidance without leaking
+        // sensitive details to the attacker.
+        span.setAttribute('mre.auth.outcome', result.reason);
+        logger.info('Login attempt failed in domain service.', {
+          event: `auth.login.${result.reason.replace(/-/g, '_')}`,
+          outcome: 'rejected',
+          clientFingerprint,
+          emailFingerprint,
+          durationMs: Date.now() - requestStartedAt,
+        });
+        redirect(
+          buildRedirectUrl('/auth/login', {
+            error: result.reason,
+            prefill: buildPrefillParam({ email }),
+          }),
+        );
+      }
+
+      const cookieJar = cookies();
+      const expiresAt = result.expiresAt;
+      const maxAge = Math.max(Math.floor((expiresAt.getTime() - Date.now()) / 1000), 1);
+      // The session cookie is httpOnly and same-site lax so it is resilient against
+      // XSS and CSRF while still allowing multi-tab usage.  We rely on the TTL
+      // returned by the service to synchronise browser and database expirations.
+      cookieJar.set({
+        name: 'mre_session',
+        value: result.sessionToken,
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: isCookieSecure(),
+        path: '/',
+        expires: expiresAt,
+        maxAge,
+      });
+
+      span.setAttribute('mre.auth.outcome', 'success');
+      span.setAttribute('mre.auth.session_expires_at', expiresAt.toISOString());
+
+      logger.info('Login succeeded; session cookie issued.', {
+        event: 'auth.login.success',
+        outcome: 'success',
+        clientFingerprint,
+        emailFingerprint,
+        rememberSession,
+        sessionExpiresAt: result.expiresAt.toISOString(),
+        durationMs: Date.now() - requestStartedAt,
+      });
+
+      redirect('/dashboard');
     },
   );
-  const identifier = extractClientIdentifier(headersList);
-  const clientFingerprint = identifier === 'unknown' ? undefined : createLogFingerprint(identifier);
-  logger.info('Processing login submission.', {
-    event: 'auth.login.submission_received',
-    outcome: 'processing',
-    clientFingerprint,
-  });
-  const rateLimit = checkLoginRateLimit(identifier);
-  if (!rateLimit.ok) {
-    // When the rate limiter trips we short-circuit to the login page with a
-    // dedicated error code.  The redirect prevents timing attacks that could
-    // differentiate between throttled and rejected credentials.
-    logger.warn('Login blocked by rate limiter.', {
-      event: 'auth.login.rate_limited',
-      outcome: 'blocked',
-      clientFingerprint,
-      retryAfterMs: rateLimit.retryAfterMs,
-      durationMs: Date.now() - requestStartedAt,
-    });
-    redirect(
-      buildRedirectUrl('/auth/login', {
-        error: 'rate-limited',
-      }),
-    );
-  }
-
-  const token = getFormValue(formData, 'formToken');
-  const tokenValidation = validateAuthFormToken(token ?? null, 'login');
-
-  if (!tokenValidation.ok) {
-    // Missing or stale CSRF tokens are treated as an invalid session.  The UI
-    // invites the user to refresh so they pick up a fresh token value.
-    logger.warn('Login rejected due to invalid form token.', {
-      event: 'auth.login.invalid_token',
-      outcome: 'rejected',
-      clientFingerprint,
-      durationMs: Date.now() - requestStartedAt,
-    });
-    redirect(
-      buildRedirectUrl('/auth/login', {
-        error: 'invalid-token',
-      }),
-    );
-  }
-
-  const parseResult = loginSchema.safeParse({
-    email: getFormValue(formData, 'email'),
-    password: getFormValue(formData, 'password'),
-    remember: getFormValue(formData, 'remember'),
-  });
-
-  if (!parseResult.success) {
-    // Validation failures flow back with the email preserved so the user does
-    // not have to re-type it, reducing friction for simple typos.
-    const issues = parseResult.error.issues.map((issue) => ({
-      path: issue.path.map((segment) => segment.toString()).join('.') || 'root',
-      code: issue.code,
-      message: issue.message,
-    }));
-    logger.warn('Login rejected due to validation errors.', {
-      event: 'auth.login.validation_failed',
-      outcome: 'rejected',
-      clientFingerprint,
-      validationIssues: issues,
-      durationMs: Date.now() - requestStartedAt,
-    });
-    redirect(
-      buildRedirectUrl('/auth/login', {
-        error: 'validation',
-        prefill: buildPrefillParam({ email: getFormValue(formData, 'email') }),
-      }),
-    );
-  }
-
-  const { email, password, remember } = parseResult.data;
-  const userAgent = headersList.get('user-agent');
-  const emailFingerprint = createLogFingerprint(email);
-  const rememberSession = remember === 'true';
-
-  logger.info('Login payload validated.', {
-    event: 'auth.login.payload_validated',
-    outcome: 'processing',
-    clientFingerprint,
-    emailFingerprint,
-    rememberSession,
-  });
-
-  const result = await loginUserService.login({
-    email,
-    password,
-    rememberSession,
-    sessionContext: {
-      ipAddress: identifier === 'unknown' ? null : identifier,
-      userAgent,
-    },
-  });
-
-  if (!result.ok) {
-    // Domain-level errors (unverified email, suspended account, etc.) are
-    // surfaced to the page so we can display precise guidance without leaking
-    // sensitive details to the attacker.
-    logger.info('Login attempt failed in domain service.', {
-      event: `auth.login.${result.reason.replace(/-/g, '_')}`,
-      outcome: 'rejected',
-      clientFingerprint,
-      emailFingerprint,
-      durationMs: Date.now() - requestStartedAt,
-    });
-    redirect(
-      buildRedirectUrl('/auth/login', {
-        error: result.reason,
-        prefill: buildPrefillParam({ email }),
-      }),
-    );
-  }
-
-  const cookieJar = cookies();
-  const expiresAt = result.expiresAt;
-  const maxAge = Math.max(Math.floor((expiresAt.getTime() - Date.now()) / 1000), 1);
-  // The session cookie is httpOnly and same-site lax so it is resilient against
-  // XSS and CSRF while still allowing multi-tab usage.  We rely on the TTL
-  // returned by the service to synchronise browser and database expirations.
-  cookieJar.set({
-    name: 'mre_session',
-    value: result.sessionToken,
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: isCookieSecure(),
-    path: '/',
-    expires: expiresAt,
-    maxAge,
-  });
-
-  logger.info('Login succeeded; session cookie issued.', {
-    event: 'auth.login.success',
-    outcome: 'success',
-    clientFingerprint,
-    emailFingerprint,
-    rememberSession,
-    sessionExpiresAt: result.expiresAt.toISOString(),
-    durationMs: Date.now() - requestStartedAt,
-  });
-
-  redirect('/dashboard');
 };

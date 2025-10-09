@@ -4,6 +4,7 @@ import {
   RegisterUserService,
   StartPasswordResetService,
   VerifyEmailService,
+  type LoggerContext,
 } from '@core/app';
 import {
   ConsoleMailer,
@@ -63,25 +64,27 @@ const mailer = (() => {
   return new ConsoleMailer(mailerLogger);
 })();
 
-const createAuthFlowLogger = (route: string, fileNamePrefix: string) => {
-  if (loggerEnvironmentConfig.disableFileLogs) {
-    return applicationLogger.withContext({ route });
-  }
+const authFileLogger = loggerEnvironmentConfig.disableFileLogs
+  ? undefined
+  : createPinoLogger({
+      ...loggerEnvironmentConfig,
+      disableConsoleLogs: true,
+      fileNamePrefix: 'auth',
+    });
 
-  const auditLogger = createPinoLogger({
-    ...loggerEnvironmentConfig,
-    disableConsoleLogs: true,
-    fileNamePrefix,
-  });
+const authLogger = authFileLogger
+  ? createCompositeLogger(applicationLogger, authFileLogger)
+  : applicationLogger;
 
-  return createCompositeLogger(applicationLogger, auditLogger).withContext({ route });
-};
+const createAuthFlowLogger = (route: string) => authLogger.withContext({ route });
 
-const registerLogger = createAuthFlowLogger('auth/register', 'auth-register');
-const loginLogger = createAuthFlowLogger('auth/login', 'auth-login');
-const verifyEmailLogger = applicationLogger.withContext({ route: 'auth/verify-email' });
-const passwordResetStartLogger = applicationLogger.withContext({ route: 'auth/reset/start' });
-const passwordResetConfirmLogger = applicationLogger.withContext({ route: 'auth/reset/confirm' });
+export const getAuthRequestLogger = (context: LoggerContext) => authLogger.withContext(context);
+
+const registerLogger = createAuthFlowLogger('auth/register');
+const loginLogger = createAuthFlowLogger('auth/login');
+const verifyEmailLogger = createAuthFlowLogger('auth/verify-email');
+const passwordResetStartLogger = createAuthFlowLogger('auth/reset/start');
+const passwordResetConfirmLogger = createAuthFlowLogger('auth/reset/confirm');
 
 export const registerUserService = new RegisterUserService(
   userRepository,

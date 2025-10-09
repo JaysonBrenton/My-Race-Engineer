@@ -14,10 +14,10 @@ import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
-import { registerUserService } from '@/dependencies/auth';
-import { getRequestLogger } from '@/dependencies/logger';
+import { getAuthRequestLogger, registerUserService } from '@/dependencies/auth';
 import { validateAuthFormToken } from '@/lib/auth/formTokens';
 import { createLogFingerprint } from '@/lib/logging/fingerprint';
+import { withSpan } from '@/lib/observability/tracing';
 import { checkRegisterRateLimit } from '@/lib/rateLimit/authRateLimiter';
 import { extractClientIdentifier } from '@/lib/request/clientIdentifier';
 import { guardAuthPostOrigin } from '@/server/security/origin';
@@ -121,213 +121,249 @@ export const registerAction = async (
   const requestStartedAt = Date.now();
   const headersList = headers();
   const requestId = headersList.get('x-request-id') ?? randomUUID();
-  const logger = getRequestLogger({
-    requestId,
-    route: 'auth/register',
-  });
 
-  const prefills = extractPrefillValues(formData);
-
-  try {
-    guardAuthPostOrigin(
-      headersList,
-      () => {
-        throw new OriginMismatchError();
-      },
-      {
+  return withSpan(
+    'auth.register',
+    {
+      'mre.request_id': requestId,
+      'http.route': 'auth/register',
+    },
+    async (span) => {
+      const logger = getAuthRequestLogger({
+        requestId,
         route: 'auth/register',
-        logger,
-      },
-    );
-  } catch (error) {
-    if (error instanceof OriginMismatchError) {
-      return buildState('invalid-origin', prefills);
-    }
-
-    throw error;
-  }
-
-  const identifier = extractClientIdentifier(headersList);
-  const clientFingerprint = identifier === 'unknown' ? undefined : createLogFingerprint(identifier);
-  logger.info('Processing registration submission.', {
-    event: 'auth.register.submission_received',
-    outcome: 'processing',
-    clientFingerprint,
-  });
-
-  const rateLimit = checkRegisterRateLimit(identifier);
-  if (!rateLimit.ok) {
-    logger.warn('Registration blocked by rate limiter.', {
-      event: 'auth.register.rate_limited',
-      outcome: 'blocked',
-      clientFingerprint,
-      retryAfterMs: rateLimit.retryAfterMs,
-      durationMs: Date.now() - requestStartedAt,
-    });
-    return buildState('rate-limited', prefills);
-  }
-
-  const token = getFormValue(formData, 'formToken');
-  const tokenValidation = validateAuthFormToken(token ?? null, 'registration');
-
-  if (!tokenValidation.ok) {
-    logger.warn('Registration rejected due to invalid form token.', {
-      event: 'auth.register.invalid_token',
-      outcome: 'rejected',
-      clientFingerprint,
-      durationMs: Date.now() - requestStartedAt,
-    });
-    return buildState('invalid-token', prefills);
-  }
-
-  const parseResult = registrationSchema.safeParse({
-    name: getFormValue(formData, 'name'),
-    email: getFormValue(formData, 'email'),
-    password: getFormValue(formData, 'password'),
-    confirmPassword: getFormValue(formData, 'confirmPassword'),
-  });
-
-  if (!parseResult.success) {
-    const issues = parseResult.error.issues.map((issue) => ({
-      field: issue.path.map((segment) => segment.toString()).join('.') || 'root',
-      message: issue.message,
-    }));
-    logger.warn('Registration rejected due to validation errors.', {
-      event: 'auth.register.validation_failed',
-      outcome: 'rejected',
-      clientFingerprint,
-      validationIssues: issues,
-      durationMs: Date.now() - requestStartedAt,
-    });
-    return {
-      status: buildStatusMessage('validation'),
-      errorCode: 'validation',
-      values: normalisePrefillValues(prefills),
-      fieldErrors: issues,
-    };
-  }
-
-  const { name, email, password } = parseResult.data;
-  const userAgent = headersList.get('user-agent');
-  const emailFingerprint = createLogFingerprint(email);
-
-  logger.info('Registration payload validated.', {
-    event: 'auth.register.payload_validated',
-    outcome: 'processing',
-    clientFingerprint,
-    emailFingerprint,
-  });
-
-  let result: Awaited<ReturnType<typeof registerUserService.register>>;
-  try {
-    result = await registerUserService.register({
-      name,
-      email,
-      password,
-      rememberSession: true,
-      sessionContext: {
-        ipAddress: identifier === 'unknown' ? null : identifier,
-        userAgent,
-      },
-    });
-  } catch (error) {
-    const errorPayload =
-      error instanceof Error
-        ? { name: error.name, message: error.message, stack: error.stack }
-        : { name: 'UnknownError', message: 'Non-error value thrown during registration.' };
-
-    logger.error('Registration failed due to unexpected error.', {
-      event: 'auth.register.unhandled_error',
-      outcome: 'error',
-      clientFingerprint,
-      emailFingerprint,
-      error: errorPayload,
-      durationMs: Date.now() - requestStartedAt,
-    });
-
-    return buildState('server-error', { name, email });
-  }
-
-  if (!result.ok) {
-    logger.info('Registration attempt rejected by domain service.', {
-      event: `auth.register.${result.reason.replace(/-/g, '_')}`,
-      outcome: 'rejected',
-      clientFingerprint,
-      emailFingerprint,
-      durationMs: Date.now() - requestStartedAt,
-    });
-    return buildState(result.reason, { name, email });
-  }
-
-  switch (result.nextStep) {
-    case 'verify-email':
-      logger.info('Registration complete; verification required.', {
-        event: 'auth.register.next_step.verify_email',
-        outcome: 'pending',
-        clientFingerprint,
-        emailFingerprint,
-        durationMs: Date.now() - requestStartedAt,
       });
-      redirect(
-        buildRedirectUrl('/auth/login', {
-          status: 'verify-email',
-          prefill: buildPrefillParam({ email }),
-        }),
-      );
-      break;
-    case 'await-approval':
-      logger.info('Registration complete; awaiting admin approval.', {
-        event: 'auth.register.next_step.awaiting_approval',
-        outcome: 'pending',
-        clientFingerprint,
-        emailFingerprint,
-        durationMs: Date.now() - requestStartedAt,
-      });
-      redirect(
-        buildRedirectUrl('/auth/login', {
-          status: 'awaiting-approval',
-          prefill: buildPrefillParam({ email }),
-        }),
-      );
-      break;
-    case 'session-created':
-      if (result.session) {
-        const cookieJar = cookies();
-        const expiresAt = result.session.expiresAt;
-        const maxAge = Math.max(Math.floor((expiresAt.getTime() - Date.now()) / 1000), 1);
-        cookieJar.set({
-          name: 'mre_session',
-          value: result.session.token,
-          httpOnly: true,
-          sameSite: 'lax',
-          secure: isCookieSecure(),
-          path: '/',
-          expires: expiresAt,
-          maxAge,
-        });
+
+      const prefills = extractPrefillValues(formData);
+
+      try {
+        guardAuthPostOrigin(
+          headersList,
+          () => {
+            throw new OriginMismatchError();
+          },
+          {
+            route: 'auth/register',
+            logger,
+          },
+        );
+      } catch (error) {
+        if (error instanceof OriginMismatchError) {
+          span.setAttribute('mre.auth.outcome', 'invalid_origin');
+          return buildState('invalid-origin', prefills);
+        }
+
+        throw error;
       }
-      logger.info('Registration succeeded with active session.', {
-        event: 'auth.register.next_step.session_created',
-        outcome: 'success',
-        clientFingerprint,
-        emailFingerprint,
-        sessionIssued: Boolean(result.session),
-        sessionExpiresAt: result.session?.expiresAt.toISOString(),
-        durationMs: Date.now() - requestStartedAt,
-      });
-      redirect('/dashboard');
-      break;
-    default:
-      logger.error('Registration returned unexpected next step.', {
-        event: 'auth.register.next_step.unknown',
-        outcome: 'error',
-        clientFingerprint,
-        emailFingerprint,
-        nextStep: result.nextStep,
-        durationMs: Date.now() - requestStartedAt,
-      });
-      return buildState('server-error', { name, email });
-  }
 
-  return previousState;
+      const identifier = extractClientIdentifier(headersList);
+      const clientFingerprint = identifier === 'unknown' ? undefined : createLogFingerprint(identifier);
+      if (clientFingerprint) {
+        span.setAttribute('mre.auth.client_fingerprint', clientFingerprint);
+      }
+
+      logger.info('Processing registration submission.', {
+        event: 'auth.register.submission_received',
+        outcome: 'processing',
+        clientFingerprint,
+      });
+
+      const rateLimit = checkRegisterRateLimit(identifier);
+      if (!rateLimit.ok) {
+        span.setAttribute('mre.auth.outcome', 'rate_limited');
+        span.setAttribute('mre.auth.retry_after_ms', rateLimit.retryAfterMs);
+        logger.warn('Registration blocked by rate limiter.', {
+          event: 'auth.register.rate_limited',
+          outcome: 'blocked',
+          clientFingerprint,
+          retryAfterMs: rateLimit.retryAfterMs,
+          durationMs: Date.now() - requestStartedAt,
+        });
+        return buildState('rate-limited', prefills);
+      }
+
+      const token = getFormValue(formData, 'formToken');
+      const tokenValidation = validateAuthFormToken(token ?? null, 'registration');
+
+      if (!tokenValidation.ok) {
+        span.setAttribute('mre.auth.outcome', 'invalid_token');
+        logger.warn('Registration rejected due to invalid form token.', {
+          event: 'auth.register.invalid_token',
+          outcome: 'rejected',
+          clientFingerprint,
+          durationMs: Date.now() - requestStartedAt,
+        });
+        return buildState('invalid-token', prefills);
+      }
+
+      const parseResult = registrationSchema.safeParse({
+        name: getFormValue(formData, 'name'),
+        email: getFormValue(formData, 'email'),
+        password: getFormValue(formData, 'password'),
+        confirmPassword: getFormValue(formData, 'confirmPassword'),
+      });
+
+      if (!parseResult.success) {
+        span.setAttribute('mre.auth.outcome', 'validation_failed');
+        const issues = parseResult.error.issues.map((issue) => ({
+          field: issue.path.map((segment) => segment.toString()).join('.') || 'root',
+          message: issue.message,
+        }));
+        logger.warn('Registration rejected due to validation errors.', {
+          event: 'auth.register.validation_failed',
+          outcome: 'rejected',
+          clientFingerprint,
+          validationIssues: issues,
+          durationMs: Date.now() - requestStartedAt,
+        });
+        return {
+          status: buildStatusMessage('validation'),
+          errorCode: 'validation',
+          values: normalisePrefillValues(prefills),
+          fieldErrors: issues,
+        };
+      }
+
+      const { name, email, password } = parseResult.data;
+      const userAgent = headersList.get('user-agent');
+      const emailFingerprint = createLogFingerprint(email);
+
+      if (emailFingerprint) {
+        span.setAttribute('mre.auth.email_fingerprint', emailFingerprint);
+      }
+
+      logger.info('Registration payload validated.', {
+        event: 'auth.register.payload_validated',
+        outcome: 'processing',
+        clientFingerprint,
+        emailFingerprint,
+      });
+
+      let result: Awaited<ReturnType<typeof registerUserService.register>>;
+      try {
+        result = await registerUserService.register({
+          name,
+          email,
+          password,
+          rememberSession: true,
+          sessionContext: {
+            ipAddress: identifier === 'unknown' ? null : identifier,
+            userAgent,
+          },
+        });
+      } catch (error) {
+        const errorPayload =
+          error instanceof Error
+            ? { name: error.name, message: error.message, stack: error.stack }
+            : { name: 'UnknownError', message: 'Non-error value thrown during registration.' };
+
+        span.setAttribute('mre.auth.outcome', 'server_error');
+        span.setAttribute('mre.auth.error_type', errorPayload.name);
+
+        logger.error('Registration failed due to unexpected error.', {
+          event: 'auth.register.unhandled_error',
+          outcome: 'error',
+          clientFingerprint,
+          emailFingerprint,
+          error: errorPayload,
+          durationMs: Date.now() - requestStartedAt,
+        });
+
+        return buildState('server-error', { name, email });
+      }
+
+      if (!result.ok) {
+        span.setAttribute('mre.auth.outcome', result.reason);
+        logger.info('Registration attempt rejected by domain service.', {
+          event: `auth.register.${result.reason.replace(/-/g, '_')}`,
+          outcome: 'rejected',
+          clientFingerprint,
+          emailFingerprint,
+          durationMs: Date.now() - requestStartedAt,
+        });
+        return buildState(result.reason, { name, email });
+      }
+
+      switch (result.nextStep) {
+        case 'verify-email':
+          span.setAttribute('mre.auth.outcome', 'verify_email');
+          logger.info('Registration complete; verification required.', {
+            event: 'auth.register.next_step.verify_email',
+            outcome: 'pending',
+            clientFingerprint,
+            emailFingerprint,
+            durationMs: Date.now() - requestStartedAt,
+          });
+          redirect(
+            buildRedirectUrl('/auth/login', {
+              status: 'verify-email',
+              prefill: buildPrefillParam({ email }),
+            }),
+          );
+          break;
+        case 'await-approval':
+          span.setAttribute('mre.auth.outcome', 'awaiting_approval');
+          logger.info('Registration complete; awaiting admin approval.', {
+            event: 'auth.register.next_step.awaiting_approval',
+            outcome: 'pending',
+            clientFingerprint,
+            emailFingerprint,
+            durationMs: Date.now() - requestStartedAt,
+          });
+          redirect(
+            buildRedirectUrl('/auth/login', {
+              status: 'awaiting-approval',
+              prefill: buildPrefillParam({ email }),
+            }),
+          );
+          break;
+        case 'session-created':
+          span.setAttribute('mre.auth.outcome', 'success');
+          if (result.session) {
+            const cookieJar = cookies();
+            const expiresAt = result.session.expiresAt;
+            const maxAge = Math.max(Math.floor((expiresAt.getTime() - Date.now()) / 1000), 1);
+            cookieJar.set({
+              name: 'mre_session',
+              value: result.session.token,
+              httpOnly: true,
+              sameSite: 'lax',
+              secure: isCookieSecure(),
+              path: '/',
+              expires: expiresAt,
+              maxAge,
+            });
+            span.setAttribute('mre.auth.session_expires_at', expiresAt.toISOString());
+            span.setAttribute('mre.auth.session_issued', true);
+          } else {
+            span.setAttribute('mre.auth.session_issued', false);
+          }
+          logger.info('Registration succeeded with active session.', {
+            event: 'auth.register.next_step.session_created',
+            outcome: 'success',
+            clientFingerprint,
+            emailFingerprint,
+            sessionIssued: Boolean(result.session),
+            sessionExpiresAt: result.session?.expiresAt.toISOString(),
+            durationMs: Date.now() - requestStartedAt,
+          });
+          redirect('/dashboard');
+          break;
+        default:
+          span.setAttribute('mre.auth.outcome', 'server_error');
+          span.setAttribute('mre.auth.next_step', result.nextStep);
+          logger.error('Registration returned unexpected next step.', {
+            event: 'auth.register.next_step.unknown',
+            outcome: 'error',
+            clientFingerprint,
+            emailFingerprint,
+            nextStep: result.nextStep,
+            durationMs: Date.now() - requestStartedAt,
+          });
+          return buildState('server-error', { name, email });
+      }
+
+      return previousState;
+    },
+  );
 };
