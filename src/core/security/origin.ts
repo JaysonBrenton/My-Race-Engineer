@@ -50,11 +50,14 @@ export const normalizeOrigin = (input: string): string => {
   return `${protocol}//${hostname}${port}`;
 };
 
-export const parseAllowedOrigins = (env: {
-  APP_URL?: string;
-  ALLOWED_ORIGINS?: string;
-  DEV_TRUST_LOCAL_ORIGINS?: string;
-}): string[] => {
+type AllowedOriginsEnv = {
+  APP_URL?: string | undefined;
+  ALLOWED_ORIGINS?: string | undefined;
+  DEV_TRUST_LOCAL_ORIGINS?: string | undefined;
+  [key: string]: string | undefined;
+};
+
+export const parseAllowedOrigins = (env: AllowedOriginsEnv): string[] => {
   const allowed = new Map<string, true>();
 
   if (env.ALLOWED_ORIGINS) {
