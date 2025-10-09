@@ -7,7 +7,7 @@ This guide documents every automated test that exercises the login or registrati
 1. **Node.js 20+ and npm 9+.** The project enforces these engine versions in `package.json`.
 2. **Install dependencies:**
    ```bash
-   npm install
+   npm ci
    ```
 3. **Environment variables:** The listed tests either stub or manage their own environment configuration. You do **not** need to create a `.env` file to run them.
 
