@@ -17,6 +17,21 @@ import { MissingAuthFormTokenSecretError, generateAuthFormToken } from '@/lib/au
 import { canonicalFor } from '@/lib/seo';
 
 import styles from '../auth.module.css';
+import {
+  asOptionalTrimmedString,
+  firstParamValue,
+  safeParseJsonRecord,
+  type SearchParams,
+} from '../shared/search-params';
+import { registerAction } from './actions';
+import {
+  INITIAL_REGISTER_STATE,
+  buildStatusMessage,
+  type RegisterActionState,
+  type RegisterErrorCode,
+  type StatusMessage,
+} from './state';
+import { RegisterForm } from './register-form';
 
 const PAGE_TITLE = 'Create your My Race Engineer account';
 const PAGE_DESCRIPTION =
@@ -49,25 +64,11 @@ export function generateMetadata(): Metadata {
 }
 
 type RegisterPageProps = {
-  searchParams?: Record<string, string | string[] | undefined>;
+  searchParams?: SearchParams;
 };
 
-type StatusTone = 'info' | 'error';
-
-type StatusMessage = {
-  tone: StatusTone;
-  message: string;
-};
-
-// `searchParams` values may be arrays due to repeated query keys.  We take the first
-// entry to keep the UI deterministic and ignore unexpected values.
-const getParam = (value: string | string[] | undefined) => {
-  if (Array.isArray(value)) {
-    return value[0];
-  }
-
-  return value ?? undefined;
-};
+const buildPrefill = (raw: string | undefined) => {
+  const parsed = safeParseJsonRecord(raw);
 
 type RegisterPrefill = {
   name?: string;
@@ -142,17 +143,11 @@ const buildStatusMessage = (errorCode: string | undefined): StatusMessage => {
         message: 'We will send you a verification email after submission.',
       };
   }
-};
 
-// The tone controls both colour and iconography.  A helper encapsulates the CSS class
-// juggling so the JSX stays readable.
-const getStatusClassName = (tone: StatusTone) => {
-  switch (tone) {
-    case 'error':
-      return `${styles.statusRegion} ${styles.statusError}`;
-    default:
-      return `${styles.statusRegion} ${styles.statusInfo}`;
-  }
+  return {
+    name: asOptionalTrimmedString(parsed.name),
+    email: asOptionalTrimmedString(parsed.email),
+  };
 };
 
 const buildConfigurationErrorStatus = (): StatusMessage => ({

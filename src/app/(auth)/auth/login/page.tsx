@@ -22,6 +22,12 @@ import { canonicalFor } from '@/lib/seo';
 // accessible UI.
 
 import styles from '../auth.module.css';
+import {
+  asOptionalTrimmedString,
+  firstParamValue,
+  safeParseJsonRecord,
+  type SearchParams,
+} from '../shared/search-params';
 
 const PAGE_TITLE = 'Sign in to My Race Engineer';
 const PAGE_DESCRIPTION =
@@ -54,7 +60,7 @@ export function generateMetadata(): Metadata {
 }
 
 type LoginPageProps = {
-  searchParams?: Record<string, string | string[] | undefined>;
+  searchParams?: SearchParams;
 };
 
 type StatusTone = 'info' | 'success' | 'error';
@@ -64,15 +70,16 @@ type StatusMessage = {
   message: string;
 };
 
-// Utility for normalising Next.js catch-all search parameters.  The login page
-// only cares about a single value per key, so we consistently take the first
-// entry when multiple are supplied.
-const getParam = (value: string | string[] | undefined) => {
-  if (Array.isArray(value)) {
-    return value[0];
+const buildPrefill = (raw: string | undefined) => {
+  const parsed = safeParseJsonRecord(raw);
+
+  if (!parsed) {
+    return {};
   }
 
-  return value ?? undefined;
+  return {
+    email: asOptionalTrimmedString(parsed.email),
+  };
 };
 
 type LoginPrefill = {
@@ -230,12 +237,17 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
       throw error;
     }
   }
-  const statusCode = getParam(searchParams?.status);
-  const errorCode = getParam(searchParams?.error);
+  const statusCode = firstParamValue(searchParams?.status);
+  const errorCode = firstParamValue(searchParams?.error);
   const status = configurationStatus ?? buildStatusMessage(statusCode, errorCode);
+  const parsedPrefill = buildPrefill(firstParamValue(searchParams?.prefill));
+  const fallbackEmail = asOptionalTrimmedString(firstParamValue(searchParams?.email));
+  //const emailPrefill = parsedPrefill.email ?? fallbackEmail ?? '';
+
   const rawPrefill = parsePrefillParam(getParam(searchParams?.prefill));
   const fallbackEmail = getParam(searchParams?.email);
   const emailPrefill = (rawPrefill.email ?? fallbackEmail ?? '').trim();
+
   const inlineBannerCandidate = errorCode ? buildStatusMessage(undefined, errorCode) : null;
   const inlineBannerMessage =
     inlineBannerCandidate && inlineBannerCandidate.tone === 'error'

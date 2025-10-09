@@ -23,6 +23,20 @@ import { extractClientIdentifier } from '@/lib/request/clientIdentifier';
 import { guardAuthPostOrigin } from '@/server/security/origin';
 import { isCookieSecure } from '@/server/runtime';
 
+import {
+  INITIAL_REGISTER_STATE,
+  buildPrefillParam,
+  buildRedirectUrl,
+  buildStatusMessage,
+  type RegisterActionState,
+  type RegisterErrorCode,
+} from './state';
+
+type RegistrationPrefillInput = {
+  name?: string | null | undefined;
+  email?: string | null | undefined;
+};
+
 // The server action owns the full registration happy-path orchestration, so we keep
 // the validation rules alongside it.  This schema mirrors the policy enforced at the
 // service layer to provide fast feedback without duplicating logic in the client.
@@ -67,18 +81,6 @@ const registrationSchema = z
 // Redirect destinations preserve the user's non-sensitive input and the error code so
 // the page can re-render with contextual messaging.  A helper keeps this behaviour
 // consistent across each exit path.
-const buildRedirectUrl = (pathname: string, searchParams: Record<string, string | undefined>) => {
-  const params = new URLSearchParams();
-  Object.entries(searchParams).forEach(([key, value]) => {
-    if (value) {
-      params.set(key, value);
-    }
-  });
-
-  const query = params.toString();
-  return query ? `${pathname}?${query}` : pathname;
-};
-
 // `FormData.get` can yield strings or File objects.  Registration only allows text
 // inputs, so we coerce anything else to `undefined` to gracefully trigger validation
 // errors.
@@ -120,19 +122,26 @@ export const registerAction = async (formData: FormData) => {
     requestId,
     route: 'auth/register',
   });
-  guardAuthPostOrigin(
-    headersList,
-    () =>
-      redirect(
-        buildRedirectUrl('/auth/register', {
-          error: 'invalid-origin',
-        }),
-      ),
-    {
-      route: 'auth/register',
-      logger,
-    },
-  );
+
+  try {
+    guardAuthPostOrigin(
+      headersList,
+      () => {
+        throw new OriginMismatchError();
+      },
+      {
+        route: 'auth/register',
+        logger,
+      },
+    );
+  } catch (error) {
+    if (error instanceof OriginMismatchError) {
+      return buildState('invalid-origin', extractPrefillValues(formData));
+    }
+
+    throw error;
+  }
+
   const identifier = extractClientIdentifier(headersList);
   const clientFingerprint = identifier === 'unknown' ? undefined : createLogFingerprint(identifier);
   logger.info('Processing registration submission.', {
@@ -149,11 +158,7 @@ export const registerAction = async (formData: FormData) => {
       retryAfterMs: rateLimit.retryAfterMs,
       durationMs: Date.now() - requestStartedAt,
     });
-    redirect(
-      buildRedirectUrl('/auth/register', {
-        error: 'rate-limited',
-      }),
-    );
+    return buildState('rate-limited', extractPrefillValues(formData));
   }
 
   // Protect against CSRF by requiring a short-lived form token that ties back to the
@@ -168,11 +173,7 @@ export const registerAction = async (formData: FormData) => {
       clientFingerprint,
       durationMs: Date.now() - requestStartedAt,
     });
-    redirect(
-      buildRedirectUrl('/auth/register', {
-        error: 'invalid-token',
-      }),
-    );
+    return buildState('invalid-token', extractPrefillValues(formData));
   }
 
   // Parse the user-provided fields using the schema above.  `safeParse` ensures we can
@@ -186,8 +187,7 @@ export const registerAction = async (formData: FormData) => {
 
   if (!parseResult.success) {
     const issues = parseResult.error.issues.map((issue) => ({
-      path: issue.path.map((segment) => segment.toString()).join('.') || 'root',
-      code: issue.code,
+      field: issue.path.map((segment) => segment.toString()).join('.') || 'root',
       message: issue.message,
     }));
     logger.warn('Registration rejected due to validation errors.', {
@@ -347,4 +347,6 @@ export const registerAction = async (formData: FormData) => {
       });
       redirect('/auth/login');
   }
+
+  return INITIAL_REGISTER_STATE;
 };

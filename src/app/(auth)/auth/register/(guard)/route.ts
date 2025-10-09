@@ -24,6 +24,7 @@ import {
 } from '@/core/security/origin';
 
 import { registerAction } from '../actions';
+import { INITIAL_REGISTER_STATE, buildPrefillParam, buildRedirectUrl } from '../state';
 
 const shouldLogDiagnostics = () => process.env.NODE_ENV !== 'production';
 
@@ -54,7 +55,18 @@ export async function POST(req: Request): Promise<Response> {
   const formData = await req.formData();
 
   try {
-    await registerAction(formData);
+    const state = await registerAction(INITIAL_REGISTER_STATE, formData);
+    const redirectUrl = buildRedirectUrl('/auth/register', {
+      error: state.errorCode,
+      prefill: buildPrefillParam(state.values),
+      name: state.values.name || undefined,
+      email: state.values.email || undefined,
+    });
+    const location = new URL(redirectUrl, req.url);
+    const response = NextResponse.redirect(location, 303);
+    response.headers.set('Cache-Control', 'no-store');
+    response.headers.set('x-auth-origin-guard', 'ok');
+    return response;
   } catch (error) {
     if (isRedirectError(error)) {
       const location = getURLFromRedirectError(error);
