@@ -1,6 +1,7 @@
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 
 import { applicationLogger } from '@/dependencies/logger';
+import { EnvironmentValidationError, getEnvironment } from '@/server/config/environment';
 
 export type AuthFormContext =
   | 'login'
@@ -28,25 +29,32 @@ const buildMissingSecretError = (reason: 'unset' | 'too-short') =>
   );
 
 const getFormTokenSecret = () => {
-  const configuredSecret = process.env.SESSION_SECRET?.trim();
+  try {
+    return getEnvironment().sessionSecret;
+  } catch (error) {
+    if (error instanceof EnvironmentValidationError) {
+      const issue = error.issues.find((entry) => entry.key === 'SESSION_SECRET');
+      if (issue) {
+        const reason = issue.message.includes('at least 32') ? 'too-short' : 'unset';
 
-  if (!configuredSecret) {
-    logger.error('SESSION_SECRET missing — auth forms disabled.', {
-      event: 'auth.form_tokens.session_secret_missing',
-      outcome: 'blocked',
-    });
-    throw buildMissingSecretError('unset');
+        if (reason === 'unset') {
+          logger.error('SESSION_SECRET missing — auth forms disabled.', {
+            event: 'auth.form_tokens.session_secret_missing',
+            outcome: 'blocked',
+          });
+        } else {
+          logger.error('SESSION_SECRET too short — auth forms disabled.', {
+            event: 'auth.form_tokens.session_secret_too_short',
+            outcome: 'blocked',
+          });
+        }
+
+        throw buildMissingSecretError(reason);
+      }
+    }
+
+    throw error;
   }
-
-  if (configuredSecret.length < 32) {
-    logger.error('SESSION_SECRET too short — auth forms disabled.', {
-      event: 'auth.form_tokens.session_secret_too_short',
-      outcome: 'blocked',
-    });
-    throw buildMissingSecretError('too-short');
-  }
-
-  return configuredSecret;
 };
 
 export const generateAuthFormToken = (context: AuthFormContext) => {

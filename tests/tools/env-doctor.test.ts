@@ -9,11 +9,7 @@ import { runDoctor } from '../../tools/env-doctor';
 
 test('reports missing keys and exits with failure when .env lacks entries', async () => {
   const cwd = await mkdtemp(join(tmpdir(), 'env-doctor-missing-'));
-  await writeFile(
-    join(cwd, '.env.example'),
-    ['A=1', 'B=2', 'C=3', ''].join('\n'),
-    'utf8',
-  );
+  await writeFile(join(cwd, '.env.example'), ['A=1', 'B=2', 'C=3', ''].join('\n'), 'utf8');
   await writeFile(join(cwd, '.env'), ['A=1', ''].join('\n'), 'utf8');
 
   const output = new PassThrough();
@@ -74,3 +70,20 @@ test('flags short SESSION_SECRET values', async () => {
   assert.equal(parsed.invalidKeys[0]?.key, 'SESSION_SECRET');
 });
 
+test('flags invalid TRUST_PROXY values', async () => {
+  const cwd = await mkdtemp(join(tmpdir(), 'env-doctor-trust-proxy-'));
+  await writeFile(join(cwd, '.env.example'), ['TRUST_PROXY=false', ''].join('\n'), 'utf8');
+  await writeFile(join(cwd, '.env'), ['TRUST_PROXY=maybe', ''].join('\n'), 'utf8');
+
+  const output = new PassThrough();
+  let printed = '';
+  output.on('data', (chunk) => {
+    printed += chunk.toString();
+  });
+
+  const result = await runDoctor({ cwd, json: true, output });
+  assert.equal(result.exitCode, 1);
+
+  const parsed = JSON.parse(printed.trim());
+  assert.equal(parsed.invalidKeys[0]?.key, 'TRUST_PROXY');
+});

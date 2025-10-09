@@ -8,23 +8,26 @@ let cachedAppUrl: URL | null = null;
 const normalizeUrl = (value: string) => (value.endsWith('/') ? value.slice(0, -1) : value);
 
 const computeAppUrl = () => {
-  const raw = process.env.APP_URL?.trim();
+  const preferred = process.env.NEXT_PUBLIC_BASE_URL?.trim();
+  if (preferred && preferred.length > 0) {
+    return new URL(normalizeUrl(preferred));
+  }
 
+  const raw = process.env.APP_URL?.trim();
   if (raw && raw.length > 0) {
     return new URL(normalizeUrl(raw));
   }
 
-  const publicRaw = process.env.NEXT_PUBLIC_APP_URL?.trim();
-
-  if (publicRaw && publicRaw.length > 0) {
-    return new URL(normalizeUrl(publicRaw));
+  const legacyPublic = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (legacyPublic && legacyPublic.length > 0) {
+    return new URL(normalizeUrl(legacyPublic));
   }
 
   const fallback = resolveDefaultAppUrl();
 
   if (process.env.NODE_ENV === 'production') {
     console.warn(
-      `APP_URL environment variable is missing. Falling back to ${fallback}. Set APP_URL to the canonical origin to silence this warning.`,
+      `APP_URL environment variable is missing. Falling back to ${fallback}. Set APP_URL or NEXT_PUBLIC_BASE_URL to the canonical origin to silence this warning.`,
     );
   }
 

@@ -328,10 +328,7 @@ function methodNotAllowedResponse() {
 
 function buildEnvHint(report: EnvDoctorOutcome): EnvHint {
   const keysNeedingAttention = Array.from(
-    new Set([
-      ...report.missingKeys,
-      ...report.invalidKeys.map((issue) => issue.key),
-    ]),
+    new Set([...report.missingKeys, ...report.invalidKeys.map((issue) => issue.key)]),
   ).sort();
 
   if (report.isHealthy) {
@@ -345,6 +342,7 @@ function buildEnvHint(report: EnvDoctorOutcome): EnvHint {
   return {
     status: 'warn',
     missingKeys: keysNeedingAttention,
-    message: "Run `npm run env:sync` then open .env to fill values.",
+    message:
+      'Run `npm run env:doctor`; if keys are missing, run `npm run env:sync` then edit .env.',
   };
 }
