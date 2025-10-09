@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
+import { unstable_noStore as noStore } from 'next/cache';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 import { MissingAuthFormTokenSecretError, generateAuthFormToken } from '@/lib/auth/formTokens';
 import { canonicalFor } from '@/lib/seo';
@@ -120,6 +122,7 @@ const getStatusClassName = (tone: ResetStatusTone) => {
 };
 
 export default function ResetPasswordPage({ searchParams }: ResetPasswordPageProps) {
+  noStore();
   let formToken: string | null = null;
   let configurationStatus: ResetStatusMessage | null = null;
 
