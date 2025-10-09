@@ -63,7 +63,7 @@ export function middleware(request: NextRequest | Request) {
   const pathname = getRequestPathname(request);
   const result = isAllowedOrigin(request);
 
-  const shouldRedirect = !result.allowed || result.reason === 'no-origin-header';
+  const shouldRedirect = !result.allowed;
 
   if (shouldRedirect) {
     const requestId = request.headers.get('x-request-id') ?? globalThis.crypto.randomUUID();
