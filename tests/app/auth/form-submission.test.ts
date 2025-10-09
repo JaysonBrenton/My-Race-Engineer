@@ -4,12 +4,12 @@ import test from 'node:test';
 import {
   createRegisterAction,
   type RegisterActionDependencies,
-} from '../../../src/app/(auth)/auth/register/actions';
+} from '../../../src/app/(auth)/auth/register/actions.impl';
 import { INITIAL_REGISTER_STATE } from '../../../src/app/(auth)/auth/register/state';
 import {
   createLoginAction,
   type LoginActionDependencies,
-} from '../../../src/app/(auth)/auth/login/actions';
+} from '../../../src/app/(auth)/auth/login/actions.impl';
 import type { Logger } from '../../../src/core/app';
 
 type RedirectTarget = string;

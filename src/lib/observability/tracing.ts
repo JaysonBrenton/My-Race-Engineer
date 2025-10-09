@@ -1,10 +1,33 @@
-import { SpanStatusCode, trace, type AttributeValue, type Span } from '@opentelemetry/api';
+import { SpanStatusCode, trace, type AttributeValue } from '@opentelemetry/api';
 
-const tracer = trace.getTracer('mre');
+type Attributes = Partial<Record<string, AttributeValue>>;
 
-type Attributes = Record<string, AttributeValue | undefined>;
+type InternalSpan = {
+  setAttribute: (key: string, value: AttributeValue) => void;
+  recordException: (error: Error) => void;
+  setStatus: (status: { code: SpanStatusCode; message?: string }) => void;
+  end: () => void;
+};
 
-type SpanCallback<T> = (span: Span) => Promise<T> | T;
+export type SpanAdapter = {
+  setAttribute: (key: string, value: AttributeValue | undefined) => void;
+};
+
+type InstrumentedTracer = {
+  startActiveSpan: <T>(name: string, callback: (span: InternalSpan) => Promise<T>) => Promise<T>;
+};
+
+const tracer: InstrumentedTracer = (
+  trace as unknown as { getTracer: (name: string) => InstrumentedTracer }
+).getTracer('mre');
+
+type SpanCallback<T> = (span: SpanAdapter) => Promise<T> | T;
+
+export type WithSpan = <T>(
+  name: string,
+  attributes: Attributes,
+  callback: SpanCallback<T>,
+) => Promise<T>;
 
 const isRedirectLikeError = (error: unknown): boolean => {
   if (!error || typeof error !== 'object') {
@@ -13,7 +36,10 @@ const isRedirectLikeError = (error: unknown): boolean => {
 
   if ('digest' in error) {
     const digest = (error as { digest?: unknown }).digest;
-    if (typeof digest === 'string' && (digest.startsWith('NEXT_REDIRECT') || digest.startsWith('NEXT_NOT_FOUND'))) {
+    if (
+      typeof digest === 'string' &&
+      (digest.startsWith('NEXT_REDIRECT') || digest.startsWith('NEXT_NOT_FOUND'))
+    ) {
       return true;
     }
   }
@@ -21,12 +47,21 @@ const isRedirectLikeError = (error: unknown): boolean => {
   return false;
 };
 
-export const withSpan = async <T>(
+export const withSpan: WithSpan = <T>(
   name: string,
   attributes: Attributes,
   callback: SpanCallback<T>,
-): Promise<T> =>
-  tracer.startActiveSpan(name, async (span) => {
+): Promise<T> => {
+  return tracer.startActiveSpan(name, async (span: InternalSpan): Promise<T> => {
+    const adapter: SpanAdapter = {
+      setAttribute: (key, value) => {
+        if (typeof value === 'undefined') {
+          return;
+        }
+        span.setAttribute(key, value);
+      },
+    };
+
     try {
       for (const [key, value] of Object.entries(attributes)) {
         if (typeof value === 'undefined') {
@@ -35,7 +70,7 @@ export const withSpan = async <T>(
         span.setAttribute(key, value);
       }
 
-      return await callback(span);
+      return await callback(adapter);
     } catch (error) {
       if (!isRedirectLikeError(error)) {
         span.recordException(error as Error);
@@ -50,3 +85,4 @@ export const withSpan = async <T>(
       span.end();
     }
   });
+};
