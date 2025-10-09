@@ -4,6 +4,7 @@ import {
   RegisterUserService,
   StartPasswordResetService,
   VerifyEmailService,
+  type LoggerContext,
 } from '@core/app';
 import {
   ConsoleMailer,

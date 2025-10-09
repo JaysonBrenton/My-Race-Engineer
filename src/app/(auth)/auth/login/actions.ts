@@ -14,8 +14,7 @@ import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
-import { loginUserService } from '@/dependencies/auth';
-import { getRequestLogger } from '@/dependencies/logger';
+import { getAuthRequestLogger, loginUserService } from '@/dependencies/auth';
 import { validateAuthFormToken } from '@/lib/auth/formTokens';
 import { createLogFingerprint } from '@/lib/logging/fingerprint';
 import { withSpan } from '@/lib/observability/tracing';
