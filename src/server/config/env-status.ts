@@ -322,11 +322,15 @@ export function evaluateEnvironment(options: {
     });
   }
 
-  const { raw: cookieStrategyRaw, trimmed: cookieStrategyTrimmed } = readValue('COOKIE_SECURE_STRATEGY');
+  const { raw: cookieStrategyRaw, trimmed: cookieStrategyTrimmed } =
+    readValue('COOKIE_SECURE_STRATEGY');
   if (cookieStrategyRaw === undefined) {
     missing.add('COOKIE_SECURE_STRATEGY');
   } else if (cookieStrategyTrimmed.length === 0) {
-    invalid.push({ key: 'COOKIE_SECURE_STRATEGY', message: 'COOKIE_SECURE_STRATEGY cannot be empty.' });
+    invalid.push({
+      key: 'COOKIE_SECURE_STRATEGY',
+      message: 'COOKIE_SECURE_STRATEGY cannot be empty.',
+    });
   } else if (!COOKIE_SECURE_STRATEGY_VALUES.has(cookieStrategyTrimmed)) {
     invalid.push({
       key: 'COOKIE_SECURE_STRATEGY',
@@ -348,11 +352,17 @@ export function evaluateEnvironment(options: {
   if (allowedOriginsRaw === undefined) {
     missing.add('ALLOWED_ORIGINS');
   } else if (allowedOriginsTrimmed.length === 0) {
-    invalid.push({ key: 'ALLOWED_ORIGINS', message: 'ALLOWED_ORIGINS must list at least one origin.' });
+    invalid.push({
+      key: 'ALLOWED_ORIGINS',
+      message: 'ALLOWED_ORIGINS must list at least one origin.',
+    });
   } else {
     const parsedOrigins = splitCsv(allowedOriginsTrimmed);
     if (parsedOrigins.length === 0) {
-      invalid.push({ key: 'ALLOWED_ORIGINS', message: 'ALLOWED_ORIGINS must list at least one origin.' });
+      invalid.push({
+        key: 'ALLOWED_ORIGINS',
+        message: 'ALLOWED_ORIGINS must list at least one origin.',
+      });
     } else {
       const canonicalised = parsedOrigins.map(canonicaliseOrigin);
       const invalidOriginPresent = canonicalised.some((origin) => origin === null);
@@ -367,7 +377,8 @@ export function evaluateEnvironment(options: {
     }
   }
 
-  const { raw: publicOriginRaw, trimmed: publicOriginTrimmed } = readValue('NEXT_PUBLIC_APP_ORIGIN');
+  const { raw: publicOriginRaw, trimmed: publicOriginTrimmed } =
+    readValue('NEXT_PUBLIC_APP_ORIGIN');
   if (publicOriginRaw === undefined) {
     missing.add('NEXT_PUBLIC_APP_ORIGIN');
   } else if (publicOriginTrimmed.length === 0) {
@@ -411,14 +422,19 @@ export function evaluateEnvironment(options: {
   } else {
     const parsed = parseBooleanFlagValue(tracingTrimmed);
     if (parsed === null) {
-      invalid.push({ key: 'TRACING_ENABLED', message: 'TRACING_ENABLED must be "true" or "false".' });
+      invalid.push({
+        key: 'TRACING_ENABLED',
+        message: 'TRACING_ENABLED must be "true" or "false".',
+      });
     } else {
       tracingEnabled = parsed;
     }
   }
 
   if (tracingEnabled) {
-    const { raw: otelEndpointRaw, trimmed: otelEndpointTrimmed } = readValue('OTEL_EXPORTER_OTLP_ENDPOINT');
+    const { raw: otelEndpointRaw, trimmed: otelEndpointTrimmed } = readValue(
+      'OTEL_EXPORTER_OTLP_ENDPOINT',
+    );
     if (otelEndpointRaw === undefined) {
       missing.add('OTEL_EXPORTER_OTLP_ENDPOINT');
     } else if (otelEndpointTrimmed.length === 0) {
@@ -433,7 +449,8 @@ export function evaluateEnvironment(options: {
       });
     }
 
-    const { raw: otelServiceNameRaw, trimmed: otelServiceNameTrimmed } = readValue('OTEL_SERVICE_NAME');
+    const { raw: otelServiceNameRaw, trimmed: otelServiceNameTrimmed } =
+      readValue('OTEL_SERVICE_NAME');
     if (otelServiceNameRaw === undefined) {
       missing.add('OTEL_SERVICE_NAME');
     } else if (otelServiceNameTrimmed.length === 0) {
@@ -443,16 +460,21 @@ export function evaluateEnvironment(options: {
       });
     }
 
-    const { raw: otelHeadersRaw, trimmed: otelHeadersTrimmed } = readValue('OTEL_EXPORTER_OTLP_HEADERS');
+    const { raw: otelHeadersRaw, trimmed: otelHeadersTrimmed } = readValue(
+      'OTEL_EXPORTER_OTLP_HEADERS',
+    );
     if (otelHeadersRaw !== undefined && otelHeadersTrimmed.length === 0) {
       warnings.push({
         key: 'OTEL_EXPORTER_OTLP_HEADERS',
-        message: 'OTEL_EXPORTER_OTLP_HEADERS is empty; remove it or provide comma-separated header pairs.',
+        message:
+          'OTEL_EXPORTER_OTLP_HEADERS is empty; remove it or provide comma-separated header pairs.',
       });
     }
   }
 
-  const { raw: rateWindowRaw, trimmed: rateWindowTrimmed } = readValue('INGEST_RATE_LIMIT_WINDOW_MS');
+  const { raw: rateWindowRaw, trimmed: rateWindowTrimmed } = readValue(
+    'INGEST_RATE_LIMIT_WINDOW_MS',
+  );
   const { raw: rateMaxRaw, trimmed: rateMaxTrimmed } = readValue('INGEST_RATE_LIMIT_MAX_REQUESTS');
   const hasRateWindow = rateWindowRaw !== undefined && rateWindowTrimmed.length > 0;
   const hasRateMax = rateMaxRaw !== undefined && rateMaxTrimmed.length > 0;
@@ -507,7 +529,10 @@ export function evaluateEnvironment(options: {
     if (smtpUrlRaw === undefined) {
       missing.add('SMTP_URL');
     } else if (smtpUrlTrimmed.length === 0) {
-      invalid.push({ key: 'SMTP_URL', message: 'SMTP_URL cannot be empty when MAILER_DRIVER=smtp.' });
+      invalid.push({
+        key: 'SMTP_URL',
+        message: 'SMTP_URL cannot be empty when MAILER_DRIVER=smtp.',
+      });
     } else if (!isValidSmtpUrl(smtpUrlTrimmed)) {
       invalid.push({
         key: 'SMTP_URL',
@@ -519,16 +544,25 @@ export function evaluateEnvironment(options: {
     if (mailFromEmailRaw === undefined) {
       missing.add('MAIL_FROM_EMAIL');
     } else if (mailFromEmailTrimmed.length === 0) {
-      invalid.push({ key: 'MAIL_FROM_EMAIL', message: 'MAIL_FROM_EMAIL cannot be empty when MAILER_DRIVER=smtp.' });
+      invalid.push({
+        key: 'MAIL_FROM_EMAIL',
+        message: 'MAIL_FROM_EMAIL cannot be empty when MAILER_DRIVER=smtp.',
+      });
     } else if (!looksLikeEmail(mailFromEmailTrimmed)) {
-      invalid.push({ key: 'MAIL_FROM_EMAIL', message: 'MAIL_FROM_EMAIL must look like an email address.' });
+      invalid.push({
+        key: 'MAIL_FROM_EMAIL',
+        message: 'MAIL_FROM_EMAIL must look like an email address.',
+      });
     }
 
     const { raw: mailFromNameRaw, trimmed: mailFromNameTrimmed } = readValue('MAIL_FROM_NAME');
     if (mailFromNameRaw === undefined) {
       missing.add('MAIL_FROM_NAME');
     } else if (mailFromNameTrimmed.length === 0) {
-      invalid.push({ key: 'MAIL_FROM_NAME', message: 'MAIL_FROM_NAME cannot be empty when MAILER_DRIVER=smtp.' });
+      invalid.push({
+        key: 'MAIL_FROM_NAME',
+        message: 'MAIL_FROM_NAME cannot be empty when MAILER_DRIVER=smtp.',
+      });
     }
   }
 
@@ -550,14 +584,24 @@ export function evaluateEnvironment(options: {
     if (liveRcBaseRaw === undefined) {
       missing.add('LIVERC_HTTP_BASE');
     } else if (liveRcBaseTrimmed.length === 0) {
-      invalid.push({ key: 'LIVERC_HTTP_BASE', message: 'LIVERC_HTTP_BASE cannot be empty when LiveRC features are enabled.' });
+      invalid.push({
+        key: 'LIVERC_HTTP_BASE',
+        message: 'LIVERC_HTTP_BASE cannot be empty when LiveRC features are enabled.',
+      });
     } else if (!isAbsoluteUrl(liveRcBaseTrimmed)) {
-      invalid.push({ key: 'LIVERC_HTTP_BASE', message: 'LIVERC_HTTP_BASE must be an absolute HTTP(S) URL.' });
+      invalid.push({
+        key: 'LIVERC_HTTP_BASE',
+        message: 'LIVERC_HTTP_BASE must be an absolute HTTP(S) URL.',
+      });
     }
   }
 
   const { raw: publicBaseRaw, trimmed: publicBaseTrimmed } = readValue('NEXT_PUBLIC_BASE_URL');
-  if (publicBaseRaw !== undefined && publicBaseTrimmed.length > 0 && !isAbsoluteUrl(publicBaseTrimmed)) {
+  if (
+    publicBaseRaw !== undefined &&
+    publicBaseTrimmed.length > 0 &&
+    !isAbsoluteUrl(publicBaseTrimmed)
+  ) {
     invalid.push({
       key: 'NEXT_PUBLIC_BASE_URL',
       message: 'NEXT_PUBLIC_BASE_URL must be an absolute HTTP(S) URL.',
