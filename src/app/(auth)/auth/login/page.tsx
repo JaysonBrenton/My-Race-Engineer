@@ -1,7 +1,17 @@
+/**
+ * Filename: src/app/(auth)/auth/login/page.tsx
+ * Purpose: Render the login experience with cache-busting guarantees and error-prefilled forms.
+ * Author: Jayson Brenton
+ * Date: 2025-03-18
+ * License: MIT License
+ */
+
 import type { Metadata } from 'next';
+import { unstable_noStore as noStore } from 'next/cache';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 import { MissingAuthFormTokenSecretError, generateAuthFormToken } from '@/lib/auth/formTokens';
 import { canonicalFor } from '@/lib/seo';
@@ -65,6 +75,32 @@ const getParam = (value: string | string[] | undefined) => {
   return value ?? undefined;
 };
 
+type LoginPrefill = {
+  email?: string;
+};
+
+const parsePrefillParam = (raw: string | undefined): LoginPrefill => {
+  if (!raw) {
+    return {};
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null) {
+      return {};
+    }
+
+    const parsedRecord = parsed as Record<string, unknown>;
+    const email = typeof parsedRecord.email === 'string' ? parsedRecord.email : undefined;
+
+    return {
+      email,
+    };
+  } catch {
+    return {};
+  }
+};
+
 // Converts status and error codes into human-readable strings plus a tone for
 // styling.  Keeping the mapping server-side means we can refine messaging
 // without shipping additional client bundles.
@@ -105,18 +141,17 @@ const buildStatusMessage = (
     case 'invalid-origin':
       return {
         tone: 'error' as const,
-        message:
-          'Sign in requests from this origin are blocked. Add the site origin to the ALLOWED_ORIGINS environment variable and try again.',
+        message: 'Your request came from an unapproved origin.',
       };
     case 'invalid-token':
       return {
         tone: 'error' as const,
-        message: 'Your session expired. Refresh and submit the form again.',
+        message: 'Your form expired. Please try again.',
       };
     case 'validation':
       return {
         tone: 'error' as const,
-        message: 'Double-check your details and try signing in again.',
+        message: 'Please fix the highlighted fields.',
       };
     case 'invalid-credentials':
       return {
@@ -179,6 +214,7 @@ const buildConfigurationStatusMessage = (): StatusMessage => ({
 });
 
 export default function LoginPage({ searchParams }: LoginPageProps) {
+  noStore();
   let formToken: string | null = null;
   let configurationStatus: StatusMessage | null = null;
 
@@ -197,7 +233,14 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
   const statusCode = getParam(searchParams?.status);
   const errorCode = getParam(searchParams?.error);
   const status = configurationStatus ?? buildStatusMessage(statusCode, errorCode);
-  const emailPrefill = getParam(searchParams?.email) ?? '';
+  const rawPrefill = parsePrefillParam(getParam(searchParams?.prefill));
+  const fallbackEmail = getParam(searchParams?.email);
+  const emailPrefill = (rawPrefill.email ?? fallbackEmail ?? '').trim();
+  const inlineBannerCandidate = errorCode ? buildStatusMessage(undefined, errorCode) : null;
+  const inlineBannerMessage =
+    inlineBannerCandidate && inlineBannerCandidate.tone === 'error'
+      ? inlineBannerCandidate.message
+      : null;
   const statusClassName = getStatusClassName(status.tone);
   const isFormDisabled = !formToken;
 
@@ -223,6 +266,11 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
           {/* The hidden form token travels with the POST request so the server can
               confirm the submission originated from this rendered page. */}
           {formToken ? <input type="hidden" name="formToken" value={formToken} /> : null}
+          {inlineBannerMessage ? (
+            <div className={`${styles.inlineBanner} ${styles.inlineBannerError}`} role="alert">
+              {inlineBannerMessage}
+            </div>
+          ) : null}
           <div className={styles.field}>
             {/* Each input gets explicit labels and helper text to meet WCAG 2.2
                 accessibility requirements. */}

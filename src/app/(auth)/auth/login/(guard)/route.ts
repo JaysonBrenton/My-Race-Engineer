@@ -1,8 +1,9 @@
 /**
+ * Filename: src/app/(auth)/auth/login/(guard)/route.ts
+ * Purpose: Block disallowed origins before invoking the login server action.
  * Author: Jayson Brenton
- * Date: 2025-03-12
- * Purpose: Guard login posts against disallowed origins before invoking the action.
- * License: MIT
+ * Date: 2025-03-18
+ * License: MIT License
  */
 
 import { NextResponse } from 'next/server';
@@ -36,6 +37,7 @@ export async function POST(req: Request): Promise<Response> {
     }
 
     const response = NextResponse.redirect(result.redirectTo, 303);
+    response.headers.set('Cache-Control', 'no-store');
     response.headers.set('x-auth-origin-guard', 'mismatch');
     response.headers.set('x-allowed-origins', allowedOrigins.join(','));
     return response;
@@ -45,6 +47,7 @@ export async function POST(req: Request): Promise<Response> {
   await loginAction(formData);
 
   const response = NextResponse.redirect(new URL('/auth/login', req.url), { status: 303 });
+  response.headers.set('Cache-Control', 'no-store');
   response.headers.set('x-auth-origin-guard', 'ok');
   return response;
 }

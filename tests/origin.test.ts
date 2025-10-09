@@ -1,7 +1,15 @@
+/**
+ * Filename: tests/origin.test.ts
+ * Purpose: Smoke-test the origin evaluation helper exposed for server-side adapters.
+ * Author: Jayson Brenton
+ * Date: 2025-03-18
+ * License: MIT License
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { validateOrigin } from '../src/server/security/origin';
+import { evaluateOriginHeader, parseAllowedOrigins } from '../src/core/security/origin';
 
 const originalAllowedOrigins = process.env.ALLOWED_ORIGINS;
 
@@ -17,36 +25,39 @@ test.afterEach(() => {
   restoreEnv();
 });
 
-test('validateOrigin accepts requests that match the configured origin', () => {
+const evaluate = (headers: Headers) => {
+  const allowed = parseAllowedOrigins(process.env);
+  return evaluateOriginHeader(headers.get('origin'), allowed);
+};
+
+test('evaluateOriginHeader accepts requests that match the configured origin', () => {
   process.env.ALLOWED_ORIGINS = 'https://example.com';
   const headers = new Headers({
     origin: 'https://example.com',
   });
 
-  assert.equal(validateOrigin(headers), 'ok');
+  const decision = evaluate(headers);
+  assert.equal(decision.allowed, true);
+  assert.equal(decision.reason, 'allowed');
 });
 
-test('validateOrigin falls back to referer when origin is missing', () => {
+test('evaluateOriginHeader allows requests when origin is missing', () => {
   process.env.ALLOWED_ORIGINS = 'https://example.com';
-  const headers = new Headers({
-    referer: 'https://example.com/path',
-  });
+  const headers = new Headers();
 
-  assert.equal(validateOrigin(headers), 'ok');
+  const decision = evaluate(headers);
+  assert.equal(decision.allowed, true);
+  assert.equal(decision.reason, 'no-origin-header');
 });
 
-test('validateOrigin returns mismatch for unexpected origins', () => {
+test('evaluateOriginHeader rejects unexpected origins', () => {
   process.env.ALLOWED_ORIGINS = 'https://example.com';
   const headers = new Headers({
     origin: 'https://attacker.com',
   });
 
-  assert.equal(validateOrigin(headers), 'mismatch');
+  const decision = evaluate(headers);
+  assert.equal(decision.allowed, false);
+  assert.equal(decision.reason, 'origin-not-allowed');
 });
 
-test('validateOrigin reports missing when no headers are present', () => {
-  process.env.ALLOWED_ORIGINS = 'https://example.com';
-  const headers = new Headers();
-
-  assert.equal(validateOrigin(headers), 'missing');
-});

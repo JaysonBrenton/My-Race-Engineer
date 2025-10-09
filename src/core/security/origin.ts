@@ -1,8 +1,9 @@
 /**
+ * Filename: src/core/security/origin.ts
+ * Purpose: Normalise origin values and evaluate authentication requests against the allow list.
  * Author: Jayson Brenton
- * Date: 2025-03-12
- * Purpose: Provide origin normalisation and guard utilities for auth requests.
- * License: MIT
+ * Date: 2025-03-18
+ * License: MIT License
  */
 
 const TRAILING_SLASH_REGEX = /\/+$/;
@@ -19,18 +20,6 @@ const firstHeaderValue = (value: string | null): string | null => {
 
   const [first] = value.split(',');
   return first?.trim() ?? null;
-};
-
-const safeNormalize = (value: string | null | undefined): string | null => {
-  if (!value) {
-    return null;
-  }
-
-  try {
-    return normalizeOrigin(value);
-  } catch {
-    return null;
-  }
 };
 
 export const normalizeOrigin = (input: string): string => {
@@ -57,6 +46,19 @@ type AllowedOriginsEnv = {
   [key: string]: string | undefined;
 };
 
+const tryAddOrigin = (candidate: string | undefined, accumulator: Map<string, true>) => {
+  if (!candidate) {
+    return;
+  }
+
+  try {
+    const normalized = normalizeOrigin(candidate);
+    accumulator.set(normalized, true);
+  } catch {
+    // Ignore malformed origins; the guard will surface configuration issues via redirects/logs.
+  }
+};
+
 export const parseAllowedOrigins = (env: AllowedOriginsEnv): string[] => {
   const allowed = new Map<string, true>();
 
@@ -65,20 +67,12 @@ export const parseAllowedOrigins = (env: AllowedOriginsEnv): string[] => {
       .map((entry) => entry.trim())
       .filter((entry) => entry.length > 0)
       .forEach((entry) => {
-        try {
-          allowed.set(normalizeOrigin(entry), true);
-        } catch {
-          // Ignore malformed entries so valid origins still take effect.
-        }
+        tryAddOrigin(entry, allowed);
       });
   }
 
-  if (allowed.size === 0 && env.APP_URL) {
-    try {
-      allowed.set(normalizeOrigin(env.APP_URL), true);
-    } catch {
-      // Ignore invalid APP_URL so misconfiguration surfaces via guard failure.
-    }
+  if (allowed.size === 0) {
+    tryAddOrigin(env.APP_URL, allowed);
   }
 
   if (env.DEV_TRUST_LOCAL_ORIGINS === 'true') {
@@ -92,77 +86,94 @@ export const parseAllowedOrigins = (env: AllowedOriginsEnv): string[] => {
   return Array.from(allowed.keys());
 };
 
+export type OriginEvaluationReason =
+  | 'allowed'
+  | 'no-origin-header'
+  | 'invalid-origin-header'
+  | 'origin-not-allowed';
+
+export type OriginEvaluation = {
+  allowed: boolean;
+  origin?: string;
+  reason: OriginEvaluationReason;
+};
+
+export const evaluateOriginHeader = (
+  originHeader: string | null | undefined,
+  allowedOrigins: readonly string[],
+): OriginEvaluation => {
+  if (!originHeader) {
+    return { allowed: true, reason: 'no-origin-header' };
+  }
+
+  try {
+    const normalized = normalizeOrigin(originHeader);
+    if (allowedOrigins.includes(normalized)) {
+      return { allowed: true, origin: normalized, reason: 'allowed' };
+    }
+
+    return { allowed: false, origin: normalized, reason: 'origin-not-allowed' };
+  } catch {
+    return { allowed: false, reason: 'invalid-origin-header' };
+  }
+};
+
 export const effectiveRequestOrigin = (req: Request): string | null => {
   const originHeader = req.headers.get('origin');
-  const normalizedOrigin = safeNormalize(originHeader);
 
   if (originHeader) {
-    return normalizedOrigin;
+    try {
+      return normalizeOrigin(originHeader);
+    } catch {
+      return null;
+    }
   }
 
   const forwardedProto = firstHeaderValue(req.headers.get('x-forwarded-proto'));
   const forwardedHost = firstHeaderValue(req.headers.get('x-forwarded-host'));
 
   if (forwardedProto && forwardedHost) {
-    const fromForwarded = safeNormalize(`${forwardedProto}://${forwardedHost}`);
-    if (fromForwarded) {
-      return fromForwarded;
+    try {
+      return normalizeOrigin(`${forwardedProto}://${forwardedHost}`);
+    } catch {
+      // Fall through to host header handling.
     }
   }
 
   const host = firstHeaderValue(req.headers.get('host'));
   if (host) {
-    const url = new URL(req.url);
-    const protocol = url.protocol || 'https:';
-    return safeNormalize(`${protocol}//${host}`);
+    try {
+      const url = new URL(req.url);
+      const protocol = url.protocol || 'https:';
+      return normalizeOrigin(`${protocol}//${host}`);
+    } catch {
+      return null;
+    }
   }
 
   return null;
 };
 
 export type GuardAuthPostOriginResult =
-  | { ok: true }
-  | { ok: false; redirectTo: string; reason: 'mismatch' | 'missing' | 'invalid' };
+  | { ok: true; decision: OriginEvaluation }
+  | { ok: false; redirectTo: string; reason: 'mismatch' | 'invalid' };
 
 export const guardAuthPostOrigin = (
   req: Request,
   allowedOrigins: string[],
 ): GuardAuthPostOriginResult => {
-  const allowed = new Set(allowedOrigins);
+  const decision = evaluateOriginHeader(req.headers.get('origin'), allowedOrigins);
+
+  if (decision.allowed) {
+    return { ok: true, decision };
+  }
+
   const redirectUrl = new URL(req.url);
   redirectUrl.searchParams.set('error', 'invalid-origin');
 
-  const originHeader = req.headers.get('origin');
-  if (originHeader) {
-    try {
-      const normalized = normalizeOrigin(originHeader);
-      if (allowed.has(normalized)) {
-        return { ok: true };
-      }
-      return { ok: false, redirectTo: redirectUrl.toString(), reason: 'mismatch' };
-    } catch {
-      return { ok: false, redirectTo: redirectUrl.toString(), reason: 'invalid' };
-    }
+  if (decision.reason === 'invalid-origin-header') {
+    return { ok: false, redirectTo: redirectUrl.toString(), reason: 'invalid' };
   }
 
-  const fallbackRequest = originHeader
-    ? new Request(req.url, {
-        headers: (() => {
-          const headers = new Headers(req.headers);
-          headers.delete('origin');
-          return headers;
-        })(),
-      })
-    : req;
-
-  const derivedOrigin = effectiveRequestOrigin(fallbackRequest);
-  if (!derivedOrigin) {
-    return { ok: false, redirectTo: redirectUrl.toString(), reason: 'missing' };
-  }
-
-  if (!allowed.has(derivedOrigin)) {
-    return { ok: false, redirectTo: redirectUrl.toString(), reason: 'mismatch' };
-  }
-
-  return { ok: true };
+  return { ok: false, redirectTo: redirectUrl.toString(), reason: 'mismatch' };
 };

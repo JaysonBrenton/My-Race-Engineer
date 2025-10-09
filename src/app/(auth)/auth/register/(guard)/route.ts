@@ -1,8 +1,9 @@
 /**
+ * Filename: src/app/(auth)/auth/register/(guard)/route.ts
+ * Purpose: Block disallowed origins before invoking the registration server action.
  * Author: Jayson Brenton
- * Date: 2025-03-12
- * Purpose: Guard registration posts against disallowed origins before invoking the action.
- * License: MIT
+ * Date: 2025-03-18
+ * License: MIT License
  */
 
 import { NextResponse } from 'next/server';
@@ -44,6 +45,7 @@ export async function POST(req: Request): Promise<Response> {
     }
 
     const response = NextResponse.redirect(result.redirectTo, 303);
+    response.headers.set('Cache-Control', 'no-store');
     response.headers.set('x-auth-origin-guard', 'mismatch');
     response.headers.set('x-allowed-origins', allowedOrigins.join(','));
     return response;
@@ -63,9 +65,9 @@ export async function POST(req: Request): Promise<Response> {
       }
 
       const response = NextResponse.redirect(location, statusCode);
+      response.headers.set('Cache-Control', 'no-store');
       response.headers.set('x-auth-origin-guard', 'ok');
 
-      // Ensure cookies mutated within the server action propagate to the caller.
       const mutableCookies = (error as { mutableCookies?: ResponseCookies }).mutableCookies;
       if (mutableCookies) {
         appendMutableCookies(response.headers, mutableCookies);
@@ -78,6 +80,7 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   const response = NextResponse.redirect(new URL('/auth/register', req.url), { status: 303 });
+  response.headers.set('Cache-Control', 'no-store');
   response.headers.set('x-auth-origin-guard', 'ok');
   return response;
 }

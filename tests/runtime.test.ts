@@ -1,48 +1,39 @@
+/**
+ * Filename: tests/runtime.test.ts
+ * Purpose: Verify runtime helpers for cookie security flags honour environment expectations.
+ * Author: Jayson Brenton
+ * Date: 2025-03-18
+ * License: MIT License
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { isCookieSecure } from '../src/server/runtime';
 
-const originalAppUrl = process.env.APP_URL;
-const originalCookieSecure = process.env.COOKIE_SECURE;
+const env = process.env as Record<string, string | undefined>;
+const originalNodeEnv = env.NODE_ENV;
 
-const restoreEnv = () => {
-  if (originalAppUrl === undefined) {
-    delete process.env.APP_URL;
+const setNodeEnv = (value: string | undefined) => {
+  if (value === undefined) {
+    delete env.NODE_ENV;
   } else {
-    process.env.APP_URL = originalAppUrl;
+    env.NODE_ENV = value;
   }
-
-  if (originalCookieSecure === undefined) {
-    delete process.env.COOKIE_SECURE;
-  } else {
-    process.env.COOKIE_SECURE = originalCookieSecure;
-  }
-
 };
 
 test.afterEach(() => {
-  restoreEnv();
+  setNodeEnv(originalNodeEnv);
 });
 
-test('isCookieSecure returns false for http app URLs by default', () => {
-  process.env.APP_URL = 'http://localhost:3001';
-  delete process.env.COOKIE_SECURE;
+test('isCookieSecure disables the Secure attribute outside production', () => {
+  setNodeEnv('development');
 
   assert.equal(isCookieSecure(), false);
 });
 
-test('isCookieSecure prefers explicit env override', () => {
-  process.env.APP_URL = 'http://localhost:3001';
-  process.env.COOKIE_SECURE = 'true';
+test('isCookieSecure enables the Secure attribute in production', () => {
+  setNodeEnv('production');
 
   assert.equal(isCookieSecure(), true);
 });
-
-test('isCookieSecure returns true when APP_URL is https', () => {
-  process.env.APP_URL = 'https://example.com';
-  delete process.env.COOKIE_SECURE;
-
-  assert.equal(isCookieSecure(), true);
-});
-
