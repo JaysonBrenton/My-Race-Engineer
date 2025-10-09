@@ -24,7 +24,6 @@ import { guardAuthPostOrigin } from '@/server/security/origin';
 import { isCookieSecure } from '@/server/runtime';
 
 import {
-  INITIAL_REGISTER_STATE,
   buildPrefillParam,
   buildRedirectUrl,
   buildStatusMessage,
@@ -32,13 +31,20 @@ import {
   type RegisterErrorCode,
 } from './state';
 
+class OriginMismatchError extends Error {
+  constructor() {
+    super('Request origin did not match the allowed origin list.');
+    this.name = 'OriginMismatchError';
+  }
+}
+
 type RegistrationPrefillInput = {
   name?: string | null | undefined;
   email?: string | null | undefined;
 };
 
 // The server action owns the full registration happy-path orchestration, so we keep
-// the validation rules alongside it.  This schema mirrors the policy enforced at the
+// the validation rules alongside it. This schema mirrors the policy enforced at the
 // service layer to provide fast feedback without duplicating logic in the client.
 const passwordSchema = z
   .string()
@@ -49,7 +55,7 @@ const passwordSchema = z
   .regex(/[^A-Za-z0-9]/, 'Password must include a symbol.');
 
 // We normalise incoming form data so the domain service receives a clean object with
-// trimmed strings and a lower-cased email.  Custom refinement keeps the error mapping
+// trimmed strings and a lower-cased email. Custom refinement keeps the error mapping
 // predictable for the UI when passwords do not match.
 const registrationSchema = z
   .object({
@@ -79,9 +85,9 @@ const registrationSchema = z
   });
 
 // Redirect destinations preserve the user's non-sensitive input and the error code so
-// the page can re-render with contextual messaging.  A helper keeps this behaviour
+// the page can re-render with contextual messaging. A helper keeps this behaviour
 // consistent across each exit path.
-// `FormData.get` can yield strings or File objects.  Registration only allows text
+// `FormData.get` can yield strings or File objects. Registration only allows text
 // inputs, so we coerce anything else to `undefined` to gracefully trigger validation
 // errors.
 const getFormValue = (data: FormData, key: string) => {
@@ -89,39 +95,38 @@ const getFormValue = (data: FormData, key: string) => {
   return typeof value === 'string' ? value : undefined;
 };
 
-type RegistrationPrefillInput = {
-  name?: string | null | undefined;
-  email?: string | null | undefined;
-};
+const extractPrefillValues = (data: FormData): RegistrationPrefillInput => ({
+  name: getFormValue(data, 'name'),
+  email: getFormValue(data, 'email'),
+});
 
-// Registration prefills only rehydrate display-safe fields so that passwords are never
-// echoed back to the client.  Values are trimmed to avoid leaking leading/trailing spaces.
-const buildPrefillParam = (prefill: RegistrationPrefillInput): string | undefined => {
-  const safeEntries = Object.entries(prefill)
-    .filter(([, value]) => typeof value === 'string' && value.trim().length > 0)
-    .map(([key, value]) => [key, (value as string).trim()]);
+const normalisePrefillValues = (prefill: RegistrationPrefillInput) => ({
+  name: typeof prefill.name === 'string' ? prefill.name.trim() : '',
+  email: typeof prefill.email === 'string' ? prefill.email.trim() : '',
+});
 
-  if (safeEntries.length === 0) {
-    return undefined;
-  }
+const buildState = (
+  errorCode: RegisterErrorCode,
+  prefill: RegistrationPrefillInput,
+): RegisterActionState => ({
+  status: buildStatusMessage(errorCode),
+  errorCode,
+  values: normalisePrefillValues(prefill),
+});
 
-  try {
-    return JSON.stringify(Object.fromEntries(safeEntries));
-  } catch {
-    return undefined;
-  }
-};
-
-export const registerAction = async (formData: FormData) => {
+export const registerAction = async (
+  previousState: RegisterActionState,
+  formData: FormData,
+): Promise<RegisterActionState> => {
   const requestStartedAt = Date.now();
-  // Rate limiting and the client identifier check run before any heavy work so abusive
-  // attempts short-circuit without touching downstream dependencies.
   const headersList = headers();
   const requestId = headersList.get('x-request-id') ?? randomUUID();
   const logger = getRequestLogger({
     requestId,
     route: 'auth/register',
   });
+
+  const prefills = extractPrefillValues(formData);
 
   try {
     guardAuthPostOrigin(
@@ -136,7 +141,7 @@ export const registerAction = async (formData: FormData) => {
     );
   } catch (error) {
     if (error instanceof OriginMismatchError) {
-      return buildState('invalid-origin', extractPrefillValues(formData));
+      return buildState('invalid-origin', prefills);
     }
 
     throw error;
@@ -149,6 +154,7 @@ export const registerAction = async (formData: FormData) => {
     outcome: 'processing',
     clientFingerprint,
   });
+
   const rateLimit = checkRegisterRateLimit(identifier);
   if (!rateLimit.ok) {
     logger.warn('Registration blocked by rate limiter.', {
@@ -158,11 +164,9 @@ export const registerAction = async (formData: FormData) => {
       retryAfterMs: rateLimit.retryAfterMs,
       durationMs: Date.now() - requestStartedAt,
     });
-    return buildState('rate-limited', extractPrefillValues(formData));
+    return buildState('rate-limited', prefills);
   }
 
-  // Protect against CSRF by requiring a short-lived form token that ties back to the
-  // session seeded when we rendered the page.
   const token = getFormValue(formData, 'formToken');
   const tokenValidation = validateAuthFormToken(token ?? null, 'registration');
 
@@ -173,11 +177,9 @@ export const registerAction = async (formData: FormData) => {
       clientFingerprint,
       durationMs: Date.now() - requestStartedAt,
     });
-    return buildState('invalid-token', extractPrefillValues(formData));
+    return buildState('invalid-token', prefills);
   }
 
-  // Parse the user-provided fields using the schema above.  `safeParse` ensures we can
-  // branch on success without throwing, which keeps the control flow linear.
   const parseResult = registrationSchema.safeParse({
     name: getFormValue(formData, 'name'),
     email: getFormValue(formData, 'email'),
@@ -197,15 +199,12 @@ export const registerAction = async (formData: FormData) => {
       validationIssues: issues,
       durationMs: Date.now() - requestStartedAt,
     });
-    redirect(
-      buildRedirectUrl('/auth/register', {
-        error: 'validation',
-        prefill: buildPrefillParam({
-          name: getFormValue(formData, 'name'),
-          email: getFormValue(formData, 'email'),
-        }),
-      }),
-    );
+    return {
+      status: buildStatusMessage('validation'),
+      errorCode: 'validation',
+      values: normalisePrefillValues(prefills),
+      fieldErrors: issues,
+    };
   }
 
   const { name, email, password } = parseResult.data;
@@ -219,8 +218,6 @@ export const registerAction = async (formData: FormData) => {
     emailFingerprint,
   });
 
-  // Delegate business logic to the app-layer service.  It coordinates persistence,
-  // password hashing, and any follow-up actions such as verification emails.
   let result: Awaited<ReturnType<typeof registerUserService.register>>;
   try {
     result = await registerUserService.register({
@@ -248,12 +245,7 @@ export const registerAction = async (formData: FormData) => {
       durationMs: Date.now() - requestStartedAt,
     });
 
-    redirect(
-      buildRedirectUrl('/auth/register', {
-        error: 'server-error',
-        prefill: buildPrefillParam({ name, email }),
-      }),
-    );
+    return buildState('server-error', { name, email });
   }
 
   if (!result.ok) {
@@ -264,16 +256,9 @@ export const registerAction = async (formData: FormData) => {
       emailFingerprint,
       durationMs: Date.now() - requestStartedAt,
     });
-    redirect(
-      buildRedirectUrl('/auth/register', {
-        error: result.reason,
-        prefill: buildPrefillParam({ name, email }),
-      }),
-    );
+    return buildState(result.reason, { name, email });
   }
 
-  // Map the service outcome to the correct redirect so the UI can guide the user to
-  // the next action in the onboarding flow.
   switch (result.nextStep) {
     case 'verify-email':
       logger.info('Registration complete; verification required.', {
@@ -305,10 +290,7 @@ export const registerAction = async (formData: FormData) => {
         }),
       );
       break;
-    case 'session-created': {
-      // Persist the issued session in an HTTP-only cookie so the browser carries it on
-      // subsequent requests.  We respect the TTL provided by the service to keep the
-      // session lifecycle in sync across tiers.
+    case 'session-created':
       if (result.session) {
         const cookieJar = cookies();
         const expiresAt = result.session.expiresAt;
@@ -335,7 +317,6 @@ export const registerAction = async (formData: FormData) => {
       });
       redirect('/dashboard');
       break;
-    }
     default:
       logger.error('Registration returned unexpected next step.', {
         event: 'auth.register.next_step.unknown',
@@ -345,8 +326,8 @@ export const registerAction = async (formData: FormData) => {
         nextStep: result.nextStep,
         durationMs: Date.now() - requestStartedAt,
       });
-      redirect('/auth/login');
+      return buildState('server-error', { name, email });
   }
 
-  return INITIAL_REGISTER_STATE;
+  return previousState;
 };

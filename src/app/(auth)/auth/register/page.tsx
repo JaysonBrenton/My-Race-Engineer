@@ -23,22 +23,14 @@ import {
   safeParseJsonRecord,
   type SearchParams,
 } from '../shared/search-params';
-import { registerAction } from './actions';
-import {
-  INITIAL_REGISTER_STATE,
-  buildStatusMessage,
-  type RegisterActionState,
-  type RegisterErrorCode,
-  type StatusMessage,
-} from './state';
-import { RegisterForm } from './register-form';
+import { buildStatusMessage, type RegisterErrorCode, type StatusMessage } from './state';
 
 const PAGE_TITLE = 'Create your My Race Engineer account';
 const PAGE_DESCRIPTION =
   'Bring your team onboard with secure access to telemetry dashboards and collaboration tools.';
 
 export function generateMetadata(): Metadata {
-  // Registration is SEO-addressable because we link to it from marketing content.  We
+  // Registration is SEO-addressable because we link to it from marketing content. We
   // compute the canonical URL once so social previews, Open Graph metadata, and search
   // engines share the same reference.
   const canonical = canonicalFor('/auth/register');
@@ -67,87 +59,48 @@ type RegisterPageProps = {
   searchParams?: SearchParams;
 };
 
-const buildPrefill = (raw: string | undefined) => {
-  const parsed = safeParseJsonRecord(raw);
-
 type RegisterPrefill = {
   name?: string;
   email?: string;
 };
 
-const parsePrefillParam = (raw: string | undefined): RegisterPrefill => {
-  if (!raw) {
+const buildPrefill = (raw: string | undefined): RegisterPrefill => {
+  const parsed = safeParseJsonRecord(raw);
+
+  if (!parsed) {
     return {};
-  }
-
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== 'object' || parsed === null) {
-      return {};
-    }
-
-    const shape = parsed as Record<string, unknown>;
-    const name = typeof shape.name === 'string' ? shape.name : undefined;
-    const email = typeof shape.email === 'string' ? shape.email : undefined;
-
-    return { name, email };
-  } catch {
-    return {};
-  }
-};
-
-// Translate redirect error codes into human-friendly copy that also drives the visual
-// state of the live region.  Keeping the mapping in one place makes it easy to audit
-// for accessibility.
-const buildStatusMessage = (errorCode: string | undefined): StatusMessage => {
-  switch (errorCode) {
-    case 'invalid-origin':
-      return {
-        tone: 'error' as const,
-        message: 'Your request came from an unapproved origin.',
-      };
-    case 'invalid-token':
-      return {
-        tone: 'error' as const,
-        message: 'Your form expired. Please try again.',
-      };
-    case 'validation':
-      return {
-        tone: 'error' as const,
-        message: 'Please fix the highlighted fields.',
-      };
-    case 'email-taken':
-      return {
-        tone: 'error' as const,
-        message: 'An account already exists for that email address. Try signing in instead.',
-      };
-    case 'weak-password':
-      return {
-        tone: 'error' as const,
-        message: 'Choose a stronger password that meets the security policy.',
-      };
-    case 'rate-limited':
-      return {
-        tone: 'error' as const,
-        message: 'Too many attempts in a short time. Wait a few minutes before trying again.',
-      };
-    case 'server-error':
-      return {
-        tone: 'error' as const,
-        message:
-          'We hit an unexpected error while creating your account. Please try again shortly.',
-      };
-    default:
-      return {
-        tone: 'info' as const,
-        message: 'We will send you a verification email after submission.',
-      };
   }
 
   return {
     name: asOptionalTrimmedString(parsed.name),
     email: asOptionalTrimmedString(parsed.email),
   };
+};
+
+const parseErrorCode = (raw: string | undefined): RegisterErrorCode | undefined => {
+  switch (raw) {
+    case 'invalid-origin':
+    case 'invalid-token':
+    case 'validation':
+    case 'rate-limited':
+    case 'email-taken':
+    case 'weak-password':
+    case 'server-error':
+      return raw;
+    default:
+      return undefined;
+  }
+};
+
+const getStatusClassName = (tone: StatusMessage['tone']) => {
+  switch (tone) {
+    case 'error':
+      return `${styles.statusRegion} ${styles.statusError}`;
+    case 'success':
+      return `${styles.statusRegion} ${styles.statusSuccess}`;
+    default:
+      return styles.statusRegion;
+  }
 };
 
 const buildConfigurationErrorStatus = (): StatusMessage => ({
@@ -162,7 +115,7 @@ export default function RegisterPage({ searchParams }: RegisterPageProps) {
   let configurationStatus: StatusMessage | null = null;
 
   try {
-    // We generate a per-request token that the action checks to prevent CSRF.  If the
+    // We generate a per-request token that the action checks to prevent CSRF. If the
     // secret is missing we still render the page but communicate that registration is
     // unavailable instead of throwing an opaque error.
     formToken = generateAuthFormToken('registration');
@@ -173,15 +126,17 @@ export default function RegisterPage({ searchParams }: RegisterPageProps) {
       throw error;
     }
   }
-  // Merge configuration errors with any status returned from the action so the live
-  // region always reflects the highest priority message for the user.
-  const errorCode = getParam(searchParams?.error);
+
+  const errorParam = firstParamValue(searchParams?.error);
+  const errorCode = parseErrorCode(errorParam);
   const status = configurationStatus ?? buildStatusMessage(errorCode);
-  const parsedPrefill = parsePrefillParam(getParam(searchParams?.prefill));
-  const fallbackName = getParam(searchParams?.name);
-  const fallbackEmail = getParam(searchParams?.email);
-  const namePrefill = (parsedPrefill.name ?? fallbackName ?? '').trim();
-  const emailPrefill = (parsedPrefill.email ?? fallbackEmail ?? '').trim();
+
+  const parsedPrefill = buildPrefill(firstParamValue(searchParams?.prefill));
+  const fallbackName = asOptionalTrimmedString(firstParamValue(searchParams?.name));
+  const fallbackEmail = asOptionalTrimmedString(firstParamValue(searchParams?.email));
+  const namePrefill = parsedPrefill.name ?? fallbackName ?? '';
+  const emailPrefill = parsedPrefill.email ?? fallbackEmail ?? '';
+
   const inlineBannerCandidate = errorCode ? buildStatusMessage(errorCode) : null;
   const inlineBannerMessage =
     inlineBannerCandidate && inlineBannerCandidate.tone === 'error'
