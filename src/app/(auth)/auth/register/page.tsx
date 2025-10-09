@@ -16,6 +16,12 @@ import { MissingAuthFormTokenSecretError, generateAuthFormToken } from '@/lib/au
 import { canonicalFor } from '@/lib/seo';
 
 import styles from '../auth.module.css';
+import {
+  asOptionalTrimmedString,
+  firstParamValue,
+  safeParseJsonRecord,
+  type SearchParams,
+} from '../shared/search-params';
 import { registerAction } from './actions';
 import {
   INITIAL_REGISTER_STATE,
@@ -57,43 +63,20 @@ export function generateMetadata(): Metadata {
 }
 
 type RegisterPageProps = {
-  searchParams?: Record<string, string | string[] | undefined>;
+  searchParams?: SearchParams;
 };
 
-// `searchParams` values may be arrays due to repeated query keys.  We take the first
-// entry to keep the UI deterministic and ignore unexpected values.
-const getParam = (value: string | string[] | undefined) => {
-  if (Array.isArray(value)) {
-    return value[0];
-  }
+const buildPrefill = (raw: string | undefined) => {
+  const parsed = safeParseJsonRecord(raw);
 
-  return value ?? undefined;
-};
-
-type RegisterPrefill = {
-  name?: string;
-  email?: string;
-};
-
-const parsePrefillParam = (raw: string | undefined): RegisterPrefill => {
-  if (!raw) {
+  if (!parsed) {
     return {};
   }
 
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== 'object' || parsed === null) {
-      return {};
-    }
-
-    const shape = parsed as Record<string, unknown>;
-    const name = typeof shape.name === 'string' ? shape.name : undefined;
-    const email = typeof shape.email === 'string' ? shape.email : undefined;
-
-    return { name, email };
-  } catch {
-    return {};
-  }
+  return {
+    name: asOptionalTrimmedString(parsed.name),
+    email: asOptionalTrimmedString(parsed.email),
+  };
 };
 
 const buildConfigurationErrorStatus = (): StatusMessage => ({
@@ -121,14 +104,14 @@ export default function RegisterPage({ searchParams }: RegisterPageProps) {
   }
   // Merge configuration errors with any status returned from the action so the live
   // region always reflects the highest priority message for the user.
-  const errorCode = getParam(searchParams?.error);
+  const errorCode = firstParamValue(searchParams?.error);
   const normalizedErrorCode = (errorCode ?? undefined) as RegisterErrorCode | undefined;
   const status = configurationStatus ?? buildStatusMessage(normalizedErrorCode);
-  const parsedPrefill = parsePrefillParam(getParam(searchParams?.prefill));
-  const fallbackName = getParam(searchParams?.name);
-  const fallbackEmail = getParam(searchParams?.email);
-  const namePrefill = (parsedPrefill.name ?? fallbackName ?? '').trim();
-  const emailPrefill = (parsedPrefill.email ?? fallbackEmail ?? '').trim();
+  const parsedPrefill = buildPrefill(firstParamValue(searchParams?.prefill));
+  const fallbackName = asOptionalTrimmedString(firstParamValue(searchParams?.name));
+  const fallbackEmail = asOptionalTrimmedString(firstParamValue(searchParams?.email));
+  const namePrefill = parsedPrefill.name ?? fallbackName ?? '';
+  const emailPrefill = parsedPrefill.email ?? fallbackEmail ?? '';
   const initialState: RegisterActionState = {
     ...INITIAL_REGISTER_STATE,
     status,
