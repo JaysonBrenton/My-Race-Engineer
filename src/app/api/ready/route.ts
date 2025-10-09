@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server';
 
 import type { Logger } from '@core/app';
 import { applicationLogger } from '@/dependencies/logger';
+import { evaluateProcessEnvironment, type EnvDoctorOutcome } from '@/server/config/env-status';
 import { getPrismaClient, isPrismaClientInitializationError } from '@core/infra';
 
 export const dynamic = 'force-dynamic';
@@ -41,6 +42,12 @@ type ReadinessEvaluation = {
   checks: ReadinessChecks;
 };
 
+type EnvHint = {
+  status: 'ok' | 'warn';
+  missingKeys: string[];
+  message: string;
+};
+
 export async function GET(request: Request) {
   const requestId = request.headers.get('x-request-id') ?? randomUUID();
   const logger = applicationLogger.withContext({
@@ -48,13 +55,16 @@ export async function GET(request: Request) {
     route: '/api/ready',
   });
 
+  const envReportPromise = evaluateProcessEnvironment();
   const evaluation = await evaluateReadiness(logger);
+  const envHint = buildEnvHint(await envReportPromise);
 
   if (!evaluation.ok) {
     logger.error('Readiness check failed.', {
       event: 'readiness.failed',
       outcome: 'unhealthy',
       checks: evaluation.checks,
+      env: envHint,
     });
 
     return NextResponse.json(
@@ -63,6 +73,7 @@ export async function GET(request: Request) {
         requestId,
         timestamp: new Date().toISOString(),
         checks: evaluation.checks,
+        env: envHint,
       },
       {
         status: 503,
@@ -75,6 +86,7 @@ export async function GET(request: Request) {
     event: 'readiness.ok',
     outcome: 'healthy',
     checks: evaluation.checks,
+    env: envHint,
   });
 
   return NextResponse.json(
@@ -83,6 +95,7 @@ export async function GET(request: Request) {
       requestId,
       timestamp: new Date().toISOString(),
       checks: evaluation.checks,
+      env: envHint,
     },
     {
       status: 200,
@@ -311,4 +324,27 @@ function methodNotAllowedResponse() {
       Allow: 'GET',
     },
   });
+}
+
+function buildEnvHint(report: EnvDoctorOutcome): EnvHint {
+  const keysNeedingAttention = Array.from(
+    new Set([
+      ...report.missingKeys,
+      ...report.invalidKeys.map((issue) => issue.key),
+    ]),
+  ).sort();
+
+  if (report.isHealthy) {
+    return {
+      status: 'ok',
+      missingKeys: [],
+      message: 'Environment configuration looks complete.',
+    };
+  }
+
+  return {
+    status: 'warn',
+    missingKeys: keysNeedingAttention,
+    message: "Run `npm run env:sync` then open .env to fill values.",
+  };
 }
