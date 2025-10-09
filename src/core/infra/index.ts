@@ -12,3 +12,4 @@ export * from './mailer/consoleMailer';
 export * from './mailer/nodemailerMailer';
 export * from './http/liveRcClient';
 export * from './logger/pinoLogger';
+export * from './logger/compositeLogger';
