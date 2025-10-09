@@ -1,5 +1,7 @@
-const defaultPort = process.env.PORT?.trim() || '3001';
-const DEFAULT_APP_URL = `http://localhost:${defaultPort}`;
+const resolveDefaultAppUrl = () => {
+  const port = process.env.PORT?.trim() || '3001';
+  return `http://localhost:${port}`;
+};
 
 let cachedAppUrl: URL | null = null;
 
@@ -12,11 +14,21 @@ const computeAppUrl = () => {
     return new URL(normalizeUrl(raw));
   }
 
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('APP_URL environment variable must be defined to generate absolute URLs.');
+  const publicRaw = process.env.NEXT_PUBLIC_APP_URL?.trim();
+
+  if (publicRaw && publicRaw.length > 0) {
+    return new URL(normalizeUrl(publicRaw));
   }
 
-  return new URL(normalizeUrl(process.env.NEXT_PUBLIC_APP_URL?.trim() || DEFAULT_APP_URL));
+  const fallback = resolveDefaultAppUrl();
+
+  if (process.env.NODE_ENV === 'production') {
+    console.warn(
+      `APP_URL environment variable is missing. Falling back to ${fallback}. Set APP_URL to the canonical origin to silence this warning.`,
+    );
+  }
+
+  return new URL(normalizeUrl(fallback));
 };
 
 export function getAppUrl(): URL {
@@ -109,4 +121,8 @@ export function buildSiteNavigationJsonLd(items: BreadcrumbItem[]) {
     name: item.name,
     url: absUrl(item.path),
   }));
+}
+
+export function __resetAppUrlCacheForTests() {
+  cachedAppUrl = null;
 }
