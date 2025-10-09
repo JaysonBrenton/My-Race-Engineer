@@ -72,3 +72,8 @@ systemctl --user status mre
 ```
 Switching `npm install` to `npm ci` is the only recommended change for deterministic installs.
 
+
+## Troubleshooting
+
+### Next.js build error: “A 'use server' file can only export async functions”
+This usually means a `route.ts` file includes a `'use server'` directive alongside constant or object exports. Remove `'use server'` from route handlers and keep only async handlers plus static route config exports.
