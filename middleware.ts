@@ -13,12 +13,26 @@ import { evaluateOriginHeader, parseAllowedOrigins } from '@/core/security/origi
 
 const AUTH_POST_PATHS = [/^\/auth\/login(?:\/.*)?$/, /^\/auth\/register(?:\/.*)?$/];
 
-const isAuthPost = (request: NextRequest) =>
-  request.method === 'POST' && AUTH_POST_PATHS.some((pattern) => pattern.test(request.nextUrl.pathname));
+const hasNextUrl = (request: NextRequest | Request): request is NextRequest =>
+  'nextUrl' in request && typeof request.nextUrl?.pathname === 'string';
 
-const buildRedirectLocation = (request: NextRequest) => {
-  const targetPath = request.nextUrl.pathname.startsWith('/auth/register') ? '/auth/register' : '/auth/login';
-  const redirectUrl = new URL(request.url);
+const resolveAuthRedirectTarget = (pathname: string) =>
+  pathname.startsWith('/auth/register') ? '/auth/register' : '/auth/login';
+
+const getRequestPathname = (request: NextRequest | Request) => {
+  if (hasNextUrl(request)) {
+    return request.nextUrl.pathname;
+  }
+
+  const { pathname } = new URL(request.url);
+  return pathname;
+};
+
+const isAuthPost = (request: NextRequest | Request) =>
+  request.method === 'POST' && AUTH_POST_PATHS.some((pattern) => pattern.test(getRequestPathname(request)));
+
+const buildRedirectLocation = (requestUrl: string, targetPath: string) => {
+  const redirectUrl = new URL(requestUrl);
   redirectUrl.pathname = targetPath;
   redirectUrl.search = '';
   redirectUrl.searchParams.set('error', 'invalid-origin');
@@ -46,7 +60,7 @@ export function middleware(request: NextRequest | Request) {
     return response;
   }
 
-  const { pathname } = new URL(request.url);
+  const pathname = getRequestPathname(request);
   const result = isAllowedOrigin(request);
 
   const shouldRedirect = !result.allowed || result.reason === 'no-origin-header';
