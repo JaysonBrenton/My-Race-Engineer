@@ -13,6 +13,7 @@ Next.js (App Router) + TypeScript + Prisma/PostgreSQL with clean layering, stric
 - [Environment variables](#environment-variables)
 - [Authentication](#authentication)
 - [Scripts](#scripts)
+- [Operations playbooks](#operations-playbooks)
 - [Error handling & logging](#error-handling--logging)
 - [Performance budgets](#performance-budgets)
 - [Branching & PR rules](#branching--pr-rules)
@@ -209,6 +210,11 @@ Expect a `303` redirect to `/auth/login?error=invalid-origin` and `x-auth-origin
 - `npm run prisma:migrate:deploy` — apply pending migrations in prod  
 
 **PR gates:** `typecheck`, `lint`, `build` (and tests when present) must pass.
+
+---
+
+## Operations playbooks
+- [Dev VM update & restart playbook](docs/guides/dev-vm-update-playbook.md) — how to pull new code, apply Prisma migrations, rebuild, and restart the `mre` systemd service on `10.211.55.13`.
 
 ---
 
