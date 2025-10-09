@@ -60,6 +60,8 @@ export async function runDoctor(options: RunDoctorOptions = {}): Promise<DoctorR
         missingKeys: report.missingKeys,
         extraKeys: report.extraKeys,
         invalidKeys: report.invalidKeys,
+        warnings: report.warnings,
+        appliedDefaults: report.appliedDefaults,
         isHealthy: report.isHealthy,
       })}\n`,
     );
@@ -88,6 +90,14 @@ function formatReportTable(report: EnvDoctorOutcome): string {
     rows.push({
       key: issue.key,
       status: `${COLORS.red}invalid${COLORS.reset}`,
+      details: sanitiseIssueMessage(issue),
+    });
+  }
+
+  for (const issue of report.warnings) {
+    rows.push({
+      key: issue.key,
+      status: `${COLORS.yellow}warn${COLORS.reset}`,
       details: sanitiseIssueMessage(issue),
     });
   }
@@ -121,6 +131,9 @@ function formatReportTable(report: EnvDoctorOutcome): string {
 
 function formatSummary(report: EnvDoctorOutcome): string {
   if (report.isHealthy) {
+    if (report.warnings.length > 0) {
+      return `${COLORS.yellow}${report.warnings.length} warning(s) detected. Review the details above to apply the recommended defaults.${COLORS.reset}`;
+    }
     return `${COLORS.green}All required environment keys are present and valid.${COLORS.reset}`;
   }
 
@@ -130,7 +143,8 @@ function formatSummary(report: EnvDoctorOutcome): string {
   const invalidPart = report.invalidKeys.length > 0
     ? `${report.invalidKeys.length} invalid`
     : undefined;
-  const parts = [missingPart, invalidPart].filter(Boolean).join(', ');
+  const warnPart = report.warnings.length > 0 ? `${report.warnings.length} warning(s)` : undefined;
+  const parts = [missingPart, invalidPart, warnPart].filter(Boolean).join(', ');
 
   return `${COLORS.red}Environment checks failed (${parts}). Fix the issues above and rerun \`npm run env:doctor\`.${COLORS.reset}`;
 }

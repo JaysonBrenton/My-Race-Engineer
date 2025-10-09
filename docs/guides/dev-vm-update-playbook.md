@@ -12,10 +12,13 @@ Immediately check whether any new environment keys are required:
 ```
 npm run env:doctor
 ```
+`env:doctor` will warn (not fail) when it applies safe defaults (for example, `MAILER_DRIVER=console` or `NEXT_PUBLIC_APP_ORIGIN` matching `APP_URL`). Optional feature keys stay optional until their feature is enabled.
+
 If it reports missing keys, append them safely and then populate real values:
 ```
 npm run env:sync
 ```
+Add `-- --all` when you want every placeholder from `.env.example` instead of only the always-required and feature-enabled keys.
 > Pulling code does **not** update your local `.env`. `env:sync` only adds new keys and never overwrites existing values—open `.env` afterwards to provide the real secrets.
 
 ## 2. Refresh Node dependencies
