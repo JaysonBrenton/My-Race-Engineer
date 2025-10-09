@@ -1,6 +1,6 @@
 /**
  * Author: Jayson Brenton
- * Date: 2025-03-12
+ * Date: 2025-03-18
  * Purpose: Verify auth origin parsing and guard behaviour.
  * License: MIT
  */
@@ -80,6 +80,8 @@ void test('guardAuthPostOrigin allows configured origins', () => {
   const result = guardAuthPostOrigin(request, allowed);
 
   assert.equal(result.ok, true);
+  assert.equal(result.decision.reason, 'allowed');
+  assert.equal(result.decision.origin, 'https://example.com');
 });
 
 void test('guardAuthPostOrigin reports mismatched origins', () => {
@@ -99,7 +101,7 @@ void test('guardAuthPostOrigin reports mismatched origins', () => {
   assert.equal(result.redirectTo, 'https://app.local/auth/login?error=invalid-origin');
 });
 
-void test('guardAuthPostOrigin reports missing origins when headers are absent', () => {
+void test('guardAuthPostOrigin allows requests when the Origin header is absent', () => {
   process.env.ALLOWED_ORIGINS = 'https://example.com';
   const allowed = parseAllowedOrigins(process.env);
   const request = new Request('https://app.local/auth/register', {
@@ -108,7 +110,6 @@ void test('guardAuthPostOrigin reports missing origins when headers are absent',
 
   const result = guardAuthPostOrigin(request, allowed);
 
-  assert.equal(result.ok, false);
-  assert.equal(result.reason, 'missing');
-  assert.equal(result.redirectTo, 'https://app.local/auth/register?error=invalid-origin');
+  assert.equal(result.ok, true);
+  assert.equal(result.decision.reason, 'no-origin-header');
 });

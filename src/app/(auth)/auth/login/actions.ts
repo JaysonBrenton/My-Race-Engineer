@@ -1,5 +1,13 @@
 'use server';
 
+/**
+ * Filename: src/app/(auth)/auth/login/actions.ts
+ * Purpose: Validate login submissions, enforce security controls, and issue authenticated sessions.
+ * Author: Jayson Brenton
+ * Date: 2025-03-18
+ * License: MIT License
+ */
+
 import { randomUUID } from 'node:crypto';
 
 import { cookies, headers } from 'next/headers';
@@ -55,6 +63,24 @@ const buildRedirectUrl = (pathname: string, searchParams: Record<string, string 
 const getFormValue = (data: FormData, key: string) => {
   const value = data.get(key);
   return typeof value === 'string' ? value : undefined;
+};
+
+// Only whitelisted, non-sensitive fields are rehydrated on validation errors.  Password
+// inputs are intentionally excluded so we never echo secrets back to the browser.
+const buildPrefillParam = (prefill: { email?: string | null | undefined }): string | undefined => {
+  const safeEntries = Object.entries(prefill)
+    .filter(([, value]) => typeof value === 'string' && value.trim().length > 0)
+    .map(([key, value]) => [key, (value as string).trim()]);
+
+  if (safeEntries.length === 0) {
+    return undefined;
+  }
+
+  try {
+    return JSON.stringify(Object.fromEntries(safeEntries));
+  } catch {
+    return undefined;
+  }
 };
 
 export const loginAction = async (formData: FormData) => {
@@ -150,7 +176,7 @@ export const loginAction = async (formData: FormData) => {
     redirect(
       buildRedirectUrl('/auth/login', {
         error: 'validation',
-        email: getFormValue(formData, 'email'),
+        prefill: buildPrefillParam({ email: getFormValue(formData, 'email') }),
       }),
     );
   }
@@ -192,7 +218,7 @@ export const loginAction = async (formData: FormData) => {
     redirect(
       buildRedirectUrl('/auth/login', {
         error: result.reason,
-        email,
+        prefill: buildPrefillParam({ email }),
       }),
     );
   }

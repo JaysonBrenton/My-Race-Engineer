@@ -1,5 +1,13 @@
 'use server';
 
+/**
+ * Filename: src/app/(auth)/auth/register/actions.ts
+ * Purpose: Handle account registration submissions with validation, security checks, and session provisioning.
+ * Author: Jayson Brenton
+ * Date: 2025-03-18
+ * License: MIT License
+ */
+
 import { randomUUID } from 'node:crypto';
 
 import { cookies, headers } from 'next/headers';
@@ -77,6 +85,29 @@ const buildRedirectUrl = (pathname: string, searchParams: Record<string, string 
 const getFormValue = (data: FormData, key: string) => {
   const value = data.get(key);
   return typeof value === 'string' ? value : undefined;
+};
+
+type RegistrationPrefillInput = {
+  name?: string | null | undefined;
+  email?: string | null | undefined;
+};
+
+// Registration prefills only rehydrate display-safe fields so that passwords are never
+// echoed back to the client.  Values are trimmed to avoid leaking leading/trailing spaces.
+const buildPrefillParam = (prefill: RegistrationPrefillInput): string | undefined => {
+  const safeEntries = Object.entries(prefill)
+    .filter(([, value]) => typeof value === 'string' && value.trim().length > 0)
+    .map(([key, value]) => [key, (value as string).trim()]);
+
+  if (safeEntries.length === 0) {
+    return undefined;
+  }
+
+  try {
+    return JSON.stringify(Object.fromEntries(safeEntries));
+  } catch {
+    return undefined;
+  }
 };
 
 export const registerAction = async (formData: FormData) => {
@@ -169,8 +200,10 @@ export const registerAction = async (formData: FormData) => {
     redirect(
       buildRedirectUrl('/auth/register', {
         error: 'validation',
-        name: getFormValue(formData, 'name'),
-        email: getFormValue(formData, 'email'),
+        prefill: buildPrefillParam({
+          name: getFormValue(formData, 'name'),
+          email: getFormValue(formData, 'email'),
+        }),
       }),
     );
   }
@@ -218,8 +251,7 @@ export const registerAction = async (formData: FormData) => {
     redirect(
       buildRedirectUrl('/auth/register', {
         error: 'server-error',
-        name,
-        email,
+        prefill: buildPrefillParam({ name, email }),
       }),
     );
   }
@@ -235,8 +267,7 @@ export const registerAction = async (formData: FormData) => {
     redirect(
       buildRedirectUrl('/auth/register', {
         error: result.reason,
-        name,
-        email,
+        prefill: buildPrefillParam({ name, email }),
       }),
     );
   }
@@ -255,7 +286,7 @@ export const registerAction = async (formData: FormData) => {
       redirect(
         buildRedirectUrl('/auth/login', {
           status: 'verify-email',
-          email,
+          prefill: buildPrefillParam({ email }),
         }),
       );
       break;
@@ -270,7 +301,7 @@ export const registerAction = async (formData: FormData) => {
       redirect(
         buildRedirectUrl('/auth/login', {
           status: 'awaiting-approval',
-          email,
+          prefill: buildPrefillParam({ email }),
         }),
       );
       break;

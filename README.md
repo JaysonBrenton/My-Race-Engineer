@@ -158,6 +158,37 @@ Dev server listens on `http://localhost:3001/` (also `http://0.0.0.0:3001/`).
 
 ---
 
+### Auth setup checklist
+
+- **APP_URL** must match the browser origin exactly (scheme + host + port).
+- **ALLOWED_ORIGINS** must include every origin that will post to `/auth/login` or `/auth/register`.
+- **SESSION_SECRET** must be a stable 32+ byte value; rotate it only when you intend to invalidate sessions.
+- In local development keep `NODE_ENV=development` so the session cookie is accepted over HTTP.
+
+#### Quick verification
+
+Run these probes after configuring your `.env` file. The `formToken` payload can be a placeholder—the server action will still reject it, but the headers prove whether the origin guard passed.
+
+```bash
+curl -i -X POST \
+  http://10.211.55.13:3001/auth/login \
+  -H 'Origin: http://10.211.55.13:3001' \
+  -d 'email=driver@example.com&password=placeholder&formToken=dummy'
+```
+
+Expect a `303` response with `x-auth-origin-guard: ok`.
+
+```bash
+curl -i -X POST \
+  http://10.211.55.13:3001/auth/login \
+  -H 'Origin: http://example.com' \
+  -d 'email=driver@example.com&password=placeholder&formToken=dummy'
+```
+
+Expect a `303` redirect to `/auth/login?error=invalid-origin` and `x-auth-origin-guard: mismatch`.
+
+---
+
 ## Scripts
 - `npm run dev` — start Next in dev on `:3001`  
 - `npm run build` — typecheck + build  

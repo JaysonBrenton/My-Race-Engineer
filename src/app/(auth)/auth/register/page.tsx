@@ -1,7 +1,17 @@
+/**
+ * Filename: src/app/(auth)/auth/register/page.tsx
+ * Purpose: Render the registration form with safe prefills, inline error states, and cache disabling.
+ * Author: Jayson Brenton
+ * Date: 2025-03-18
+ * License: MIT License
+ */
+
 import type { Metadata } from 'next';
+import { unstable_noStore as noStore } from 'next/cache';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 import { MissingAuthFormTokenSecretError, generateAuthFormToken } from '@/lib/auth/formTokens';
 import { canonicalFor } from '@/lib/seo';
@@ -59,6 +69,32 @@ const getParam = (value: string | string[] | undefined) => {
   return value ?? undefined;
 };
 
+type RegisterPrefill = {
+  name?: string;
+  email?: string;
+};
+
+const parsePrefillParam = (raw: string | undefined): RegisterPrefill => {
+  if (!raw) {
+    return {};
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null) {
+      return {};
+    }
+
+    const shape = parsed as Record<string, unknown>;
+    const name = typeof shape.name === 'string' ? shape.name : undefined;
+    const email = typeof shape.email === 'string' ? shape.email : undefined;
+
+    return { name, email };
+  } catch {
+    return {};
+  }
+};
+
 // Translate redirect error codes into human-friendly copy that also drives the visual
 // state of the live region.  Keeping the mapping in one place makes it easy to audit
 // for accessibility.
@@ -67,18 +103,17 @@ const buildStatusMessage = (errorCode: string | undefined): StatusMessage => {
     case 'invalid-origin':
       return {
         tone: 'error' as const,
-        message:
-          'This request came from an origin that is not allowed. Update the ALLOWED_ORIGINS environment variable to include this site and refresh the page.',
+        message: 'Your request came from an unapproved origin.',
       };
     case 'invalid-token':
       return {
         tone: 'error' as const,
-        message: 'Your session expired. Refresh the page and try again.',
+        message: 'Your form expired. Please try again.',
       };
     case 'validation':
       return {
         tone: 'error' as const,
-        message: 'Check the highlighted fields and try submitting again.',
+        message: 'Please fix the highlighted fields.',
       };
     case 'email-taken':
       return {
@@ -127,6 +162,7 @@ const buildConfigurationErrorStatus = (): StatusMessage => ({
 });
 
 export default function RegisterPage({ searchParams }: RegisterPageProps) {
+  noStore();
   let formToken: string | null = null;
   let configurationStatus: StatusMessage | null = null;
 
@@ -146,8 +182,16 @@ export default function RegisterPage({ searchParams }: RegisterPageProps) {
   // region always reflects the highest priority message for the user.
   const errorCode = getParam(searchParams?.error);
   const status = configurationStatus ?? buildStatusMessage(errorCode);
-  const namePrefill = getParam(searchParams?.name) ?? '';
-  const emailPrefill = getParam(searchParams?.email) ?? '';
+  const parsedPrefill = parsePrefillParam(getParam(searchParams?.prefill));
+  const fallbackName = getParam(searchParams?.name);
+  const fallbackEmail = getParam(searchParams?.email);
+  const namePrefill = (parsedPrefill.name ?? fallbackName ?? '').trim();
+  const emailPrefill = (parsedPrefill.email ?? fallbackEmail ?? '').trim();
+  const inlineBannerCandidate = errorCode ? buildStatusMessage(errorCode) : null;
+  const inlineBannerMessage =
+    inlineBannerCandidate && inlineBannerCandidate.tone === 'error'
+      ? inlineBannerCandidate.message
+      : null;
   const statusClassName = getStatusClassName(status.tone);
   const isFormDisabled = !formToken;
 
@@ -172,6 +216,11 @@ export default function RegisterPage({ searchParams }: RegisterPageProps) {
           aria-describedby="auth-register-status"
         >
           {formToken ? <input type="hidden" name="formToken" value={formToken} /> : null}
+          {inlineBannerMessage ? (
+            <div className={`${styles.inlineBanner} ${styles.inlineBannerError}`} role="alert">
+              {inlineBannerMessage}
+            </div>
+          ) : null}
           <div className={styles.field}>
             <label className={styles.label} htmlFor="auth-register-name">
               Full name

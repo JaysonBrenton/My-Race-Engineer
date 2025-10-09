@@ -1,3 +1,11 @@
+/**
+ * Filename: src/server/runtime.ts
+ * Purpose: Provide server-side runtime helpers for URL parsing and cookie security flags.
+ * Author: Jayson Brenton
+ * Date: 2025-03-18
+ * License: MIT License
+ */
+
 export const getAppUrl = (): URL => {
   const raw = process.env.APP_URL?.trim();
 
@@ -13,9 +21,9 @@ export const getAppUrl = (): URL => {
 };
 
 export const isCookieSecure = (): boolean => {
-  if (process.env.COOKIE_SECURE === 'true') {
-    return true;
-  }
-
-  return getAppUrl().protocol === 'https:';
+  // Session cookies must ship with the `Secure` attribute in production to prevent
+  // browsers from sending them over plaintext HTTP.  During local development we
+  // intentionally disable the flag because most setups run over http://localhost,
+  // and modern browsers silently drop cookies marked `Secure` on non-HTTPS origins.
+  return process.env.NODE_ENV === 'production';
 };
