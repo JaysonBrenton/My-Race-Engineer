@@ -66,7 +66,7 @@ prisma/
 ---
 
 ## Local quickstart
-> Run on: macOS/Linux.  
+> Run on: macOS/Linux.
 > Prereqs: Node 20+ (LTS), npm (or pnpm), and PostgreSQL 14/15/16. Docker alternative included.
 
 ### 1) Get the code
@@ -120,6 +120,14 @@ npm run dev
 Dev server listens on `http://localhost:3001/` (also `http://0.0.0.0:3001/`).
 
 > **Production preview:** when deploying under systemd/user, run `prisma migrate deploy` **before** the app starts and gate readiness on schema (see [Migrations & readiness](#migrations--readiness)).
+
+---
+
+## Configuration
+
+- After every `git pull`, run `npm run env:doctor` to diff `.env` against `.env.example` and catch missing or invalid keys early.
+- When `env:doctor` reports missing keys, run `npm run env:sync` to append placeholders safely, then open `.env` to provide real values.
+- Pulling code never edits your `.env` automatically—new secrets must always be filled in by hand.
 
 ---
 

@@ -8,6 +8,16 @@ git pull --ff-only
 ```
 Using `--ff-only` keeps the branch history linear and fails fast if you forgot to push local commits.
 
+Immediately check whether any new environment keys are required:
+```
+npm run env:doctor
+```
+If it reports missing keys, append them safely and then populate real values:
+```
+npm run env:sync
+```
+> Pulling code does **not** update your local `.env`. `env:sync` only adds new keys and never overwrites existing values—open `.env` afterwards to provide the real secrets.
+
 ## 2. Refresh Node dependencies
 ```
 npm ci
