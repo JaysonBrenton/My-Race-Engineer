@@ -33,14 +33,23 @@ export const calculateLapSummary = (entrant: Entrant, laps: Lap[]): LapSummary =
     };
   }
 
-  const sorted = [...laps].sort((a, b) => a.lapTime.milliseconds - b.lapTime.milliseconds);
-  const total = laps.reduce((acc, lap) => acc + lap.lapTime.milliseconds, 0);
+  let bestLapMs = Infinity;
+  let total = 0;
+
+  for (const { lapTime } of laps) {
+    const { milliseconds } = lapTime;
+    total += milliseconds;
+
+    if (milliseconds < bestLapMs) {
+      bestLapMs = milliseconds;
+    }
+  }
 
   return {
     entrantId: entrant.id,
     entrantDisplayName: entrant.displayName,
     lapsCompleted: laps.length,
-    bestLapMs: sorted[0]?.lapTime.milliseconds ?? 0,
+    bestLapMs: bestLapMs === Infinity ? 0 : bestLapMs,
     averageLapMs: Math.round(total / laps.length),
   };
 };
