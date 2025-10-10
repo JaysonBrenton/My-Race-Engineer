@@ -27,13 +27,15 @@ import { INITIAL_REGISTER_STATE, buildPrefillParam, buildRedirectUrl } from '../
 const shouldLogDiagnostics = (): boolean => process.env.NODE_ENV !== 'production';
 
 export const handleRegisterGuardPost = async (req: Request): Promise<Response> => {
-  const allowedOrigins = parseAllowedOrigins(process.env);
-  const result = guardAuthPostOrigin(req, allowedOrigins);
+  const route = '/auth/register';
+  const logger = applicationLogger.withContext({ route });
+  const allowedOrigins = parseAllowedOrigins(process.env, { logger });
+  const result = guardAuthPostOrigin(req, allowedOrigins, { logger, route });
 
   if (!result.ok) {
     if (shouldLogDiagnostics()) {
-      applicationLogger.warn('auth.origin_guard.register_blocked', {
-        route: '/auth/register',
+      logger.warn('auth.origin_guard.register_blocked', {
+        route,
         reason: result.reason,
         allowedOrigins,
         effectiveOrigin: effectiveRequestOrigin(req),
