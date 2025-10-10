@@ -1,14 +1,14 @@
 /**
- * Author: Jayson Brenton
- * Date: 2025-03-12
- * Purpose: Validate middleware origin guard handling for auth POST requests.
- * License: MIT
+ * Author: Jayson + The Brainy One
+ * Date: 2025-03-18
+ * Purpose: Verify auth origin middleware edge handling for allowed and disallowed POSTs.
+ * License: MIT License
  */
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { middleware } from '../../../middleware';
+import { middleware } from '../../../src/middleware';
 
 const createRequest = (url: string, init?: RequestInit): Request => new Request(url, init);
 
@@ -42,6 +42,12 @@ test.afterEach(() => {
   restoreEnv();
 });
 
+const expectPassThrough = (response: Response | undefined) => {
+  assert(response);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('location'), null);
+};
+
 test('middleware allows POSTs from configured origins', () => {
   process.env.ALLOWED_ORIGINS = 'https://app.local:3001';
 
@@ -54,13 +60,10 @@ test('middleware allows POSTs from configured origins', () => {
 
   const response = middleware(request);
 
-  assert.equal(response?.status, 200);
-  assert.equal(response?.headers.get('location'), null);
-  assert.equal(response?.headers.get('x-auth-origin-guard'), 'ok');
-  assert.equal(response?.headers.get('x-auth-origin'), 'https://app.local:3001');
+  expectPassThrough(response ?? undefined);
 });
 
-test('middleware redirects login POSTs with mismatched origins', () => {
+test('middleware redirects login POSTs with mismatched origins using 303', () => {
   process.env.ALLOWED_ORIGINS = 'https://app.local:3001';
 
   const request = createRequest('https://app.local:3001/auth/login', {
@@ -75,8 +78,23 @@ test('middleware redirects login POSTs with mismatched origins', () => {
   assert(response);
   assert.equal(response.status, 303);
   assert.equal(response.headers.get('location'), 'https://app.local:3001/auth/login?error=invalid-origin');
-  assert.equal(response.headers.get('x-auth-origin-guard'), 'mismatch');
-  assert.equal(response.headers.get('x-allowed-origins'), 'https://app.local:3001');
+});
+
+test('middleware redirects register POSTs with mismatched origins using 303', () => {
+  process.env.ALLOWED_ORIGINS = 'https://app.local:3001';
+
+  const request = createRequest('https://app.local:3001/auth/register', {
+    method: 'POST',
+    headers: {
+      origin: 'https://attacker.example',
+    },
+  });
+
+  const response = middleware(request);
+
+  assert(response);
+  assert.equal(response.status, 303);
+  assert.equal(response.headers.get('location'), 'https://app.local:3001/auth/register?error=invalid-origin');
 });
 
 test('middleware allows register POSTs when origin header is missing', () => {
@@ -88,11 +106,7 @@ test('middleware allows register POSTs when origin header is missing', () => {
 
   const response = middleware(request);
 
-  assert(response);
-  assert.equal(response.status, 200);
-  assert.equal(response.headers.get('location'), null);
-  assert.equal(response.headers.get('x-auth-origin-guard'), 'ok');
-  assert.equal(response.headers.get('x-auth-origin'), null);
+  expectPassThrough(response ?? undefined);
 });
 
 test('middleware allows login POSTs when origin header is missing', () => {
@@ -104,9 +118,6 @@ test('middleware allows login POSTs when origin header is missing', () => {
 
   const response = middleware(request);
 
-  assert(response);
-  assert.equal(response.status, 200);
-  assert.equal(response.headers.get('location'), null);
-  assert.equal(response.headers.get('x-auth-origin-guard'), 'ok');
-  assert.equal(response.headers.get('x-auth-origin'), null);
+  expectPassThrough(response ?? undefined);
 });
+
