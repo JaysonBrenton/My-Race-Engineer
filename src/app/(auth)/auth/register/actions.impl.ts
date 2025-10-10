@@ -21,20 +21,7 @@ import { extractClientIdentifier } from '@/lib/request/clientIdentifier';
 import { computeCookieSecure, type CookieSecureStrategy } from '@/server/runtime/cookies';
 import { guardAuthPostOrigin } from '@/server/security/origin';
 
-import {
-  buildPrefillParam,
-  buildRedirectUrl,
-  buildStatusMessage,
-  type RegisterActionState,
-  type RegisterErrorCode,
-} from './state';
-
-class OriginMismatchError extends Error {
-  constructor() {
-    super('Request origin did not match the allowed origin list.');
-    this.name = 'OriginMismatchError';
-  }
-}
+import { buildPrefillParam, buildRedirectUrl, type RegisterErrorCode } from './state';
 
 type RegistrationPrefillInput = {
   name?: string | null | undefined;
@@ -103,15 +90,6 @@ const normalisePrefillValues = (prefill: RegistrationPrefillInput) => ({
   email: typeof prefill.email === 'string' ? prefill.email.trim() : '',
 });
 
-const buildState = (
-  errorCode: RegisterErrorCode,
-  prefill: RegistrationPrefillInput,
-): RegisterActionState => ({
-  status: buildStatusMessage(errorCode),
-  errorCode,
-  values: normalisePrefillValues(prefill),
-});
-
 type RegisterService = Pick<typeof registerUserService, 'register'>;
 
 export type RegisterActionDependencies = {
@@ -157,55 +135,58 @@ const resolveCookieSecureStrategy = (): CookieSecureStrategy =>
     process.env.COOKIE_SECURE_STRATEGY as CookieSecureStrategy | undefined,
   ) ?? (process.env.NODE_ENV === 'production' ? 'auto' : 'never');
 
-export type RegisterAction = (
-  previousState: RegisterActionState,
-  formData: FormData,
-) => Promise<RegisterActionState>;
+export type RegisterAction = (formData: FormData) => Promise<void>;
 
 export const createRegisterAction = (
   deps: RegisterActionDependencies = defaultRegisterActionDependencies,
 ): RegisterAction => {
-  return async (
-    previousState: RegisterActionState,
-    formData: FormData,
-  ): Promise<RegisterActionState> => {
+  return async (formData: FormData): Promise<void> => {
     const requestStartedAt = Date.now();
     const headersList = deps.headers();
     const requestId = headersList.get('x-request-id') ?? randomUUID();
 
-    return deps.withSpan(
+    await deps.withSpan(
       'auth.register',
       {
         'mre.request_id': requestId,
         'http.route': 'auth/register',
       },
-      async (span: SpanAdapter): Promise<RegisterActionState> => {
+      async (span: SpanAdapter): Promise<void> => {
         const logger = deps.getAuthRequestLogger({
           requestId,
           route: 'auth/register',
         });
 
         const prefills = extractPrefillValues(formData);
+        const normalisedPrefills = normalisePrefillValues(prefills);
 
-        try {
-          deps.guardAuthPostOrigin(
-            headersList,
-            () => {
-              throw new OriginMismatchError();
-            },
-            {
-              route: 'auth/register',
-              logger,
-            },
-          );
-        } catch (error) {
-          if (error instanceof OriginMismatchError) {
+        const redirectToRegister = (errorCode: RegisterErrorCode): never => {
+          const redirectUrl = buildRedirectUrl('/auth/register', {
+            error: errorCode,
+            prefill: buildPrefillParam(normalisedPrefills),
+            name: normalisedPrefills.name || undefined,
+            email: normalisedPrefills.email || undefined,
+          });
+
+          return deps.redirect(redirectUrl);
+        };
+
+        deps.guardAuthPostOrigin(
+          headersList,
+          () => {
             span.setAttribute('mre.auth.outcome', 'invalid_origin');
-            return buildState('invalid-origin', prefills);
-          }
-
-          throw error;
-        }
+            logger.warn('Registration blocked due to origin mismatch.', {
+              event: 'auth.register.invalid_origin',
+              outcome: 'blocked',
+              durationMs: Date.now() - requestStartedAt,
+            });
+            return redirectToRegister('invalid-origin');
+          },
+          {
+            route: 'auth/register',
+            logger,
+          },
+        );
 
         const identifier = deps.extractClientIdentifier(headersList);
         const clientFingerprint =
@@ -231,7 +212,7 @@ export const createRegisterAction = (
             retryAfterMs: rateLimit.retryAfterMs,
             durationMs: Date.now() - requestStartedAt,
           });
-          return buildState('rate-limited', prefills);
+          return redirectToRegister('rate-limited');
         }
 
         const token = getFormValue(formData, 'formToken');
@@ -245,7 +226,7 @@ export const createRegisterAction = (
             clientFingerprint,
             durationMs: Date.now() - requestStartedAt,
           });
-          return buildState('invalid-token', prefills);
+          return redirectToRegister('invalid-token');
         }
 
         const parseResult = registrationSchema.safeParse({
@@ -268,12 +249,7 @@ export const createRegisterAction = (
             validationIssues: issues,
             durationMs: Date.now() - requestStartedAt,
           });
-          return {
-            status: buildStatusMessage('validation'),
-            errorCode: 'validation',
-            values: normalisePrefillValues(prefills),
-            fieldErrors: issues,
-          };
+          return redirectToRegister('validation');
         }
 
         const { name, email, password } = parseResult.data;
@@ -321,7 +297,7 @@ export const createRegisterAction = (
             durationMs: Date.now() - requestStartedAt,
           });
 
-          return buildState('server-error', { name, email });
+          return redirectToRegister('server-error');
         }
 
         if (!result.ok) {
@@ -333,7 +309,7 @@ export const createRegisterAction = (
             emailFingerprint,
             durationMs: Date.now() - requestStartedAt,
           });
-          return buildState(result.reason, { name, email });
+          return redirectToRegister(result.reason);
         }
 
         switch (result.nextStep) {
@@ -418,10 +394,8 @@ export const createRegisterAction = (
               nextStep: result.nextStep,
               durationMs: Date.now() - requestStartedAt,
             });
-            return buildState('server-error', { name, email });
+            return redirectToRegister('server-error');
         }
-
-        return previousState;
       },
     );
   };

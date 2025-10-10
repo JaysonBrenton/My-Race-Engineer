@@ -24,6 +24,7 @@ import {
   type SearchParams,
 } from '../shared/search-params';
 import { buildStatusMessage, type RegisterErrorCode, type StatusMessage } from './state';
+import { registerAction } from './actions';
 
 const PAGE_TITLE = 'Create your My Race Engineer account';
 const PAGE_DESCRIPTION =
@@ -162,7 +163,7 @@ export default function RegisterPage({ searchParams }: RegisterPageProps) {
         <form
           className={styles.form}
           method="post"
-          action="/auth/register"
+          action={registerAction}
           aria-describedby="auth-register-status"
         >
           {formToken ? <input type="hidden" name="formToken" value={formToken} /> : null}
