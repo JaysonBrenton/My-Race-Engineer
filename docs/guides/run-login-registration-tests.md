@@ -1,3 +1,11 @@
+<!--
+Filename: docs/guides/run-login-registration-tests.md
+Author: Jayson + The Brainy One
+Date: 2025-03-18
+Purpose: Document every automated login and registration test and how to run them locally.
+License: MIT License
+-->
+
 # Login & Registration Test Execution Guide
 
 This guide documents every automated test that exercises the login or registration flow and explains exactly how to run them locally. All commands assume you are in the repository root (`My-Race-Engineer`).
@@ -51,7 +59,22 @@ npx tsx --test tests/next/middleware/auth-origin-middleware.test.ts
 ```
 The tests snapshot and restore any `APP_URL`, `ALLOWED_ORIGINS`, and `DEV_TRUST_LOCAL_ORIGINS` values, so you can run them without pre-configuring the environment.
 
-## 5. Route module compile guards
+## 5. Middleware manifest verification
+
+Validates that a production build emits middleware metadata covering `/auth/:path*`, ensuring the origin guard stays active in deployment bundles.
+
+1. Build the project (CI flag keeps output lean):
+   ```bash
+   CI=1 npm run build
+   ```
+2. Execute the manifest assertion:
+   ```bash
+   npx tsx --test tests/util/middleware-manifest.test.ts
+   ```
+
+If the manifest is missing the matcher, the test fails with a descriptive assertion so the regression can be triaged before release.
+
+## 6. Route module compile guards
 
 Confirms that the guard routes wrapping the login and registration endpoints load without throwing when compiled.
 
@@ -60,7 +83,7 @@ npx tsx --test tests/build/auth-guard-routes.compile.test.ts
 ```
 This is a lightweight smoke test that dynamically imports `src/app/(auth)/auth/login/(guard)/route` and `src/app/(auth)/auth/register/(guard)/route`.
 
-## 6. Running everything together
+## 7. Running everything together
 
 To execute **all** login and registration related tests in one go, combine the commands:
 
@@ -68,12 +91,14 @@ To execute **all** login and registration related tests in one go, combine the c
 npm run test:auth \
   && npx tsx --test tests/app/auth/form-submission.test.ts \
   && npx tsx --test tests/next/middleware/auth-origin-middleware.test.ts \
+  && CI=1 npm run build \
+  && npx tsx --test tests/util/middleware-manifest.test.ts \
   && npx tsx --test tests/build/auth-guard-routes.compile.test.ts
 ```
 
 Because each command exits non-zero on failure, the chain stops at the first failing suite, making it easy to spot and address issues.
 
-## 7. Troubleshooting tips
+## 8. Troubleshooting tips
 
 - **TypeScript build errors:** Ensure `npx tsx --test` is used (not `node --test`), so that TypeScript files are compiled on the fly.
 - **Slow runs:** Pass `--watch` to any `tsx --test` command to re-run on file changes.
