@@ -100,6 +100,10 @@ npm run test:auth \
 
 Because each command exits non-zero on failure, the chain stops at the first failing suite, making it easy to spot and address issues.
 
+### Do the tests write to auth logs?
+
+No. All suites swap in in-memory loggers so they can assert on emitted messages without touching the real auth logs. The core service tests provision an `InMemoryLogger` for both registration and login adapters, while the App Router action tests stub the request logger with a no-op implementation. As a result you can run the commands above without generating noise in shared logging backends.
+
 ## 8. Troubleshooting tips
 
 - **TypeScript build errors:** Ensure `npx tsx --test` is used (not `node --test`), so that TypeScript files are compiled on the fly.
