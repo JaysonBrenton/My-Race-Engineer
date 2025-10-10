@@ -94,3 +94,19 @@ test('middleware allows register POSTs when origin header is missing', () => {
   assert.equal(response.headers.get('x-auth-origin-guard'), 'ok');
   assert.equal(response.headers.get('x-auth-origin'), null);
 });
+
+test('middleware allows login POSTs when origin header is missing', () => {
+  process.env.ALLOWED_ORIGINS = 'https://app.local:3001';
+
+  const request = createRequest('https://app.local:3001/auth/login', {
+    method: 'POST',
+  });
+
+  const response = middleware(request);
+
+  assert(response);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('location'), null);
+  assert.equal(response.headers.get('x-auth-origin-guard'), 'ok');
+  assert.equal(response.headers.get('x-auth-origin'), null);
+});
