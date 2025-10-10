@@ -6,12 +6,37 @@
  * License: MIT License
  */
 
+import type { Logger } from '@core/app';
+
 const TRAILING_SLASH_REGEX = /\/+$/;
 const LOCAL_DEV_ORIGINS = [
   'http://localhost:3001',
   'http://127.0.0.1:3001',
   'http://10.211.55.13:3001',
 ];
+
+type OriginLogger = Pick<Logger, 'debug' | 'warn'>;
+
+type OriginSource = 'ALLOWED_ORIGINS' | 'APP_URL' | 'DEV_DEFAULT';
+
+type TryAddOriginOptions = {
+  logger?: OriginLogger;
+  source: OriginSource;
+};
+
+type ParseAllowedOriginsOptions = {
+  logger?: OriginLogger;
+};
+
+type EvaluateOriginHeaderOptions = {
+  logger?: OriginLogger;
+  route?: string;
+};
+
+type GuardAuthPostOriginOptions = {
+  logger?: OriginLogger;
+  route?: string;
+};
 
 const firstHeaderValue = (value: string | null): string | null => {
   if (!value) {
@@ -46,20 +71,51 @@ type AllowedOriginsEnv = {
   [key: string]: string | undefined;
 };
 
-const tryAddOrigin = (candidate: string | undefined, accumulator: Map<string, true>) => {
+const tryAddOrigin = (
+  candidate: string | undefined,
+  accumulator: Map<string, true>,
+  options: TryAddOriginOptions,
+) => {
+  const { logger, source } = options;
+
   if (!candidate) {
+    if (source !== 'ALLOWED_ORIGINS') {
+      logger?.warn('security.origin.missing_candidate', { source });
+    }
     return;
   }
 
   try {
     const normalized = normalizeOrigin(candidate);
+    const alreadyPresent = accumulator.has(normalized);
     accumulator.set(normalized, true);
-  } catch {
-    // Ignore malformed origins; the guard will surface configuration issues via redirects/logs.
+
+    if (alreadyPresent) {
+      logger?.debug('security.origin.duplicate_allowed_origin', {
+        origin: normalized,
+        source,
+      });
+      return;
+    }
+
+    logger?.debug('security.origin.allowed_origin_added', {
+      origin: normalized,
+      source,
+    });
+  } catch (error) {
+    logger?.warn('security.origin.invalid_candidate', {
+      source,
+      candidate,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 };
 
-export const parseAllowedOrigins = (env: AllowedOriginsEnv): string[] => {
+export const parseAllowedOrigins = (
+  env: AllowedOriginsEnv,
+  options: ParseAllowedOriginsOptions = {},
+): string[] => {
+  const { logger } = options;
   const allowed = new Map<string, true>();
 
   if (env.ALLOWED_ORIGINS) {
@@ -67,23 +123,26 @@ export const parseAllowedOrigins = (env: AllowedOriginsEnv): string[] => {
       .map((entry) => entry.trim())
       .filter((entry) => entry.length > 0)
       .forEach((entry) => {
-        tryAddOrigin(entry, allowed);
+        tryAddOrigin(entry, allowed, { logger, source: 'ALLOWED_ORIGINS' });
       });
   }
 
   if (allowed.size === 0) {
-    tryAddOrigin(env.APP_URL, allowed);
+    tryAddOrigin(env.APP_URL, allowed, { logger, source: 'APP_URL' });
   }
 
   if (env.DEV_TRUST_LOCAL_ORIGINS === 'true') {
     for (const origin of LOCAL_DEV_ORIGINS) {
-      if (!allowed.has(origin)) {
-        allowed.set(origin, true);
-      }
+      tryAddOrigin(origin, allowed, { logger, source: 'DEV_DEFAULT' });
     }
   }
 
-  return Array.from(allowed.keys());
+  const origins = Array.from(allowed.keys());
+  logger?.debug('security.origin.allowed_origins_finalised', {
+    origins,
+  });
+
+  return origins;
 };
 
 export type OriginEvaluationReason =
@@ -101,19 +160,39 @@ export type OriginEvaluation = {
 export const evaluateOriginHeader = (
   originHeader: string | null | undefined,
   allowedOrigins: readonly string[],
+  options: EvaluateOriginHeaderOptions = {},
 ): OriginEvaluation => {
+  const { logger, route } = options;
+
   if (!originHeader) {
+    logger?.debug('security.origin.no_origin_header', {
+      route,
+    });
     return { allowed: true, reason: 'no-origin-header' };
   }
 
   try {
     const normalized = normalizeOrigin(originHeader);
     if (allowedOrigins.includes(normalized)) {
+      logger?.debug('security.origin.origin_allowed', {
+        route,
+        origin: normalized,
+      });
       return { allowed: true, origin: normalized, reason: 'allowed' };
     }
 
+    logger?.warn('security.origin.origin_not_allowed', {
+      route,
+      origin: normalized,
+      allowedOrigins,
+    });
     return { allowed: false, origin: normalized, reason: 'origin-not-allowed' };
-  } catch {
+  } catch (error) {
+    logger?.warn('security.origin.invalid_origin_header', {
+      route,
+      header: originHeader,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return { allowed: false, reason: 'invalid-origin-header' };
   }
 };
@@ -161,15 +240,31 @@ export type GuardAuthPostOriginResult =
 export const guardAuthPostOrigin = (
   req: Request,
   allowedOrigins: string[],
+  options: GuardAuthPostOriginOptions = {},
 ): GuardAuthPostOriginResult => {
-  const decision = evaluateOriginHeader(req.headers.get('origin'), allowedOrigins);
+  const { logger, route } = options;
+  const decision = evaluateOriginHeader(req.headers.get('origin'), allowedOrigins, {
+    logger,
+    route,
+  });
 
   if (decision.allowed) {
+    logger?.debug('security.origin.guard_request_allowed', {
+      route,
+      reason: decision.reason,
+      origin: decision.origin ?? null,
+    });
     return { ok: true, decision };
   }
 
   const redirectUrl = new URL(req.url);
   redirectUrl.searchParams.set('error', 'invalid-origin');
+
+  logger?.warn('security.origin.guard_request_blocked', {
+    route,
+    reason: decision.reason,
+    origin: decision.origin ?? null,
+  });
 
   if (decision.reason === 'invalid-origin-header') {
     return { ok: false, redirectTo: redirectUrl.toString(), reason: 'invalid' };

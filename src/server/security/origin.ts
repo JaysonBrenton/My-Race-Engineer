@@ -93,14 +93,15 @@ export const guardAuthPostOrigin = (
   options?: GuardOptions,
 ): void => {
   const route = options?.route ?? '/auth';
-  const allowedOrigins = parseAllowedOrigins(process.env);
-  const decision = evaluateOriginHeader(headers.get('origin'), allowedOrigins);
+  const baseLogger = options?.logger ?? applicationLogger;
+  const logger = baseLogger.withContext({ route });
+  const allowedOrigins = parseAllowedOrigins(process.env, { logger });
+  const decision = evaluateOriginHeader(headers.get('origin'), allowedOrigins, { logger, route });
 
   if (decision.allowed) {
     return;
   }
 
-  const logger = options?.logger ?? applicationLogger;
   const requestForLog = buildSyntheticRequest(headers, route, allowedOrigins);
   const reason: GuardReason =
     decision.reason === 'invalid-origin-header' ? 'invalid-origin-header' : 'origin-not-allowed';
