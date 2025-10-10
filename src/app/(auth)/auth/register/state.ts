@@ -48,7 +48,8 @@ export const buildStatusMessage = (errorCode: RegisterErrorCode | undefined): St
     case 'invalid-origin':
       return {
         tone: 'error',
-        message: 'Your request came from an unapproved origin.',
+        message:
+          'Your request came from an unapproved origin. Check that APP_URL or ALLOWED_ORIGINS includes this host and try again.',
       };
     case 'invalid-token':
       return {
