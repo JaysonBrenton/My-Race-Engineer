@@ -247,6 +247,7 @@ Expect a `303` redirect to `/auth/login?error=invalid-origin` and `x-auth-origin
 - **Structured logs (JSON):** include `timestamp`, `level`, `requestId`, `route`, `userAnonId`, `event`, `durationMs`, `outcome`, and a redacted error object.
 - **Logger usage:** always use `applicationLogger`/`getRequestLogger` from `src/dependencies/logger.ts` for server-side logging; avoid `console.*` in APIs and infrastructure.
 - **File outputs:** structured logs stream to `_logs/app.log` (all levels), `_logs/error.log` (warn+), and `_logs/auth.log` for every authentication flow; set `DISABLE_FILE_LOGS=true` when persistent storage is unavailable.
+- **Troubleshooting empty auth logs:** the dedicated `_logs/auth.log` (or `${LOG_DIR}/auth.log` when overridden) only receives entries when a POST flow runs (`/auth/login`, `/auth/register`, or password reset actions). Loading the page alone will not write any records. Confirm `DISABLE_FILE_LOGS=false`, run the action from the same shell where `.env` is loaded, and check after the app is running (file logging is disabled during `next build`).
 - **Tracing:** set `TRACING_ENABLED=true` to bootstrap `instrumentation.ts`. Spans inherit the `requestId`, and exporters are configured via `OTEL_SERVICE_NAME`, `OTEL_EXPORTER_OTLP_ENDPOINT`, and `OTEL_EXPORTER_OTLP_HEADERS`.
 - **PII guardrails:** never log secrets/tokens/passwords/raw cookies.
 - **Retention:** raw logs **7 days**, aggregated metrics **90 days**.
