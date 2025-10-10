@@ -96,7 +96,13 @@ npm run test:auth \
   && npx tsx --test tests/build/auth-guard-routes.compile.test.ts
 ```
 
+`CI=1` forces the build to run in continuous-integration mode, matching our pipeline's behaviour: Next.js skips interactive prompts, keeps the output terse, and treats warnings that would fail CI the same way locally. This makes the chained run a faithful rehearsal of what GitHub Actions will do before a release.
+
 Because each command exits non-zero on failure, the chain stops at the first failing suite, making it easy to spot and address issues.
+
+### Do the tests write to auth logs?
+
+No. All suites swap in in-memory loggers so they can assert on emitted messages without touching the real auth logs. The core service tests provision an `InMemoryLogger` for both registration and login adapters, while the App Router action tests stub the request logger with a no-op implementation. As a result you can run the commands above without generating noise in shared logging backends.
 
 ## 8. Troubleshooting tips
 
