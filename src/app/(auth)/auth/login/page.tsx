@@ -22,6 +22,7 @@ import { canonicalFor } from '@/lib/seo';
 // accessible UI.
 
 import styles from '../auth.module.css';
+import { loginAction } from './actions';
 import {
   asOptionalTrimmedString,
   firstParamValue,
@@ -242,7 +243,7 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
         <form
           className={styles.form}
           method="post"
-          action="/auth/login"
+          action={loginAction}
           aria-describedby="auth-login-status"
         >
           {/* The hidden form token travels with the POST request so the server can

@@ -5,7 +5,6 @@ import {
   createRegisterAction,
   type RegisterActionDependencies,
 } from '../../../src/app/(auth)/auth/register/actions.impl';
-import { INITIAL_REGISTER_STATE } from '../../../src/app/(auth)/auth/register/state';
 import {
   createLoginAction,
   type LoginActionDependencies,
@@ -222,7 +221,7 @@ const createLoginDeps = (overrides: Partial<LoginActionDependencies> = {}): Logi
   };
 };
 
-test('registerAction returns invalid-origin state when the guard rejects the submission', async () => {
+test('registerAction redirects with invalid-origin when the guard rejects the submission', async () => {
   let registerCalled = false;
   const { deps } = createRegisterDeps({
     guardAuthPostOrigin: (_headers, onFailure) => {
@@ -260,15 +259,28 @@ test('registerAction returns invalid-origin state when the guard rejects the sub
   formData.set('confirmPassword', 'Str0ngPassword!23');
   formData.set('formToken', 'token');
 
-  const result = await registerAction(INITIAL_REGISTER_STATE, formData);
+  try {
+    await registerAction(formData);
+    assert.fail('Expected register action to redirect when origin validation fails.');
+  } catch (error) {
+    assert.ok(error instanceof RedirectCaptured);
+    const url = new URL(`https://app.local${error.location}`);
+    assert.equal(url.pathname, '/auth/register');
+    assert.equal(url.searchParams.get('error'), 'invalid-origin');
+    assert.equal(url.searchParams.get('name'), 'Example User');
+    assert.equal(url.searchParams.get('email'), 'USER@example.com');
+    const prefillParam = url.searchParams.get('prefill');
+    assert.ok(prefillParam);
+    assert.deepEqual(JSON.parse(prefillParam), {
+      name: 'Example User',
+      email: 'USER@example.com',
+    });
+  }
 
-  assert.equal(result.errorCode, 'invalid-origin');
-  assert.equal(result.values.name, 'Example User');
-  assert.equal(result.values.email, 'USER@example.com');
   assert.equal(registerCalled, false);
 });
 
-test('registerAction returns validation errors for mismatched passwords without calling the service', async () => {
+test('registerAction redirects with validation error for mismatched passwords without calling the service', async () => {
   let registerInvocations = 0;
   const { deps } = createRegisterDeps({
     registerUserService: {
@@ -303,10 +315,24 @@ test('registerAction returns validation errors for mismatched passwords without 
   formData.set('confirmPassword', 'WrongPassword!23');
   formData.set('formToken', 'token');
 
-  const result = await registerAction(INITIAL_REGISTER_STATE, formData);
+  try {
+    await registerAction(formData);
+    assert.fail('Expected register action to redirect when validation fails.');
+  } catch (error) {
+    assert.ok(error instanceof RedirectCaptured);
+    const url = new URL(`https://app.local${error.location}`);
+    assert.equal(url.pathname, '/auth/register');
+    assert.equal(url.searchParams.get('error'), 'validation');
+    assert.equal(url.searchParams.get('name'), 'Example User');
+    assert.equal(url.searchParams.get('email'), 'user@example.com');
+    const prefillParam = url.searchParams.get('prefill');
+    assert.ok(prefillParam);
+    assert.deepEqual(JSON.parse(prefillParam), {
+      name: 'Example User',
+      email: 'user@example.com',
+    });
+  }
 
-  assert.equal(result.errorCode, 'validation');
-  assert.ok(result.fieldErrors?.some((issue) => issue.field === 'confirmPassword'));
   assert.equal(registerInvocations, 0);
 });
 
@@ -348,7 +374,7 @@ test('registerAction issues a session cookie and redirects on successful registr
   formData.set('formToken', 'token');
 
   try {
-    await registerAction(INITIAL_REGISTER_STATE, formData);
+    await registerAction(formData);
     assert.fail('Expected registration action to redirect after success.');
   } catch (error) {
     assert.ok(error instanceof RedirectCaptured);

@@ -22,7 +22,6 @@ import {
 } from '@/core/security/origin';
 
 import { registerAction } from '../actions';
-import { INITIAL_REGISTER_STATE, buildPrefillParam, buildRedirectUrl } from '../state';
 
 const shouldLogDiagnostics = (): boolean => process.env.NODE_ENV !== 'production';
 
@@ -55,18 +54,7 @@ export const handleRegisterGuardPost = async (req: Request): Promise<Response> =
   const formData = await req.formData();
 
   try {
-    const state = await registerAction(INITIAL_REGISTER_STATE, formData);
-    const redirectUrl = buildRedirectUrl('/auth/register', {
-      error: state.errorCode,
-      prefill: buildPrefillParam(state.values),
-      name: state.values.name || undefined,
-      email: state.values.email || undefined,
-    });
-    const location = new URL(redirectUrl, req.url);
-    const response = NextResponse.redirect(location, 303);
-    response.headers.set('Cache-Control', 'no-store');
-    response.headers.set('x-auth-origin-guard', 'ok');
-    return response;
+    await registerAction(formData);
   } catch (error) {
     if (isRedirectError(error)) {
       const location = getURLFromRedirectError(error);
@@ -90,4 +78,9 @@ export const handleRegisterGuardPost = async (req: Request): Promise<Response> =
 
     throw error;
   }
+
+  const fallback = NextResponse.redirect(new URL('/auth/register', req.url), 303);
+  fallback.headers.set('Cache-Control', 'no-store');
+  fallback.headers.set('x-auth-origin-guard', 'ok');
+  return fallback;
 };
