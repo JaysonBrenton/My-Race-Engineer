@@ -12,8 +12,14 @@ import {
   guardAuthPostOrigin,
   parseAllowedOrigins,
 } from '@/core/security/origin';
+import {
+  getRedirectStatusCodeFromError,
+  getURLFromRedirectError,
+  isRedirectError,
+} from 'next/dist/client/components/redirect';
 
-import { loginAction } from '../actions';
+import { createLoginAction } from '../actions.impl';
+import { applyAuthDebugHeaders, createAuthActionDebugRecorder } from '@/server/security/authDebug';
 
 const shouldLogDiagnostics = (): boolean => process.env.NODE_ENV !== 'production';
 
@@ -22,6 +28,15 @@ export const handleLoginGuardPost = async (req: Request): Promise<Response> => {
   const logger = applicationLogger.withContext({ route });
   const allowedOrigins = parseAllowedOrigins(process.env, { logger });
   const result = guardAuthPostOrigin(req, allowedOrigins, { logger, route });
+
+  logger.info('Login guard received request.', {
+    event: 'auth.login.request',
+    component: 'guard',
+    method: req.method,
+    hasOriginHeader: req.headers.has('origin'),
+    originAllowed: result.ok,
+    middlewareOriginHeader: req.headers.get('x-auth-origin-guard'),
+  });
 
   if (!result.ok) {
     if (shouldLogDiagnostics()) {
@@ -40,14 +55,42 @@ export const handleLoginGuardPost = async (req: Request): Promise<Response> => {
     response.headers.set('Cache-Control', 'no-store');
     response.headers.set('x-auth-origin-guard', 'mismatch');
     response.headers.set('x-allowed-origins', allowedOrigins.join(','));
+    if (process.env.NODE_ENV !== 'production') {
+      response.headers.set('x-auth-action', 'login');
+      response.headers.set('x-auth-token', 'missing');
+      response.headers.set('x-auth-outcome', 'redirect');
+    }
     return response;
   }
 
   const formData = await req.formData();
-  await loginAction(formData);
+  const debugRecorder = createAuthActionDebugRecorder('login');
+  const action = createLoginAction(undefined, { onDebugEvent: debugRecorder.record });
+
+  try {
+    await action(formData);
+  } catch (error) {
+    if (isRedirectError(error)) {
+      const location = getURLFromRedirectError(error);
+      const statusCode = getRedirectStatusCodeFromError(error);
+
+      if (!location) {
+        throw error;
+      }
+
+      const response = NextResponse.redirect(location, statusCode);
+      response.headers.set('Cache-Control', 'no-store');
+      response.headers.set('x-auth-origin-guard', 'ok');
+      applyAuthDebugHeaders(response, debugRecorder.snapshot());
+      return response;
+    }
+
+    throw error;
+  }
 
   const response = NextResponse.redirect(new URL('/auth/login', req.url), { status: 303 });
   response.headers.set('Cache-Control', 'no-store');
   response.headers.set('x-auth-origin-guard', 'ok');
+  applyAuthDebugHeaders(response, debugRecorder.snapshot());
   return response;
 };

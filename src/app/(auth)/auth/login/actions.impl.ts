@@ -13,13 +13,14 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
 import { getAuthRequestLogger, loginUserService } from '@/dependencies/auth';
-import { validateAuthFormToken } from '@/lib/auth/formTokens';
+import { fingerprintAuthFormToken, validateAuthFormToken } from '@/lib/auth/formTokens';
 import { createLogFingerprint } from '@/lib/logging/fingerprint';
 import { withSpan, type SpanAdapter, type WithSpan } from '@/lib/observability/tracing';
 import { checkLoginRateLimit } from '@/lib/rateLimit/authRateLimiter';
 import { extractClientIdentifier } from '@/lib/request/clientIdentifier';
 import { computeCookieSecure, type CookieSecureStrategy } from '@/server/runtime/cookies';
 import { guardAuthPostOrigin } from '@/server/security/origin';
+import type { AuthActionDebugEvent } from '@/server/security/authDebug';
 
 // This server action executes the full login flow: it validates inputs, enforces
 // rate limits, delegates credential checks to the domain service, and finally
@@ -98,6 +99,10 @@ export type LoginActionDependencies = {
   computeCookieSecure: typeof computeCookieSecure;
 };
 
+export type LoginActionOptions = {
+  onDebugEvent?: (event: AuthActionDebugEvent) => void;
+};
+
 const defaultLoginActionDependencies: LoginActionDependencies = {
   headers,
   cookies,
@@ -130,6 +135,7 @@ export type LoginAction = (formData: FormData) => Promise<void>;
 
 export const createLoginAction = (
   deps: LoginActionDependencies = defaultLoginActionDependencies,
+  options: LoginActionOptions = {},
 ): LoginAction => {
   return async (formData: FormData): Promise<void> => {
     const requestStartedAt = Date.now();
@@ -138,6 +144,7 @@ export const createLoginAction = (
     // address (e.g. team pit wall).
     const headersList = deps.headers();
     const requestId = headersList.get('x-request-id') ?? randomUUID();
+    const emitDebugEvent = options.onDebugEvent;
 
     await deps.withSpan(
       'auth.login',
@@ -151,14 +158,49 @@ export const createLoginAction = (
           route: 'auth/login',
         });
 
+        const originHeader = headersList.get('origin');
+        const originGuardHeader = headersList.get('x-auth-origin-guard');
+        const methodHeader =
+          headersList.get('x-http-method-override') ??
+          headersList.get('x-mre-http-method') ??
+          'POST';
+
+        logger.info('Login request received.', {
+          event: 'auth.login.request',
+          outcome: 'received',
+          hasOriginHeader: Boolean(originHeader),
+          originAllowed: originGuardHeader ? originGuardHeader !== 'mismatch' : null,
+          method: methodHeader,
+        });
+
+        const recordOutcome = (outcome: {
+          kind: 'redirect' | 'rerender';
+          target?: string;
+          statusKey?: string;
+        }) => {
+          logger.info('Login outcome resolved.', {
+            event: 'auth.login.outcome',
+            kind: outcome.kind,
+            target: outcome.target,
+            statusKey: outcome.statusKey,
+          });
+          emitDebugEvent?.({
+            type: 'outcome',
+            kind: outcome.kind,
+            target: outcome.target,
+            statusKey: outcome.statusKey,
+          });
+        };
+
         deps.guardAuthPostOrigin(
           headersList,
-          () =>
-            deps.redirect(
-              buildRedirectUrl('/auth/login', {
-                error: 'invalid-origin',
-              }),
-            ),
+          () => {
+            const target = buildRedirectUrl('/auth/login', {
+              error: 'invalid-origin',
+            });
+            recordOutcome({ kind: 'redirect', target, statusKey: 'invalid-origin' });
+            return deps.redirect(target);
+          },
           {
             route: 'auth/login',
             logger,
@@ -192,15 +234,52 @@ export const createLoginAction = (
             retryAfterMs: rateLimit.retryAfterMs,
             durationMs: Date.now() - requestStartedAt,
           });
-          deps.redirect(
-            buildRedirectUrl('/auth/login', {
-              error: 'rate-limited',
-            }),
-          );
+          const target = buildRedirectUrl('/auth/login', {
+            error: 'rate-limited',
+          });
+          recordOutcome({ kind: 'redirect', target, statusKey: 'rate-limited' });
+          deps.redirect(target);
         }
 
         const token = getFormValue(formData, 'formToken');
+        const tokenFingerprint = token ? fingerprintAuthFormToken(token) : null;
         const tokenValidation = deps.validateAuthFormToken(token ?? null, 'login');
+        const tokenAgeMs = tokenValidation.ok
+          ? Date.now() - tokenValidation.issuedAt.getTime()
+          : null;
+
+        if (tokenValidation.ok) {
+          logger.info('Login form token validated.', {
+            event: 'auth.formToken.validate',
+            result: 'ok',
+            action: 'login',
+            tokenFingerprint,
+            tokenAgeMs,
+          });
+          emitDebugEvent?.({
+            type: 'token-validation',
+            status: 'ok',
+            fingerprint: tokenFingerprint,
+            ageMs: tokenAgeMs,
+          });
+        } else {
+          const status = tokenValidation.reason === 'expired' ? 'expired' : 'invalid';
+          logger.warn('Login form token rejected.', {
+            event: 'auth.formToken.validate',
+            result: status,
+            action: 'login',
+            reason: tokenValidation.reason,
+            tokenFingerprint,
+            tokenAgeMs,
+          });
+          emitDebugEvent?.({
+            type: 'token-validation',
+            status,
+            reason: tokenValidation.reason,
+            fingerprint: tokenFingerprint,
+            ageMs: tokenAgeMs,
+          });
+        }
 
         if (!tokenValidation.ok) {
           span.setAttribute('mre.auth.outcome', 'invalid_token');
@@ -212,11 +291,11 @@ export const createLoginAction = (
             clientFingerprint,
             durationMs: Date.now() - requestStartedAt,
           });
-          deps.redirect(
-            buildRedirectUrl('/auth/login', {
-              error: 'invalid-token',
-            }),
-          );
+          const target = buildRedirectUrl('/auth/login', {
+            error: 'invalid-token',
+          });
+          recordOutcome({ kind: 'redirect', target, statusKey: 'invalid-token' });
+          deps.redirect(target);
         }
 
         const parseResult = loginSchema.safeParse({
@@ -241,13 +320,23 @@ export const createLoginAction = (
             validationIssues: issues,
             durationMs: Date.now() - requestStartedAt,
           });
-          deps.redirect(
-            buildRedirectUrl('/auth/login', {
-              error: 'validation',
-              prefill: buildPrefillParam({ email: getFormValue(formData, 'email') }),
-            }),
-          );
+          logger.info('Login validation summary.', {
+            event: 'auth.login.validation',
+            result: 'invalid',
+            issues: issues.map((issue) => issue.path),
+          });
+          const target = buildRedirectUrl('/auth/login', {
+            error: 'validation',
+            prefill: buildPrefillParam({ email: getFormValue(formData, 'email') }),
+          });
+          recordOutcome({ kind: 'redirect', target, statusKey: 'validation' });
+          deps.redirect(target);
         }
+
+        logger.info('Login validation summary.', {
+          event: 'auth.login.validation',
+          result: 'ok',
+        });
 
         const { email, password, remember } = parseResult.data;
         const userAgent = headersList.get('user-agent');
@@ -289,12 +378,12 @@ export const createLoginAction = (
             emailFingerprint,
             durationMs: Date.now() - requestStartedAt,
           });
-          deps.redirect(
-            buildRedirectUrl('/auth/login', {
-              error: result.reason,
-              prefill: buildPrefillParam({ email }),
-            }),
-          );
+          const target = buildRedirectUrl('/auth/login', {
+            error: result.reason,
+            prefill: buildPrefillParam({ email }),
+          });
+          recordOutcome({ kind: 'redirect', target, statusKey: result.reason });
+          deps.redirect(target);
         }
 
         const cookieJar = deps.cookies();
@@ -334,6 +423,7 @@ export const createLoginAction = (
           durationMs: Date.now() - requestStartedAt,
         });
 
+        recordOutcome({ kind: 'redirect', target: '/dashboard', statusKey: 'session-created' });
         deps.redirect('/dashboard');
       },
     );

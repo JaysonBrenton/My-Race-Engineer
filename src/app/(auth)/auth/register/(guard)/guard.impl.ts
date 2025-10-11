@@ -21,7 +21,8 @@ import {
   parseAllowedOrigins,
 } from '@/core/security/origin';
 
-import { registerAction } from '../actions';
+import { createRegisterAction } from '../actions.impl';
+import { applyAuthDebugHeaders, createAuthActionDebugRecorder } from '@/server/security/authDebug';
 
 const shouldLogDiagnostics = (): boolean => process.env.NODE_ENV !== 'production';
 
@@ -30,6 +31,15 @@ export const handleRegisterGuardPost = async (req: Request): Promise<Response> =
   const logger = applicationLogger.withContext({ route });
   const allowedOrigins = parseAllowedOrigins(process.env, { logger });
   const result = guardAuthPostOrigin(req, allowedOrigins, { logger, route });
+
+  logger.info('Registration guard received request.', {
+    event: 'auth.register.request',
+    component: 'guard',
+    method: req.method,
+    hasOriginHeader: req.headers.has('origin'),
+    originAllowed: result.ok,
+    middlewareOriginHeader: req.headers.get('x-auth-origin-guard'),
+  });
 
   if (!result.ok) {
     if (shouldLogDiagnostics()) {
@@ -48,13 +58,20 @@ export const handleRegisterGuardPost = async (req: Request): Promise<Response> =
     response.headers.set('Cache-Control', 'no-store');
     response.headers.set('x-auth-origin-guard', 'mismatch');
     response.headers.set('x-allowed-origins', allowedOrigins.join(','));
+    if (process.env.NODE_ENV !== 'production') {
+      response.headers.set('x-auth-action', 'register');
+      response.headers.set('x-auth-token', 'missing');
+      response.headers.set('x-auth-outcome', 'redirect');
+    }
     return response;
   }
 
   const formData = await req.formData();
+  const debugRecorder = createAuthActionDebugRecorder('register');
+  const action = createRegisterAction(undefined, { onDebugEvent: debugRecorder.record });
 
   try {
-    await registerAction(formData);
+    await action(formData);
   } catch (error) {
     if (isRedirectError(error)) {
       const location = getURLFromRedirectError(error);
@@ -67,6 +84,8 @@ export const handleRegisterGuardPost = async (req: Request): Promise<Response> =
       const response = NextResponse.redirect(location, statusCode);
       response.headers.set('Cache-Control', 'no-store');
       response.headers.set('x-auth-origin-guard', 'ok');
+
+      applyAuthDebugHeaders(response, debugRecorder.snapshot());
 
       const mutableCookies = (error as { mutableCookies?: ResponseCookies }).mutableCookies;
       if (mutableCookies) {
@@ -82,5 +101,6 @@ export const handleRegisterGuardPost = async (req: Request): Promise<Response> =
   const fallback = NextResponse.redirect(new URL('/auth/register', req.url), 303);
   fallback.headers.set('Cache-Control', 'no-store');
   fallback.headers.set('x-auth-origin-guard', 'ok');
+  applyAuthDebugHeaders(fallback, debugRecorder.snapshot());
   return fallback;
 };
