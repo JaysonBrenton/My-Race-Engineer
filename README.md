@@ -337,6 +337,7 @@ Use **semantic colour tokens** instead of hard-coding hex in components.
 - [`docs/ux-principles.md`](docs/ux-principles.md) — layout, spacing, accessibility, and microcopy standards for authentication flows.
 
 ### LiveRC ingestion references
+- [`docs/adr/ADR-20251011-liverc-catalogue-and-import.md`](docs/adr/ADR-20251011-liverc-catalogue-and-import.md) — provider-scoped namespace, phases, and data retention plan.
 - [`docs/integrations/liverc-data-model.md`](docs/integrations/liverc-data-model.md) — contract that the current entry list + race result pipeline honours.
 - [`docs/integrations/liverc-import-api.md`](docs/integrations/liverc-import-api.md) — `/api/liverc/import` request/response envelopes and error mapping.
 - [`src/core/app/README.md`](src/core/app/README.md) — service responsibilities and orchestration notes.
