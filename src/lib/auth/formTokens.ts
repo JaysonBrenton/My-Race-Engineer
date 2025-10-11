@@ -16,7 +16,7 @@ export class MissingAuthFormTokenSecretError extends Error {
   }
 }
 
-export const FORM_TOKEN_PREFIX = 'mre.auth';
+export const FORM_TOKEN_PREFIX = 'mre-auth';
 
 export const FORM_TOKEN_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const logger = applicationLogger.withContext({ route: 'auth/formTokens' });
