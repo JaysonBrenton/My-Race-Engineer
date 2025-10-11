@@ -27,9 +27,9 @@ if [[ -f .env.example && -f .env && .env.example -nt .env ]]; then
 fi
 
 # Optional: run env doctor if present
-if npm run -s | grep -qE '^\s*env:doctor\b'; then
+if node -e "const pkg=require('./package.json');process.exit(pkg?.scripts?.['env:doctor']?0:1);" >/dev/null 2>&1; then
   echo "$ARROW Checking environment (npm run env:doctor)…"
-  if ! npm run -s env:doctor; then
+  if ! npm run env:doctor --if-present; then
     echo "$ERR Environment check failed. Fix .env (see output above) and re-run."
     exit 1
   fi
@@ -66,8 +66,35 @@ fi
 # Probe health based on APP_URL in .env (fallback to localhost)
 APP_URL_ENV=""
 if [[ -f .env ]]; then
-  # crude parse: strip APP_URL= and surrounding quotes
-  APP_URL_ENV="$(grep -E '^[[:space:]]*APP_URL=' .env | tail -1 | sed -E 's/^[[:space:]]*APP_URL=//; s/^["'\'']?([^"'\'']*)["'\'']?$/\1/')"
+  # Parse APP_URL= value while handling whitespace, comments, and optional quotes
+  APP_URL_ENV="$(python3 <<'PY'
+import re
+
+value = ""
+try:
+    with open('.env', 'r', encoding='utf-8') as env_file:
+        for line in env_file:
+            stripped = line.strip()
+            if not stripped or stripped.startswith('#'):
+                continue
+            if stripped.startswith('export '):
+                stripped = stripped[len('export '):].lstrip()
+            if '=' not in stripped:
+                continue
+            key, raw_val = stripped.split('=', 1)
+            if key.strip() != 'APP_URL':
+                continue
+            val = raw_val.strip()
+            # Remove inline comments (supports APP_URL=foo # comment)
+            val = re.split(r'\s+#', val, maxsplit=1)[0].rstrip()
+            if val and val[0] == val[-1] and val[0] in ('"', "'"):
+                val = val[1:-1]
+            value = val
+    print(value, end='')
+except FileNotFoundError:
+    pass
+PY
+)"
 fi
 BASE_URL="${APP_URL_ENV:-http://127.0.0.1:3001}"
 HEALTH_URL="${BASE_URL%/}/api/health"
