@@ -8,59 +8,79 @@ generator client {
 }
 
 model Event {
-  id            String       @id @default(cuid())
-  name          String
-  sourceEventId String       @unique
-  sourceUrl     String       @unique
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  id              String    @id @default(cuid())
+  name            String
+  sourceEventId   String    @unique
+  sourceUrl       String    @unique
+  provider        String    @default("LiveRC")
+  providerEventId String?
+  clubId          String?
+  title           String?
+  startDate       DateTime?
+  endDate         DateTime?
+  entriesCount    Int?
+  driversCount    Int?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  raceClasses   RaceClass[]
-  sessions      Session[]
-  entrants      Entrant[]
+  raceClasses RaceClass[]
+  sessions    Session[]
+  entrants    Entrant[]
+  club        Club?       @relation(fields: [clubId], references: [id], onDelete: SetNull)
 
+  @@unique([provider, providerEventId])
   @@index([name])
 }
 
 model RaceClass {
-  id        String    @id @default(cuid())
+  id        String   @id @default(cuid())
   eventId   String
   name      String
   classCode String
   sourceUrl String
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  event     Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  sessions  Session[]
-  entrants  Entrant[]
+  event    Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  sessions Session[]
+  entrants Entrant[]
 
   @@unique([eventId, classCode])
   @@index([classCode])
 }
 
 model Session {
-  id              String    @id @default(cuid())
-  eventId         String
-  raceClassId     String
-  name            String
-  sourceSessionId String    @unique
-  sourceUrl       String    @unique
-  scheduledStart  DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id                String       @id @default(cuid())
+  eventId           String
+  raceClassId       String
+  name              String
+  sourceSessionId   String       @unique
+  sourceUrl         String       @unique
+  provider          String       @default("LiveRC")
+  providerSessionId String?
+  className         String?
+  roundLabel        String?
+  heatLabel         String?
+  type              SessionType?
+  startTime         DateTime?
+  durationSec       Int?
+  scheduledStart    DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
 
-  event     Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  raceClass RaceClass @relation(fields: [raceClassId], references: [id], onDelete: Cascade)
-  laps      Lap[]
-  entrants  Entrant[]
+  event      Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  raceClass  RaceClass   @relation(fields: [raceClassId], references: [id], onDelete: Cascade)
+  laps       Lap[]
+  entrants   Entrant[]
+  resultRows ResultRow[]
 
+  @@unique([provider, providerSessionId])
   @@index([eventId])
   @@index([raceClassId])
 }
 
 model Entrant {
-  id                  String    @id @default(cuid())
+  id                  String   @id @default(cuid())
   eventId             String
   raceClassId         String
   sessionId           String
@@ -68,8 +88,8 @@ model Entrant {
   carNumber           String?
   sourceEntrantId     String?
   sourceTransponderId String?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   event     Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
   raceClass RaceClass @relation(fields: [raceClassId], references: [id], onDelete: Cascade)
@@ -82,19 +102,146 @@ model Entrant {
 }
 
 model Lap {
-  id         String   @id @default(cuid())
-  entrantId  String
-  sessionId  String
-  lapNumber  Int
-  lapTimeMs  Int
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id            String   @id @default(cuid())
+  entrantId     String
+  sessionId     String
+  lapNumber     Int
+  lapTimeMs     Int
+  driverId      String?
+  positionOnLap Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   entrant Entrant @relation(fields: [entrantId], references: [id], onDelete: Cascade)
   session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  driver  Driver? @relation(fields: [driverId], references: [id], onDelete: SetNull)
 
   @@unique([entrantId, lapNumber])
+  @@unique([sessionId, driverId, lapNumber])
   @@index([sessionId, lapNumber])
+}
+
+model Club {
+  id              String    @id @default(cuid())
+  slug            String    @unique
+  name            String
+  subdomain       String    @unique
+  region          String?
+  timezone        String?
+  lastRefreshedAt DateTime?
+  lastChangedAt   DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  events Event[]
+}
+
+model Driver {
+  id          String   @id @default(cuid())
+  displayName String
+  transponder String?  @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  aliases    DriverAlias[]
+  resultRows ResultRow[]
+  laps       Lap[]
+}
+
+model DriverAlias {
+  id          String  @id @default(cuid())
+  driverId    String
+  transponder String?
+  nameVariant String
+
+  driver Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@unique([driverId, nameVariant])
+}
+
+model ResultRow {
+  id             String   @id @default(cuid())
+  sessionId      String
+  driverId       String
+  position       Int?
+  carNumber      String?
+  laps           Int?
+  totalTimeMs    Int?
+  behindMs       Int?
+  fastestLapMs   Int?
+  fastestLapNum  Int?
+  avgLapMs       Int?
+  avgTop5Ms      Int?
+  avgTop10Ms     Int?
+  avgTop15Ms     Int?
+  top3ConsecMs   Int?
+  stdDevMs       Int?
+  consistencyPct Float?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  driver  Driver  @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, driverId])
+}
+
+model ImportJob {
+  id          String         @id @default(cuid())
+  planHash    String
+  mode        ImportJobMode
+  state       ImportJobState @default(QUEUED)
+  progressPct Float?
+  message     String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  items ImportJobItem[]
+}
+
+model ImportJobItem {
+  id         String                  @id @default(cuid())
+  jobId      String
+  targetType ImportJobItemTargetType
+  targetRef  String
+  countsJson Json?
+  state      ImportJobItemState      @default(QUEUED)
+  message    String?
+  createdAt  DateTime                @default(now())
+  updatedAt  DateTime                @updatedAt
+
+  job ImportJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, targetType, targetRef])
+}
+
+enum SessionType {
+  QUAL
+  MAIN
+}
+
+enum ImportJobMode {
+  SUMMARY
+  FULL
+}
+
+enum ImportJobState {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum ImportJobItemTargetType {
+  EVENT
+  SESSION
+}
+
+enum ImportJobItemState {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
 }
 
 enum UserStatus {
@@ -104,32 +251,32 @@ enum UserStatus {
 }
 
 model User {
-  id              String       @id @default(cuid())
+  id              String     @id @default(cuid())
   name            String
-  email           String       @unique
+  email           String     @unique
   passwordHash    String
-  status          UserStatus   @default(PENDING)
+  status          UserStatus @default(PENDING)
   emailVerifiedAt DateTime?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 
-  sessions UserSession[]
-  verificationTokens UserEmailVerificationToken[]
+  sessions            UserSession[]
+  verificationTokens  UserEmailVerificationToken[]
   passwordResetTokens PasswordResetToken[]
 }
 
 model UserSession {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   userId       String
-  sessionToken String   @unique
+  sessionToken String    @unique
   expiresAt    DateTime
   ipAddress    String?
   userAgent    String?
   deviceName   String?
   lastUsedAt   DateTime?
   revokedAt    DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -139,13 +286,13 @@ model UserSession {
 }
 
 model UserEmailVerificationToken {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   userId     String
-  tokenHash  String   @unique
+  tokenHash  String    @unique
   expiresAt  DateTime
   consumedAt DateTime?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -154,13 +301,13 @@ model UserEmailVerificationToken {
 }
 
 model PasswordResetToken {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   userId     String
-  tokenHash  String   @unique
+  tokenHash  String    @unique
   expiresAt  DateTime
   consumedAt DateTime?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
