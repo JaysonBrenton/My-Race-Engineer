@@ -121,13 +121,14 @@ export class InMemoryUserRepository implements UserRepository {
 
 export class RecordingUserSessionRepository implements UserSessionRepository {
   public createdSessions: CreateUserSessionInput[] = [];
+  private readonly sessionsByHash = new Map<string, UserSession>();
 
   constructor(private readonly clock: TestClock = () => new Date()) {}
 
   async create(input: CreateUserSessionInput): Promise<UserSession> {
     this.createdSessions.push(input);
     const createdAt = this.clock();
-    return {
+    const session: UserSession = {
       id: input.id,
       userId: input.userId,
       sessionTokenHash: input.sessionTokenHash,
@@ -140,10 +141,29 @@ export class RecordingUserSessionRepository implements UserSessionRepository {
       createdAt,
       updatedAt: createdAt,
     };
+    this.sessionsByHash.set(session.sessionTokenHash, session);
+    return session;
   }
 
-  async revokeAllForUser(): Promise<void> {
-    // Not required for tests.
+  async findByTokenHash(tokenHash: string): Promise<UserSession | null> {
+    return this.sessionsByHash.get(tokenHash) ?? null;
+  }
+
+  async revokeAllForUser(userId: string): Promise<void> {
+    const now = this.clock();
+    for (const [hash, session] of this.sessionsByHash.entries()) {
+      if (session.userId === userId && session.revokedAt === null) {
+        this.sessionsByHash.set(hash, {
+          ...session,
+          revokedAt: now,
+          updatedAt: now,
+        });
+      }
+    }
+  }
+
+  seed(session: UserSession) {
+    this.sessionsByHash.set(session.sessionTokenHash, session);
   }
 }
 

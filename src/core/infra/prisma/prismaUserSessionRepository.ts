@@ -37,6 +37,14 @@ export class PrismaUserSessionRepository implements UserSessionRepository {
     return toDomain(session);
   }
 
+  async findByTokenHash(tokenHash: string): Promise<UserSession | null> {
+    const session = await this.prisma.userSession.findUnique({
+      where: { sessionToken: tokenHash },
+    });
+
+    return session ? toDomain(session) : null;
+  }
+
   async revokeAllForUser(userId: string): Promise<void> {
     await this.prisma.userSession.updateMany({
       where: { userId, revokedAt: null },

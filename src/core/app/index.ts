@@ -21,4 +21,5 @@ export * from './services/auth/loginUser';
 export * from './services/auth/verifyEmail';
 export * from './services/auth/startPasswordReset';
 export * from './services/auth/confirmPasswordReset';
+export * from './services/auth/validateSessionToken';
 export * from './liverc/responseMappers';
