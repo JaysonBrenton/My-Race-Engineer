@@ -1,4 +1,5 @@
 import type { UserRepository } from '@core/app';
+import { DuplicateUserEmailError } from '@core/app';
 import type { CreateUserInput, User } from '@core/domain';
 /*
  * Prisma's generated client returns fully typed objects, but `@typescript-eslint`
@@ -6,7 +7,7 @@ import type { CreateUserInput, User } from '@core/domain';
  * intentionally suppress the false positives around these mappings.
  */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
-import { $Enums } from '@prisma/client';
+import { $Enums, Prisma } from '@prisma/client';
 import type { PrismaClient, User as PrismaUser } from '@prisma/client';
 
 import { getPrismaClient } from './prismaClient';
@@ -23,6 +24,8 @@ const toDomain = (user: PrismaUser): User => ({
 });
 
 export class PrismaUserRepository implements UserRepository {
+  constructor(private readonly prisma: PrismaClient | Prisma.TransactionClient = getPrismaClient()) {}
+
   private toPrismaStatus(status: User['status']): $Enums.UserStatus {
     switch (status) {
       case 'active':
@@ -35,40 +38,46 @@ export class PrismaUserRepository implements UserRepository {
   }
 
   async findByEmail(email: string): Promise<User | null> {
-    const prisma: PrismaClient = getPrismaClient();
-    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+    const user = await this.prisma.user.findUnique({ where: { email: email.toLowerCase() } });
 
     return user ? toDomain(user) : null;
   }
 
   async findById(id: string): Promise<User | null> {
-    const prisma: PrismaClient = getPrismaClient();
-    const user = await prisma.user.findUnique({ where: { id } });
+    const user = await this.prisma.user.findUnique({ where: { id } });
 
     return user ? toDomain(user) : null;
   }
 
   async create(input: CreateUserInput): Promise<User> {
-    const prisma: PrismaClient = getPrismaClient();
+    try {
+      return toDomain(
+        await this.prisma.user.create({
+          data: {
+            id: input.id,
+            name: input.name,
+            email: input.email.toLowerCase(),
+            passwordHash: input.passwordHash,
+            status: this.toPrismaStatus(input.status),
+            emailVerifiedAt: input.emailVerifiedAt ?? null,
+          },
+        }),
+      );
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new DuplicateUserEmailError(input.email.toLowerCase());
+      }
 
-    return toDomain(
-      await prisma.user.create({
-        data: {
-          id: input.id,
-          name: input.name,
-          email: input.email.toLowerCase(),
-          passwordHash: input.passwordHash,
-          status: this.toPrismaStatus(input.status),
-          emailVerifiedAt: input.emailVerifiedAt ?? null,
-        },
-      }),
-    );
+      throw error;
+    }
   }
 
   async updateEmailVerification(userId: string, verifiedAt: Date | null): Promise<User> {
-    const prisma: PrismaClient = getPrismaClient();
     return toDomain(
-      await prisma.user.update({
+      await this.prisma.user.update({
         where: { id: userId },
         data: { emailVerifiedAt: verifiedAt },
       }),
@@ -76,9 +85,8 @@ export class PrismaUserRepository implements UserRepository {
   }
 
   async updateStatus(userId: string, status: User['status']): Promise<User> {
-    const prisma = getPrismaClient();
     return toDomain(
-      await prisma.user.update({
+      await this.prisma.user.update({
         where: { id: userId },
         data: { status: this.toPrismaStatus(status) },
       }),
@@ -86,13 +94,27 @@ export class PrismaUserRepository implements UserRepository {
   }
 
   async updatePasswordHash(userId: string, passwordHash: string): Promise<User> {
-    const prisma = getPrismaClient();
     return toDomain(
-      await prisma.user.update({
+      await this.prisma.user.update({
         where: { id: userId },
         data: { passwordHash },
       }),
     );
+  }
+
+  async deleteById(userId: string): Promise<void> {
+    try {
+      await this.prisma.user.delete({ where: { id: userId } });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2025'
+      ) {
+        return;
+      }
+
+      throw error;
+    }
   }
 }
 /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */

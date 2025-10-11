@@ -400,6 +400,47 @@ test('registerAction issues a session cookie and redirects on successful registr
   assert.equal(cookie.expires?.toISOString(), expiresAt.toISOString());
 });
 
+test('registerAction redirects with verify-email-awaiting-approval when both checks are required', async () => {
+  const { deps } = createRegisterDeps({
+    registerUserService: {
+      register: async () => ({
+        ok: true as const,
+        nextStep: 'verify-email-await-approval' as const,
+        user: {
+          id: 'user-approve',
+          name: 'Example User',
+          email: 'user@example.com',
+          status: 'pending',
+          passwordHash: 'hash',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          emailVerifiedAt: null,
+        },
+      }),
+    },
+  });
+  const registerAction = createRegisterAction(deps);
+  const formData = new FormData();
+  formData.set('name', 'Example User');
+  formData.set('email', 'user@example.com');
+  formData.set('password', 'Str0ngPassword!23');
+  formData.set('confirmPassword', 'Str0ngPassword!23');
+  formData.set('formToken', 'token');
+
+  try {
+    await registerAction(formData);
+    assert.fail('Expected registration action to redirect for verification + approval flow.');
+  } catch (error) {
+    assert.ok(error instanceof RedirectCaptured);
+    const url = new URL(`https://app.local${error.location}`);
+    assert.equal(url.pathname, '/auth/login');
+    assert.equal(url.searchParams.get('status'), 'verify-email-awaiting-approval');
+    const prefill = url.searchParams.get('prefill');
+    assert.ok(prefill);
+    assert.deepEqual(JSON.parse(prefill), { email: 'user@example.com' });
+  }
+});
+
 test('loginAction redirects back to the form when the token is invalid', async () => {
   let loginInvocations = 0;
   const { deps } = createLoginDeps({

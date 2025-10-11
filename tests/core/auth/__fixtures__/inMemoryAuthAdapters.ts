@@ -5,10 +5,13 @@ import type {
   MailMessage,
   MailerPort,
   PasswordHasher,
+  RegistrationPersistencePorts,
+  RegistrationUnitOfWork,
   UserEmailVerificationTokenRepository,
   UserRepository,
   UserSessionRepository,
 } from '../../../../src/core/app';
+import { DuplicateUserEmailError } from '../../../../src/core/app';
 import { LoginUserService } from '../../../../src/core/app/services/auth/loginUser';
 import { RegisterUserService } from '../../../../src/core/app/services/auth/registerUser';
 import type {
@@ -40,6 +43,10 @@ export class InMemoryUserRepository implements UserRepository {
   }
 
   async create(input: CreateUserInput): Promise<User> {
+    if (this.usersByEmail.has(input.email.toLowerCase())) {
+      throw new DuplicateUserEmailError(input.email.toLowerCase());
+    }
+
     const createdAt = this.clock();
     const user: User = {
       id: input.id,
@@ -96,6 +103,16 @@ export class InMemoryUserRepository implements UserRepository {
     return updated;
   }
 
+  async deleteById(userId: string): Promise<void> {
+    const user = this.usersById.get(userId);
+    if (!user) {
+      return;
+    }
+
+    this.usersById.delete(userId);
+    this.usersByEmail.delete(user.email);
+  }
+
   seed(user: User) {
     this.usersByEmail.set(user.email.toLowerCase(), user);
     this.usersById.set(user.id, user);
@@ -113,7 +130,7 @@ export class RecordingUserSessionRepository implements UserSessionRepository {
     return {
       id: input.id,
       userId: input.userId,
-      sessionToken: input.sessionToken,
+      sessionTokenHash: input.sessionTokenHash,
       expiresAt: input.expiresAt,
       ipAddress: input.ipAddress ?? null,
       userAgent: input.userAgent ?? null,
@@ -127,6 +144,14 @@ export class RecordingUserSessionRepository implements UserSessionRepository {
 
   async revokeAllForUser(): Promise<void> {
     // Not required for tests.
+  }
+}
+
+export class InMemoryRegistrationUnitOfWork implements RegistrationUnitOfWork {
+  constructor(private readonly ports: RegistrationPersistencePorts) {}
+
+  async run<T>(work: (ports: RegistrationPersistencePorts) => Promise<T>): Promise<T> {
+    return work(this.ports);
   }
 }
 
@@ -232,7 +257,7 @@ export class InMemoryLogger implements Logger {
 
 export type RegisterServiceOptions = ConstructorParameters<
   typeof RegisterUserService
->[6];
+>[5];
 
 export type LoginServiceOptions = ConstructorParameters<
   typeof LoginUserService
@@ -281,11 +306,14 @@ export const createAuthTestEnvironment = (
 
   const registerService = new RegisterUserService(
     userRepository,
-    sessionRepository,
     passwordHasher,
-    verificationTokens,
     registerMailer,
     registerLogger,
+    new InMemoryRegistrationUnitOfWork({
+      userRepository,
+      userSessionRepository: sessionRepository,
+      emailVerificationTokens: verificationTokens,
+    }),
     registerOptions,
     clock,
   );

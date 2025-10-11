@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 
 import type { Logger, PasswordHasher, UserRepository, UserSessionRepository } from '@core/app';
 import type { User } from '@core/domain';
@@ -144,7 +144,7 @@ export class LoginUserService {
     await this.userSessionRepository.create({
       id: randomUUID(),
       userId: user.id,
-      sessionToken,
+      sessionTokenHash: createHash('sha256').update(sessionToken).digest('hex'),
       expiresAt,
       ipAddress: input.sessionContext?.ipAddress ?? null,
       userAgent: input.sessionContext?.userAgent ?? null,

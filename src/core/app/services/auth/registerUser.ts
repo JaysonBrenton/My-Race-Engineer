@@ -3,11 +3,11 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type {
   MailerPort,
   PasswordHasher,
-  UserEmailVerificationTokenRepository,
+  RegistrationUnitOfWork,
   UserRepository,
-  UserSessionRepository,
   Logger,
 } from '@core/app';
+import { DuplicateUserEmailError } from '@core/app';
 import type { User } from '@core/domain';
 
 export type RegisterUserInput = {
@@ -27,7 +27,11 @@ export type RegisterUserResult =
   | {
       ok: true;
       user: User;
-      nextStep: 'session-created' | 'verify-email' | 'await-approval';
+      nextStep:
+        | 'session-created'
+        | 'verify-email'
+        | 'await-approval'
+        | 'verify-email-await-approval';
       session?: { token: string; expiresAt: Date };
     };
 
@@ -51,11 +55,10 @@ const hashToken = (token: string) => createHash('sha256').update(token).digest('
 export class RegisterUserService {
   constructor(
     private readonly userRepository: UserRepository,
-    private readonly userSessionRepository: UserSessionRepository,
     private readonly passwordHasher: PasswordHasher,
-    private readonly emailVerificationTokens: UserEmailVerificationTokenRepository,
     private readonly mailer: MailerPort,
     private readonly logger: Logger,
+    private readonly unitOfWork: RegistrationUnitOfWork,
     private readonly options: {
       requireEmailVerification: boolean;
       requireAdminApproval: boolean;
@@ -106,14 +109,73 @@ export class RegisterUserService {
     // Create the user record with the appropriate initial status.  The password hash is
     // generated through the injected `PasswordHasher` so our cryptography choice is
     // swappable at the edge of the domain.
-    const user = await this.userRepository.create({
-      id: randomUUID(),
-      name: input.name,
-      email: input.email,
-      passwordHash: await this.passwordHasher.hash(input.password),
-      status: initialStatus,
-      emailVerifiedAt: requireEmailVerification ? null : this.clock(),
-    });
+    const registrationStartedAt = this.clock();
+    let verificationTokenValue: string | null = null;
+    let verificationTokenExpiresAt: Date | null = null;
+    let sessionTokenValue: string | null = null;
+    let sessionExpiresAt: Date | null = null;
+
+    let user: User;
+
+    try {
+      ({ user } = await this.unitOfWork.run(async (deps) => {
+        const createdUser = await deps.userRepository.create({
+          id: randomUUID(),
+          name: input.name,
+          email: input.email,
+          passwordHash: await this.passwordHasher.hash(input.password),
+          status: initialStatus,
+          emailVerifiedAt: requireEmailVerification ? null : this.clock(),
+        });
+
+        if (requireEmailVerification) {
+          await deps.emailVerificationTokens.deleteAllForUser(createdUser.id);
+
+          verificationTokenValue = randomBytes(32).toString('base64url');
+          verificationTokenExpiresAt = new Date(
+            registrationStartedAt.getTime() +
+              (this.options.verificationTokenTtlMs ?? VERIFICATION_TOKEN_TTL_MS),
+          );
+
+          await deps.emailVerificationTokens.create({
+            id: randomUUID(),
+            userId: createdUser.id,
+            tokenHash: hashToken(verificationTokenValue),
+            expiresAt: verificationTokenExpiresAt,
+          });
+        } else if (!requireAdminApproval) {
+          sessionTokenValue = randomBytes(32).toString('base64url');
+          const ttl = input.rememberSession
+            ? (this.options.defaultSessionTtlMs ?? DEFAULT_SESSION_TTL_MS)
+            : (this.options.shortSessionTtlMs ?? SHORT_SESSION_TTL_MS);
+
+          sessionExpiresAt = new Date(this.clock().getTime() + ttl);
+
+          await deps.userSessionRepository.create({
+            id: randomUUID(),
+            userId: createdUser.id,
+            sessionTokenHash: hashToken(sessionTokenValue),
+            expiresAt: sessionExpiresAt,
+            ipAddress: input.sessionContext?.ipAddress ?? null,
+            userAgent: input.sessionContext?.userAgent ?? null,
+            deviceName: input.sessionContext?.deviceName ?? null,
+          });
+        }
+
+        return { user: createdUser };
+      }));
+    } catch (error) {
+      if (error instanceof DuplicateUserEmailError) {
+        this.logger.info('Registration attempt failed due to duplicate email during creation.', {
+          event: 'auth.registration.email_taken',
+          outcome: 'conflict',
+          durationMs: this.clock().getTime() - requestStartedAt.getTime(),
+        });
+        return { ok: false, reason: 'email-taken' };
+      }
+
+      throw error;
+    }
 
     this.logger.info('User registered successfully.', {
       event: 'auth.registration.created',
@@ -123,32 +185,26 @@ export class RegisterUserService {
     });
 
     if (requireEmailVerification) {
-      // If verification is required we invalidate any previous tokens to prevent
-      // stacking and then send a fresh message with a signed link.
-      await this.emailVerificationTokens.deleteAllForUser(user.id);
+      if (!verificationTokenValue || !verificationTokenExpiresAt) {
+        throw new Error('Verification token state missing after transactional registration.');
+      }
 
-      const verificationToken = randomBytes(32).toString('base64url');
-      const tokenHash = hashToken(verificationToken);
-      const expiresAt = new Date(
-        requestStartedAt.getTime() +
-          (this.options.verificationTokenTtlMs ?? VERIFICATION_TOKEN_TTL_MS),
-      );
-
-      await this.emailVerificationTokens.create({
-        id: randomUUID(),
-        userId: user.id,
-        tokenHash,
-        expiresAt,
-      });
+      const verificationToken = verificationTokenValue!;
+      const verificationExpiresAt: Date = verificationTokenExpiresAt!;
 
       const verificationUrl = new URL('/auth/verify-email', this.options.baseUrl);
       verificationUrl.searchParams.set('token', verificationToken);
 
-      await this.mailer.send({
-        to: { email: user.email, name: user.name },
-        subject: 'Verify your My Race Engineer account',
-        text: `Hi ${user.name},\n\nConfirm your email by visiting ${verificationUrl.toString()} before ${expiresAt.toISOString()}.`,
+      try {
+        await this.mailer.send({
+          to: { email: user.email, name: user.name },
+          subject: 'Verify your My Race Engineer account',
+          text: `Hi ${user.name},\n\nConfirm your email by visiting ${verificationUrl.toString()} before ${verificationExpiresAt.toISOString()}.`,
       });
+      } catch (error) {
+        await this.cleanupFailedRegistration(user.id);
+        throw error;
+      }
 
       this.logger.info('Verification email dispatched.', {
         event: 'auth.registration.verification_sent',
@@ -157,12 +213,12 @@ export class RegisterUserService {
         durationMs: this.clock().getTime() - requestStartedAt.getTime(),
       });
 
-      return { ok: true, user, nextStep: 'verify-email' };
+      const nextStep = requireAdminApproval ? 'verify-email-await-approval' : 'verify-email';
+
+      return { ok: true, user, nextStep };
     }
 
     if (requireAdminApproval) {
-      // Organisations that require admin approval pause the flow after creation.  The
-      // UI will direct the user to wait for an invite from their team owner.
       this.logger.info('Registration awaiting admin approval.', {
         event: 'auth.registration.awaiting_approval',
         outcome: 'pending',
@@ -173,22 +229,12 @@ export class RegisterUserService {
       return { ok: true, user, nextStep: 'await-approval' };
     }
 
-    const sessionToken = randomBytes(32).toString('base64url');
-    const ttl = input.rememberSession
-      ? (this.options.defaultSessionTtlMs ?? DEFAULT_SESSION_TTL_MS)
-      : (this.options.shortSessionTtlMs ?? SHORT_SESSION_TTL_MS);
+    if (!sessionTokenValue || !sessionExpiresAt) {
+      throw new Error('Session state missing after transactional registration.');
+    }
 
-    const expiresAt = new Date(this.clock().getTime() + ttl);
-
-    await this.userSessionRepository.create({
-      id: randomUUID(),
-      userId: user.id,
-      sessionToken,
-      expiresAt,
-      ipAddress: input.sessionContext?.ipAddress ?? null,
-      userAgent: input.sessionContext?.userAgent ?? null,
-      deviceName: input.sessionContext?.deviceName ?? null,
-    });
+    const sessionToken = sessionTokenValue!;
+    const expiresAt = sessionExpiresAt!;
 
     this.logger.info('Session issued after registration.', {
       event: 'auth.registration.session_issued',
@@ -197,14 +243,32 @@ export class RegisterUserService {
       durationMs: this.clock().getTime() - requestStartedAt.getTime(),
     });
 
-    // When the flow reaches this point the user can be logged in immediately.  The
-    // caller stores the token in a secure cookie and handles redirecting to the
-    // dashboard.
     return {
       ok: true,
       user,
       nextStep: 'session-created',
       session: { token: sessionToken, expiresAt },
     };
+  }
+
+  private async cleanupFailedRegistration(userId: string): Promise<void> {
+    try {
+      await this.unitOfWork.run(async (deps) => {
+        await deps.emailVerificationTokens.deleteAllForUser(userId);
+        await deps.userRepository.deleteById(userId);
+      });
+    } catch (cleanupError) {
+      const errorPayload =
+        cleanupError instanceof Error
+          ? { name: cleanupError.name, message: cleanupError.message }
+          : { name: 'UnknownCleanupError', message: 'Non-error thrown during cleanup.' };
+
+      this.logger.error('Failed to clean up registration after downstream failure.', {
+        event: 'auth.registration.cleanup_failed',
+        outcome: 'error',
+        userAnonId: userId,
+        error: errorPayload,
+      });
+    }
   }
 }
