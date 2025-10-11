@@ -206,8 +206,8 @@ export class RegisterUserService {
         throw new Error('Verification token state missing after transactional registration.');
       }
 
-      const verificationToken = verificationTokenValue!;
-      const verificationExpiresAt: Date = verificationTokenExpiresAt!;
+      const verificationToken: string = verificationTokenValue;
+      const verificationExpiresAt: Date = verificationTokenExpiresAt;
 
       const verificationUrl = new URL('/auth/verify-email', this.options.baseUrl);
       verificationUrl.searchParams.set('token', verificationToken);
@@ -217,7 +217,7 @@ export class RegisterUserService {
           to: { email: user.email, name: user.name },
           subject: 'Verify your My Race Engineer account',
           text: `Hi ${user.name},\n\nConfirm your email by visiting ${verificationUrl.toString()} before ${verificationExpiresAt.toISOString()}.`,
-      });
+        });
       } catch (error) {
         await this.cleanupFailedRegistration(user.id);
         throw error;
@@ -255,8 +255,8 @@ export class RegisterUserService {
       throw new Error('Session state missing after transactional registration.');
     }
 
-    const sessionToken = sessionTokenValue!;
-    const expiresAt = sessionExpiresAt!;
+    const sessionToken: string = sessionTokenValue;
+    const expiresAt: Date = sessionExpiresAt;
 
     this.logger.info('Session issued after registration.', {
       event: 'auth.registration.session_issued',
