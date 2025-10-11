@@ -1,0 +1,5 @@
+
+> my-race-engineer@0.1.0 env:doctor
+> tsx tools/env-doctor.ts --json
+
+{"missingKeys":[],"extraKeys":["SMTP_HOST","SMTP_PORT","SMTP_SECURE","SMTP_USER","SMTP_PASS","MAIL_FROM","MAIL_REPLY_TO","NEXTAUTH_URL"],"invalidKeys":[{"key":"OTEL_EXPORTER_OTLP_ENDPOINT","message":"Value is empty."},{"key":"OTEL_EXPORTER_OTLP_HEADERS","message":"Value is empty."},{"key":"INGEST_RATE_LIMIT_WINDOW_MS","message":"Value is empty."},{"key":"INGEST_RATE_LIMIT_MAX_REQUESTS","message":"Value is empty."},{"key":"LIVERC_HTTP_BASE","message":"Value is empty."},{"key":"NEXT_PUBLIC_APP_ORIGIN","message":"Value is empty."}],"isHealthy":false}
