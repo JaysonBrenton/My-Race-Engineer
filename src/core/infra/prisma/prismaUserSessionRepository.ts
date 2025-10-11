@@ -19,7 +19,9 @@ const toDomain = (session: PrismaUserSession): UserSession => ({
 });
 
 export class PrismaUserSessionRepository implements UserSessionRepository {
-  constructor(private readonly prisma: PrismaClient | Prisma.TransactionClient = getPrismaClient()) {}
+  constructor(
+    private readonly prisma: PrismaClient | Prisma.TransactionClient = getPrismaClient(),
+  ) {}
 
   async create(input: CreateUserSessionInput): Promise<UserSession> {
     const session = await this.prisma.userSession.create({

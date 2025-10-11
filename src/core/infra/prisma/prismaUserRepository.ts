@@ -24,7 +24,9 @@ const toDomain = (user: PrismaUser): User => ({
 });
 
 export class PrismaUserRepository implements UserRepository {
-  constructor(private readonly prisma: PrismaClient | Prisma.TransactionClient = getPrismaClient()) {}
+  constructor(
+    private readonly prisma: PrismaClient | Prisma.TransactionClient = getPrismaClient(),
+  ) {}
 
   private toPrismaStatus(status: User['status']): $Enums.UserStatus {
     switch (status) {
@@ -64,10 +66,7 @@ export class PrismaUserRepository implements UserRepository {
         }),
       );
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         throw new DuplicateUserEmailError(input.email.toLowerCase());
       }
 
@@ -106,10 +105,7 @@ export class PrismaUserRepository implements UserRepository {
     try {
       await this.prisma.user.delete({ where: { id: userId } });
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2025'
-      ) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
         return;
       }
 
