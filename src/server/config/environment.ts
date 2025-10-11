@@ -234,12 +234,7 @@ export const parseEnvironment = (env: Record<string, string | undefined>): Envir
     issues,
     false,
   );
-  const inviteOnly = readBooleanFlag(
-    'FEATURE_INVITE_ONLY',
-    env.FEATURE_INVITE_ONLY,
-    issues,
-    false,
-  );
+  const inviteOnly = readBooleanFlag('FEATURE_INVITE_ONLY', env.FEATURE_INVITE_ONLY, issues, false);
 
   let allowedOrigins = allowedOriginsResult.origins;
   if (appOrigin) {

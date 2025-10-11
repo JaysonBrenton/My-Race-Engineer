@@ -110,7 +110,7 @@ export class RegisterUserService {
 
     const requireEmailVerification = this.options.requireEmailVerification;
     const requireAdminApproval = this.options.requireAdminApproval;
-    const assignedRole = 'driver' as const;
+    const assignedRole = 'driver';
 
     const initialStatus: User['status'] =
       requireAdminApproval || requireEmailVerification ? 'pending' : 'active';
