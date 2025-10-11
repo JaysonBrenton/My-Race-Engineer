@@ -1,6 +1,9 @@
 import { PrismaClient } from '@prisma/client';
 
+import { Argon2PasswordHasher } from '@/lib/auth/passwordHasher';
+
 const prisma = new PrismaClient();
+const passwordHasher = new Argon2PasswordHasher();
 
 export const findUserByEmail = (email: string) =>
   prisma.user.findUnique({
@@ -13,3 +16,16 @@ export const deleteUserByEmail = (email: string) =>
   });
 
 export const closeDb = () => prisma.$disconnect();
+
+export const createActiveUser = async (params: { name: string; email: string; password: string }) => {
+  const passwordHash = await passwordHasher.hash(params.password);
+  return prisma.user.create({
+    data: {
+      name: params.name,
+      email: params.email,
+      passwordHash,
+      status: 'ACTIVE',
+      emailVerifiedAt: new Date(),
+    },
+  });
+};

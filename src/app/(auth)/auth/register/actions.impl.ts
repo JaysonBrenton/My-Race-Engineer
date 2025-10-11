@@ -13,13 +13,14 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
 import { getAuthRequestLogger, registerUserService } from '@/dependencies/auth';
-import { validateAuthFormToken } from '@/lib/auth/formTokens';
+import { fingerprintAuthFormToken, validateAuthFormToken } from '@/lib/auth/formTokens';
 import { createLogFingerprint } from '@/lib/logging/fingerprint';
 import { withSpan, type SpanAdapter, type WithSpan } from '@/lib/observability/tracing';
 import { checkRegisterRateLimit } from '@/lib/rateLimit/authRateLimiter';
 import { extractClientIdentifier } from '@/lib/request/clientIdentifier';
 import { computeCookieSecure, type CookieSecureStrategy } from '@/server/runtime/cookies';
 import { guardAuthPostOrigin } from '@/server/security/origin';
+import type { AuthActionDebugEvent } from '@/server/security/authDebug';
 
 import { buildPrefillParam, buildRedirectUrl, type RegisterErrorCode } from './state';
 
@@ -107,6 +108,10 @@ export type RegisterActionDependencies = {
   computeCookieSecure: typeof computeCookieSecure;
 };
 
+export type RegisterActionOptions = {
+  onDebugEvent?: (event: AuthActionDebugEvent) => void;
+};
+
 const defaultRegisterActionDependencies: RegisterActionDependencies = {
   headers,
   cookies,
@@ -139,11 +144,13 @@ export type RegisterAction = (formData: FormData) => Promise<void>;
 
 export const createRegisterAction = (
   deps: RegisterActionDependencies = defaultRegisterActionDependencies,
+  options: RegisterActionOptions = {},
 ): RegisterAction => {
   return async (formData: FormData): Promise<void> => {
     const requestStartedAt = Date.now();
     const headersList = deps.headers();
     const requestId = headersList.get('x-request-id') ?? randomUUID();
+    const emitDebugEvent = options.onDebugEvent;
 
     await deps.withSpan(
       'auth.register',
@@ -157,8 +164,42 @@ export const createRegisterAction = (
           route: 'auth/register',
         });
 
+        const originHeader = headersList.get('origin');
+        const originGuardHeader = headersList.get('x-auth-origin-guard');
+        const methodHeader =
+          headersList.get('x-http-method-override') ??
+          headersList.get('x-mre-http-method') ??
+          'POST';
+
+        logger.info('Registration request received.', {
+          event: 'auth.register.request',
+          outcome: 'received',
+          hasOriginHeader: Boolean(originHeader),
+          originAllowed: originGuardHeader ? originGuardHeader !== 'mismatch' : null,
+          method: methodHeader,
+        });
+
         const prefills = extractPrefillValues(formData);
         const normalisedPrefills = normalisePrefillValues(prefills);
+
+        const recordOutcome = (outcome: {
+          kind: 'redirect' | 'rerender';
+          target?: string;
+          statusKey?: string;
+        }) => {
+          logger.info('Registration outcome resolved.', {
+            event: 'auth.register.outcome',
+            kind: outcome.kind,
+            target: outcome.target,
+            statusKey: outcome.statusKey,
+          });
+          emitDebugEvent?.({
+            type: 'outcome',
+            kind: outcome.kind,
+            target: outcome.target,
+            statusKey: outcome.statusKey,
+          });
+        };
 
         const redirectToRegister = (errorCode: RegisterErrorCode): never => {
           const redirectUrl = buildRedirectUrl('/auth/register', {
@@ -168,6 +209,7 @@ export const createRegisterAction = (
             email: normalisedPrefills.email || undefined,
           });
 
+          recordOutcome({ kind: 'redirect', target: redirectUrl, statusKey: errorCode });
           return deps.redirect(redirectUrl);
         };
 
@@ -216,7 +258,44 @@ export const createRegisterAction = (
         }
 
         const token = getFormValue(formData, 'formToken');
+        const tokenFingerprint = token ? fingerprintAuthFormToken(token) : null;
         const tokenValidation = deps.validateAuthFormToken(token ?? null, 'registration');
+        const tokenAgeMs = tokenValidation.ok
+          ? Date.now() - tokenValidation.issuedAt.getTime()
+          : null;
+
+        if (tokenValidation.ok) {
+          logger.info('Registration form token validated.', {
+            event: 'auth.formToken.validate',
+            result: 'ok',
+            action: 'register',
+            tokenFingerprint,
+            tokenAgeMs,
+          });
+          emitDebugEvent?.({
+            type: 'token-validation',
+            status: 'ok',
+            fingerprint: tokenFingerprint,
+            ageMs: tokenAgeMs,
+          });
+        } else {
+          const status = tokenValidation.reason === 'expired' ? 'expired' : 'invalid';
+          logger.warn('Registration form token rejected.', {
+            event: 'auth.formToken.validate',
+            result: status,
+            action: 'register',
+            reason: tokenValidation.reason,
+            tokenFingerprint,
+            tokenAgeMs,
+          });
+          emitDebugEvent?.({
+            type: 'token-validation',
+            status,
+            reason: tokenValidation.reason,
+            fingerprint: tokenFingerprint,
+            ageMs: tokenAgeMs,
+          });
+        }
 
         if (!tokenValidation.ok) {
           span.setAttribute('mre.auth.outcome', 'invalid_token');
@@ -249,8 +328,18 @@ export const createRegisterAction = (
             validationIssues: issues,
             durationMs: Date.now() - requestStartedAt,
           });
+          logger.info('Registration validation summary.', {
+            event: 'auth.register.validation',
+            result: 'invalid',
+            issues: issues.map((issue) => issue.field),
+          });
           return redirectToRegister('validation');
         }
+
+        logger.info('Registration validation summary.', {
+          event: 'auth.register.validation',
+          result: 'ok',
+        });
 
         const { name, email, password } = parseResult.data;
         const userAgent = headersList.get('user-agent');
@@ -322,12 +411,14 @@ export const createRegisterAction = (
               emailFingerprint,
               durationMs: Date.now() - requestStartedAt,
             });
-            deps.redirect(
-              buildRedirectUrl('/auth/login', {
+            {
+              const target = buildRedirectUrl('/auth/login', {
                 status: 'verify-email',
                 prefill: buildPrefillParam({ email }),
-              }),
-            );
+              });
+              recordOutcome({ kind: 'redirect', target, statusKey: 'verify-email' });
+              deps.redirect(target);
+            }
             break;
           case 'await-approval':
             span.setAttribute('mre.auth.outcome', 'awaiting_approval');
@@ -338,12 +429,14 @@ export const createRegisterAction = (
               emailFingerprint,
               durationMs: Date.now() - requestStartedAt,
             });
-            deps.redirect(
-              buildRedirectUrl('/auth/login', {
+            {
+              const target = buildRedirectUrl('/auth/login', {
                 status: 'awaiting-approval',
                 prefill: buildPrefillParam({ email }),
-              }),
-            );
+              });
+              recordOutcome({ kind: 'redirect', target, statusKey: 'awaiting-approval' });
+              deps.redirect(target);
+            }
             break;
           case 'session-created':
             span.setAttribute('mre.auth.outcome', 'success');
@@ -381,6 +474,7 @@ export const createRegisterAction = (
               sessionExpiresAt: result.session?.expiresAt.toISOString(),
               durationMs: Date.now() - requestStartedAt,
             });
+            recordOutcome({ kind: 'redirect', target: '/dashboard', statusKey: 'session-created' });
             deps.redirect('/dashboard');
             break;
           default:
