@@ -347,7 +347,8 @@ function buildEnvHint(report: EnvDoctorOutcome): EnvHint {
     return {
       status: 'warn',
       missingKeys: keysNeedingAttention,
-      message: 'Environment defaults applied; review warnings from env:doctor to keep values intentional.',
+      message:
+        'Environment defaults applied; review warnings from env:doctor to keep values intentional.',
     };
   }
 

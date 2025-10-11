@@ -16,9 +16,9 @@ export class MissingAuthFormTokenSecretError extends Error {
   }
 }
 
-const FORM_TOKEN_PREFIX = 'mre.auth';
+export const FORM_TOKEN_PREFIX = 'mre.auth';
 
-const FORM_TOKEN_TTL_MS = 10 * 60 * 1000; // 10 minutes
+export const FORM_TOKEN_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const logger = applicationLogger.withContext({ route: 'auth/formTokens' });
 
 const buildMissingSecretError = (reason: 'unset' | 'too-short') =>
@@ -57,8 +57,20 @@ const getFormTokenSecret = () => {
   }
 };
 
+const encodeIssuedAt = (issuedAtMs: number): string => issuedAtMs.toString(36);
+
+const decodeIssuedAt = (encoded: string): number | null => {
+  if (!encoded) {
+    return null;
+  }
+
+  const parsed = Number.parseInt(encoded, 36);
+  return Number.isNaN(parsed) ? null : parsed;
+};
+
 export const generateAuthFormToken = (context: AuthFormContext) => {
-  const issuedAt = new Date().toISOString();
+  const issuedAtMs = Date.now();
+  const issuedAt = encodeIssuedAt(issuedAtMs);
   const nonce = randomUUID();
   const secret = getFormTokenSecret();
 
@@ -95,9 +107,25 @@ const decodeFormToken = (token: string) => {
     return null;
   }
 
-  const [prefix, context, issuedAtIso, nonce, signature] = parts;
+  const [prefix, context, issuedAtEncoded, nonce, signature] = parts;
 
-  return { prefix, context, issuedAtIso, nonce, signature };
+  return { prefix, context, issuedAtEncoded, nonce, signature };
+};
+
+const computeIssuedAtDate = (encoded: string): Date | null => {
+  const issuedAtMs = decodeIssuedAt(encoded);
+  if (issuedAtMs === null) {
+    return null;
+  }
+
+  const issuedAt = new Date(issuedAtMs);
+  return Number.isNaN(issuedAt.getTime()) ? null : issuedAt;
+};
+
+export const fingerprintAuthFormToken = (token: string): string => {
+  const start = token.slice(0, 4);
+  const end = token.slice(-4);
+  return `${start}…${end}`;
 };
 
 export const validateAuthFormToken = (
@@ -114,7 +142,7 @@ export const validateAuthFormToken = (
     return { ok: false, reason: 'malformed' };
   }
 
-  const { prefix, context, issuedAtIso, nonce, signature } = decoded;
+  const { prefix, context, issuedAtEncoded, nonce, signature } = decoded;
 
   if (prefix !== FORM_TOKEN_PREFIX) {
     return { ok: false, reason: 'malformed' };
@@ -124,9 +152,9 @@ export const validateAuthFormToken = (
     return { ok: false, reason: 'unexpected-context' };
   }
 
-  const issuedAt = new Date(issuedAtIso);
+  const issuedAt = computeIssuedAtDate(issuedAtEncoded);
 
-  if (Number.isNaN(issuedAt.getTime())) {
+  if (!issuedAt) {
     return { ok: false, reason: 'malformed' };
   }
 
@@ -136,7 +164,7 @@ export const validateAuthFormToken = (
 
   const secret = getFormTokenSecret();
   const expectedSignature = createHmac('sha256', secret)
-    .update(`${FORM_TOKEN_PREFIX}:${context}:${issuedAtIso}:${nonce}`)
+    .update(`${FORM_TOKEN_PREFIX}:${context}:${issuedAtEncoded}:${nonce}`)
     .digest('base64url');
 
   if (expectedSignature.length !== signature.length) {
