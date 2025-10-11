@@ -83,10 +83,11 @@ export const generateAuthFormToken = (context: AuthFormContext) => {
 
 export const describeAuthFormToken = (token: string) => {
   const [prefix, context, issuedAt] = token.split('.', 3);
+  const issuedAtMs = Number.parseInt(issuedAt ?? '', 10);
   return {
     prefix,
     context: context as AuthFormContext | undefined,
-    issuedAt,
+    issuedAtMs: Number.isNaN(issuedAtMs) ? undefined : issuedAtMs,
   };
 };
 
