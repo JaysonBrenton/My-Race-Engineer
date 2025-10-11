@@ -2,6 +2,8 @@
 
 This guide captures the tooling added for diagnosing raw `/auth/register` and `/auth/login` submissions. Use it when reproducing origin guard behaviour, validating form token handling, or inspecting the new Playwright coverage.
 
+Auth form tokens follow the shape `mre-auth.<context>.<issuedAtBase36>.<nonce>.<signature>`. The timestamp segment remains base-36 encoded and expires based on the configured TTL, so capture and replay tokens quickly during debugging sessions.
+
 ## 1. Origin guard sanity checks
 
 Run these commands from the project root while the dev server is running on `http://127.0.0.1:3101`.
