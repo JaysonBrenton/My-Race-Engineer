@@ -157,8 +157,9 @@ Dev server listens on `http://localhost:3001/` (also `http://0.0.0.0:3001/`).
 | `TRACING_ENABLED` | `true` enables OpenTelemetry tracing (defaults to `false`) |
 | `OTEL_SERVICE_NAME` | Overrides the service name reported to tracing backends |
 | `OTEL_*` | Optional OpenTelemetry exporter settings |
-| `FEATURE_REQUIRE_EMAIL_VERIFICATION` | `true` / `false` |
-| `FEATURE_REQUIRE_ADMIN_APPROVAL` | `false` by default |
+| `FEATURE_REQUIRE_EMAIL_VERIFICATION` | `true` (default) / `false` |
+| `FEATURE_REQUIRE_ADMIN_APPROVAL` | `false` by default (set `true` to gate every new account) |
+| `FEATURE_INVITE_ONLY` | blank / `false` by default; set `true` to require invitations |
 | `APPROVAL_TOKEN_TTL_HOURS` | e.g., `48` |
 | `INGEST_RATE_LIMIT_*` | Optional ingestion limits |
 | `NEXT_PUBLIC_APP_NAME` | Public app name |
@@ -188,6 +189,7 @@ Dev server listens on `http://localhost:3001/` (also `http://0.0.0.0:3001/`).
 - **ALLOWED_ORIGINS** must include every origin that will post to `/auth/login` or `/auth/register`.
 - **SESSION_SECRET** must be a stable 32+ byte value; rotate it only when you intend to invalidate sessions.
 - In local development keep `NODE_ENV=development` so the session cookie is accepted over HTTP.
+- Keep `FEATURE_REQUIRE_EMAIL_VERIFICATION=true` for the default self-service flow. Toggle `FEATURE_REQUIRE_ADMIN_APPROVAL` only when running a closed beta or processing elevated role requests manually.
 
 #### Quick verification
 
@@ -217,6 +219,7 @@ Expect a `303` redirect to `/auth/login?error=invalid-origin` and `x-auth-origin
 - Auth forms are rendered dynamically (`force-dynamic`, `noStore()`) to keep tokens fresh and avoid silent resets.
 - Middleware guards only the `/auth/login` and `/auth/register` POST flows; `/api/**` endpoints remain unaffected.
 - Session cookies stay `httpOnly`, `sameSite='lax'`, and only use `secure` in production to prevent dev cookie drops.
+- New sign-ups self-serve with the lowest-privilege `driver` role and must verify their email when `FEATURE_REQUIRE_EMAIL_VERIFICATION=true` (default). Set `FEATURE_REQUIRE_ADMIN_APPROVAL=true` only when you need every registration reviewed manually.
 - See also: [Auth runtime & origin guard runbook](docs/guides/auth-runtime-and-origin-guard.md).
 
 ---

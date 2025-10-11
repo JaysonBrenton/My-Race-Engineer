@@ -1,3 +1,11 @@
+/**
+ * Filename: src/dependencies/auth.ts
+ * Purpose: Wire authentication services with Prisma repositories, mailers, and runtime configuration.
+ * Author: Jayson Brenton
+ * Date: 2025-10-11
+ * License: MIT
+ */
+
 import {
   ConfirmPasswordResetService,
   LoginUserService,
@@ -19,6 +27,7 @@ import {
   createPinoLogger,
 } from '@core/infra';
 import { applicationLogger, loggerEnvironmentConfig } from '@/dependencies/logger';
+import { getEnvironment } from '@/server/config/environment';
 import { Argon2PasswordHasher } from '@/lib/auth/passwordHasher';
 
 // The dependency wiring in this module centralises the concrete implementations used by
@@ -36,10 +45,11 @@ const emailVerificationTokens = new PrismaUserEmailVerificationTokenRepository()
 const passwordResetTokens = new PrismaPasswordResetTokenRepository();
 const registrationUnitOfWork = new PrismaRegistrationUnitOfWork();
 const passwordHasher = new Argon2PasswordHasher();
-const requireEmailVerification =
-  process.env.FEATURE_REQUIRE_EMAIL_VERIFICATION?.toLowerCase() === 'true';
-const requireAdminApproval = process.env.FEATURE_REQUIRE_ADMIN_APPROVAL?.toLowerCase() === 'true';
-const baseUrl = process.env.APP_URL?.trim() || 'http://localhost:3001';
+const environment = getEnvironment();
+
+const requireEmailVerification = environment.features.requireEmailVerification;
+const requireAdminApproval = environment.features.requireAdminApproval;
+const baseUrl = environment.appUrl.toString();
 const mailerDriver = process.env.MAILER_DRIVER?.toLowerCase() || 'console';
 const mailerLogger = applicationLogger.withContext({ route: 'mailer' });
 // The mailer is resolved lazily so we can validate configuration and select the
@@ -116,6 +126,7 @@ export const loginUserService = new LoginUserService(
   loginLogger,
   {
     requireEmailVerification,
+    requireAdminApproval,
   },
 );
 

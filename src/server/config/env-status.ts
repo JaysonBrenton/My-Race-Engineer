@@ -1,3 +1,11 @@
+/**
+ * Filename: src/server/config/env-status.ts
+ * Purpose: Inspect environment variables, surface configuration issues, and support env doctor tooling.
+ * Author: Jayson Brenton
+ * Date: 2025-10-11
+ * License: MIT
+ */
+
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -36,6 +44,7 @@ const FALSE_FLAG_VALUES = new Set(['0', 'false', 'no', 'n', 'off']);
 const FEATURE_BOOLEAN_KEYS = new Set([
   'FEATURE_REQUIRE_EMAIL_VERIFICATION',
   'FEATURE_REQUIRE_ADMIN_APPROVAL',
+  'FEATURE_INVITE_ONLY',
   'ENABLE_IMPORT_WIZARD',
   'ENABLE_LIVERC_RESOLVER',
   'ENABLE_IMPORT_FILE',

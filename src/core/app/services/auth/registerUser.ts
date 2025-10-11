@@ -1,3 +1,11 @@
+/**
+ * Filename: src/core/app/services/auth/registerUser.ts
+ * Purpose: Orchestrate domain logic for self-service user registrations and post-signup flows.
+ * Author: Jayson Brenton
+ * Date: 2025-10-11
+ * License: MIT
+ */
+
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 
 import type {
@@ -102,6 +110,7 @@ export class RegisterUserService {
 
     const requireEmailVerification = this.options.requireEmailVerification;
     const requireAdminApproval = this.options.requireAdminApproval;
+    const assignedRole = 'driver' as const;
 
     const initialStatus: User['status'] =
       requireAdminApproval || requireEmailVerification ? 'pending' : 'active';
@@ -177,11 +186,19 @@ export class RegisterUserService {
       throw error;
     }
 
+    const durationMs = this.clock().getTime() - requestStartedAt.getTime();
+    const emailHash = createHash('sha256').update(user.email).digest('hex');
+
     this.logger.info('User registered successfully.', {
       event: 'auth.registration.created',
       outcome: 'success',
       userAnonId: user.id,
-      durationMs: this.clock().getTime() - requestStartedAt.getTime(),
+      userId: user.id,
+      emailHash,
+      role: assignedRole,
+      adminApprovalRequired: requireAdminApproval,
+      verificationRequired: requireEmailVerification,
+      durationMs,
     });
 
     if (requireEmailVerification) {
@@ -207,9 +224,12 @@ export class RegisterUserService {
       }
 
       this.logger.info('Verification email dispatched.', {
-        event: 'auth.registration.verification_sent',
+        event: 'auth.registration.email_verification_sent',
         outcome: 'pending',
         userAnonId: user.id,
+        userId: user.id,
+        emailHash,
+        adminApprovalRequired: requireAdminApproval,
         durationMs: this.clock().getTime() - requestStartedAt.getTime(),
       });
 
@@ -220,9 +240,11 @@ export class RegisterUserService {
 
     if (requireAdminApproval) {
       this.logger.info('Registration awaiting admin approval.', {
-        event: 'auth.registration.awaiting_approval',
+        event: 'auth.registration.awaiting_admin_approval',
         outcome: 'pending',
         userAnonId: user.id,
+        userId: user.id,
+        emailHash,
         durationMs: this.clock().getTime() - requestStartedAt.getTime(),
       });
 
@@ -240,6 +262,7 @@ export class RegisterUserService {
       event: 'auth.registration.session_issued',
       outcome: 'success',
       userAnonId: user.id,
+      userId: user.id,
       durationMs: this.clock().getTime() - requestStartedAt.getTime(),
     });
 

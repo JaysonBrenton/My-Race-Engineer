@@ -1,3 +1,11 @@
+/**
+ * Filename: tests/core/auth/__fixtures__/inMemoryAuthAdapters.ts
+ * Purpose: Provide in-memory auth adapters and loggers for domain service testing.
+ * Author: Jayson Brenton
+ * Date: 2025-10-11
+ * License: MIT
+ */
+
 import { createHash } from 'node:crypto';
 
 import type {
@@ -301,6 +309,7 @@ export const createAuthTestEnvironment = (
 
   const loginOptions: LoginServiceOptions = {
     requireEmailVerification: registerOptions.requireEmailVerification,
+    requireAdminApproval: registerOptions.requireAdminApproval,
     ...(options?.login ?? {}),
   };
 

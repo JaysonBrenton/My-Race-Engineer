@@ -2,7 +2,7 @@
  * Filename: src/app/(auth)/auth/login/page.tsx
  * Purpose: Render the login experience with cache-busting guarantees and error-prefilled forms.
  * Author: Jayson Brenton
- * Date: 2025-03-18
+ * Date: 2025-10-11
  * License: MIT License
  */
 
@@ -101,7 +101,7 @@ const buildStatusMessage = (
     return {
       tone: 'info' as const,
       message:
-        'Check your inbox for a verification link. You can sign in after confirming your email.',
+        'Check your inbox for a verification link. Once confirmed, you can sign in immediately.',
     };
   }
 
@@ -109,14 +109,15 @@ const buildStatusMessage = (
     return {
       tone: 'info' as const,
       message:
-        'Verify your email, then wait for an administrator to approve your account before signing in.',
+        'We received your elevated access request. Verify your email and we will alert you when an administrator approves it.',
     };
   }
 
   if (statusCode === 'awaiting-approval') {
     return {
       tone: 'info' as const,
-      message: 'Your account is awaiting administrator approval. We will notify you once ready.',
+      message:
+        'An administrator is reviewing your elevated access request. We will notify you as soon as it is approved.',
     };
   }
 
@@ -163,7 +164,7 @@ const buildStatusMessage = (
       return {
         tone: 'error' as const,
         message:
-          'Your account is pending activation. Verify your email or wait for admin approval.',
+          'Your access request is pending administrator approval. We will email you once it is ready to use.',
       };
     case 'account-suspended':
       return {
