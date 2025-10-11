@@ -420,6 +420,28 @@ export const createRegisterAction = (
               deps.redirect(target);
             }
             break;
+          case 'verify-email-await-approval':
+            span.setAttribute('mre.auth.outcome', 'verify_email_awaiting_approval');
+            logger.info('Registration complete; verification required before admin approval.', {
+              event: 'auth.register.next_step.verify_email_awaiting_approval',
+              outcome: 'pending',
+              clientFingerprint,
+              emailFingerprint,
+              durationMs: Date.now() - requestStartedAt,
+            });
+            {
+              const target = buildRedirectUrl('/auth/login', {
+                status: 'verify-email-awaiting-approval',
+                prefill: buildPrefillParam({ email }),
+              });
+              recordOutcome({
+                kind: 'redirect',
+                target,
+                statusKey: 'verify-email-awaiting-approval',
+              });
+              deps.redirect(target);
+            }
+            break;
           case 'await-approval':
             span.setAttribute('mre.auth.outcome', 'awaiting_approval');
             logger.info('Registration complete; awaiting admin approval.', {

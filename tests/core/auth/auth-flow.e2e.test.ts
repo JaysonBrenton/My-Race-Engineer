@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import test from 'node:test';
 
 import {
@@ -56,7 +57,10 @@ test('registration requires verification before login succeeds when enabled', as
     const session = env.sessionRepository.createdSessions[0];
     assert.equal(session.userId, registerResult.user.id);
     assert.equal(session.ipAddress, '203.0.113.42');
-    assert.equal(session.sessionToken, loginAfterVerification.sessionToken);
+    const expectedHash = createHash('sha256')
+      .update(loginAfterVerification.sessionToken)
+      .digest('hex');
+    assert.equal(session.sessionTokenHash, expectedHash);
     assert.equal(session.expiresAt.getTime(), loginAfterVerification.expiresAt.getTime());
   }
 });

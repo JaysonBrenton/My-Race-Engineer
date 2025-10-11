@@ -7,6 +7,7 @@ export * from './prisma/prismaSessionRepository';
 export * from './prisma/prismaUserRepository';
 export * from './prisma/prismaUserSessionRepository';
 export * from './prisma/prismaUserEmailVerificationTokenRepository';
+export * from './prisma/prismaRegistrationUnitOfWork';
 export * from './prisma/prismaPasswordResetTokenRepository';
 export * from './mailer/consoleMailer';
 export * from './mailer/nodemailerMailer';

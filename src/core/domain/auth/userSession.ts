@@ -1,7 +1,7 @@
 export type UserSession = {
   id: string;
   userId: string;
-  sessionToken: string;
+  sessionTokenHash: string;
   expiresAt: Date;
   ipAddress: string | null;
   userAgent: string | null;
@@ -15,7 +15,7 @@ export type UserSession = {
 export type CreateUserSessionInput = {
   id: string;
   userId: string;
-  sessionToken: string;
+  sessionTokenHash: string;
   expiresAt: Date;
   ipAddress?: string | null;
   userAgent?: string | null;

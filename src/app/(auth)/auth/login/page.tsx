@@ -105,6 +105,14 @@ const buildStatusMessage = (
     };
   }
 
+  if (statusCode === 'verify-email-awaiting-approval') {
+    return {
+      tone: 'info' as const,
+      message:
+        'Verify your email, then wait for an administrator to approve your account before signing in.',
+    };
+  }
+
   if (statusCode === 'awaiting-approval') {
     return {
       tone: 'info' as const,

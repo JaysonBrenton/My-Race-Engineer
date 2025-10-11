@@ -20,9 +20,10 @@ const toDomain = (token: PrismaUserEmailVerificationToken): UserEmailVerificatio
 export class PrismaUserEmailVerificationTokenRepository
   implements UserEmailVerificationTokenRepository
 {
+  constructor(private readonly prisma = getPrismaClient()) {}
+
   async create(input: CreateUserEmailVerificationTokenInput): Promise<UserEmailVerificationToken> {
-    const prisma = getPrismaClient();
-    const token = await prisma.userEmailVerificationToken.create({
+    const token = await this.prisma.userEmailVerificationToken.create({
       data: {
         id: input.id,
         userId: input.userId,
@@ -35,8 +36,7 @@ export class PrismaUserEmailVerificationTokenRepository
   }
 
   async findActiveByTokenHash(tokenHash: string): Promise<UserEmailVerificationToken | null> {
-    const prisma = getPrismaClient();
-    const token = await prisma.userEmailVerificationToken.findFirst({
+    const token = await this.prisma.userEmailVerificationToken.findFirst({
       where: {
         tokenHash,
         expiresAt: { gt: new Date() },
@@ -48,8 +48,7 @@ export class PrismaUserEmailVerificationTokenRepository
   }
 
   async markConsumed(id: string, consumedAt: Date): Promise<UserEmailVerificationToken> {
-    const prisma = getPrismaClient();
-    const token = await prisma.userEmailVerificationToken.update({
+    const token = await this.prisma.userEmailVerificationToken.update({
       where: { id },
       data: { consumedAt },
     });
@@ -58,7 +57,6 @@ export class PrismaUserEmailVerificationTokenRepository
   }
 
   async deleteAllForUser(userId: string): Promise<void> {
-    const prisma = getPrismaClient();
-    await prisma.userEmailVerificationToken.deleteMany({ where: { userId } });
+    await this.prisma.userEmailVerificationToken.deleteMany({ where: { userId } });
   }
 }

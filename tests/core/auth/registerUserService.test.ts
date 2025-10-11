@@ -3,12 +3,14 @@ import { createHash } from 'node:crypto';
 import test from 'node:test';
 
 import { RegisterUserService } from '../../../src/core/app/services/auth/registerUser';
+import { DuplicateUserEmailError } from '../../../src/core/app/errors/duplicateUserEmailError';
 import type { User } from '../../../src/core/domain';
 import {
   DeterministicPasswordHasher,
   InMemoryLogger,
   InMemoryUserRepository,
   InMemoryVerificationTokenRepository,
+  InMemoryRegistrationUnitOfWork,
   RecordingMailer,
   RecordingUserSessionRepository,
   createFixedClock,
@@ -43,11 +45,14 @@ const buildService = (overrides?: {
 
   const service = new RegisterUserService(
     repository,
-    sessionRepository,
     passwordHasher,
-    tokenRepository,
     mailer,
     logger,
+    new InMemoryRegistrationUnitOfWork({
+      userRepository: repository,
+      userSessionRepository: sessionRepository,
+      emailVerificationTokens: tokenRepository,
+    }),
     options,
     clock,
   );
@@ -174,7 +179,82 @@ test('creates a session when verification is not required', async () => {
     assert.equal(created.expiresAt.getTime(), expectedExpiry.getTime());
     assert.equal(result.session?.expiresAt.getTime(), expectedExpiry.getTime());
     assert.ok(result.session?.token);
+    if (result.session) {
+      const hashedToken = createHash('sha256').update(result.session.token).digest('hex');
+      assert.equal(created.sessionTokenHash, hashedToken);
+    }
   }
 
   assert.deepEqual(passwordHasher.hashed, ['P@ssword12345']);
+});
+
+test('returns verify-email-await-approval when both verification and admin approval are required', async () => {
+  const { service, tokenRepository, mailer, sessionRepository } = buildService({
+    options: { requireEmailVerification: true, requireAdminApproval: true },
+  });
+
+  const result = await service.register({
+    name: 'Example User',
+    email: 'user@example.com',
+    password: 'P@ssword12345',
+  });
+
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.nextStep, 'verify-email-await-approval');
+    assert.equal(result.session, undefined);
+    assert.equal(result.user.status, 'pending');
+  }
+
+  assert.equal(tokenRepository.tokens.length, 1);
+  assert.equal(mailer.sent.length, 1);
+  assert.equal(sessionRepository.createdSessions.length, 0);
+});
+
+test('maps unique constraint violations during creation to email-taken', async () => {
+  class ThrowingUserRepository extends InMemoryUserRepository {
+    async create(): Promise<User> {
+      throw new DuplicateUserEmailError('user@example.com');
+    }
+  }
+
+  const repository = new ThrowingUserRepository(clock);
+  const { service, tokenRepository, sessionRepository } = buildService({ repository });
+
+  const result = await service.register({
+    name: 'Example User',
+    email: 'user@example.com',
+    password: 'P@ssword12345',
+  });
+
+  assert.deepEqual(result, { ok: false, reason: 'email-taken' });
+  assert.equal(tokenRepository.tokens.length, 0);
+  assert.equal(sessionRepository.createdSessions.length, 0);
+});
+
+test('rolls back user creation when verification email dispatch fails', async () => {
+  class FailingMailer extends RecordingMailer {
+    async send(): Promise<void> {
+      throw new Error('smtp-offline');
+    }
+  }
+
+  const mailer = new FailingMailer();
+  const { service, repository, tokenRepository } = buildService({
+    mailer,
+    options: { requireEmailVerification: true },
+  });
+
+  await assert.rejects(
+    () =>
+      service.register({
+        name: 'Example User',
+        email: 'user@example.com',
+        password: 'P@ssword12345',
+      }),
+    /smtp-offline/,
+  );
+
+  assert.equal(repository.usersById.size, 0);
+  assert.equal(tokenRepository.tokens.length, 0);
 });

@@ -13,6 +13,7 @@ import {
   PrismaUserEmailVerificationTokenRepository,
   PrismaUserRepository,
   PrismaUserSessionRepository,
+  PrismaRegistrationUnitOfWork,
   createCompositeLogger,
   createNodemailerMailer,
   createPinoLogger,
@@ -33,6 +34,7 @@ const userRepository = new PrismaUserRepository();
 const userSessionRepository = new PrismaUserSessionRepository();
 const emailVerificationTokens = new PrismaUserEmailVerificationTokenRepository();
 const passwordResetTokens = new PrismaPasswordResetTokenRepository();
+const registrationUnitOfWork = new PrismaRegistrationUnitOfWork();
 const passwordHasher = new Argon2PasswordHasher();
 const requireEmailVerification =
   process.env.FEATURE_REQUIRE_EMAIL_VERIFICATION?.toLowerCase() === 'true';
@@ -90,11 +92,10 @@ const passwordResetConfirmLogger = createAuthFlowLogger('auth/reset/confirm');
 
 export const registerUserService = new RegisterUserService(
   userRepository,
-  userSessionRepository,
   passwordHasher,
-  emailVerificationTokens,
   mailer,
   registerLogger,
+  registrationUnitOfWork,
   {
     // Feature flags toggle post-registration requirements without touching the page or
     // action logic.  Passing them in via the options object makes the expectations
