@@ -16,7 +16,7 @@ export class MissingAuthFormTokenSecretError extends Error {
   }
 }
 
-const FORM_TOKEN_PREFIX = 'mre.auth';
+const FORM_TOKEN_PREFIX = 'mre-auth';
 
 const FORM_TOKEN_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const logger = applicationLogger.withContext({ route: 'auth/formTokens' });
@@ -58,7 +58,8 @@ const getFormTokenSecret = () => {
 };
 
 export const generateAuthFormToken = (context: AuthFormContext) => {
-  const issuedAt = new Date().toISOString();
+  const issuedAtMs = Date.now();
+  const issuedAt = issuedAtMs.toString(10);
   const nonce = randomUUID();
   const secret = getFormTokenSecret();
 
@@ -71,10 +72,11 @@ export const generateAuthFormToken = (context: AuthFormContext) => {
 
 export const describeAuthFormToken = (token: string) => {
   const [prefix, context, issuedAt] = token.split('.', 3);
+  const issuedAtMs = Number.parseInt(issuedAt ?? '', 10);
   return {
     prefix,
     context: context as AuthFormContext | undefined,
-    issuedAt,
+    issuedAtMs: Number.isNaN(issuedAtMs) ? undefined : issuedAtMs,
   };
 };
 
@@ -124,7 +126,12 @@ export const validateAuthFormToken = (
     return { ok: false, reason: 'unexpected-context' };
   }
 
-  const issuedAt = new Date(issuedAtIso);
+  const issuedAtMs = Number.parseInt(issuedAtIso, 10);
+  if (!Number.isFinite(issuedAtMs)) {
+    return { ok: false, reason: 'malformed' };
+  }
+
+  const issuedAt = new Date(issuedAtMs);
 
   if (Number.isNaN(issuedAt.getTime())) {
     return { ok: false, reason: 'malformed' };
