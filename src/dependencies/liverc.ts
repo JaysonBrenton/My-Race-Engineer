@@ -1,8 +1,10 @@
-import { LiveRcImportService } from '@core/app';
+import { LiveRcImportPlanService, LiveRcImportService } from '@core/app';
+import { HttpLiveRcClient } from '@core/app/connectors/liverc/client';
 import {
   LiveRcHttpClient,
   PrismaEntrantRepository,
   PrismaEventRepository,
+  PrismaImportPlanRepository,
   PrismaLapRepository,
   PrismaRaceClassRepository,
   PrismaSessionRepository,
@@ -11,15 +13,17 @@ import {
 
 import { applicationLogger } from '@/dependencies/logger';
 
-const liveRcClient = new LiveRcHttpClient();
+const liveRcJsonClient = new LiveRcHttpClient();
+const liveRcHtmlClient = new HttpLiveRcClient();
 const eventRepository = new PrismaEventRepository();
 const raceClassRepository = new PrismaRaceClassRepository();
 const sessionRepository = new PrismaSessionRepository();
 const entrantRepository = new PrismaEntrantRepository();
 const lapRepository = new PrismaLapRepository();
+const importPlanRepository = new PrismaImportPlanRepository();
 
 export const liveRcImportService = new LiveRcImportService({
-  liveRcClient,
+  liveRcClient: liveRcJsonClient,
   eventRepository,
   raceClassRepository,
   sessionRepository,
@@ -28,13 +32,20 @@ export const liveRcImportService = new LiveRcImportService({
   logger: applicationLogger,
 });
 
+export const liveRcImportPlanService = new LiveRcImportPlanService({
+  client: liveRcHtmlClient,
+  repository: importPlanRepository,
+});
+
 export const liveRcDependencies = {
-  liveRcClient,
+  liveRcJsonClient,
+  liveRcHtmlClient,
   eventRepository,
   raceClassRepository,
   sessionRepository,
   entrantRepository,
   lapRepository,
+  importPlanRepository,
   logger: applicationLogger,
 };
 
