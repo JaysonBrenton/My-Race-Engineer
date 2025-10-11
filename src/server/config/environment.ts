@@ -1,3 +1,11 @@
+/**
+ * Filename: src/server/config/environment.ts
+ * Purpose: Parse and validate process environment variables into strongly typed configuration objects.
+ * Author: Jayson Brenton
+ * Date: 2025-10-11
+ * License: MIT
+ */
+
 import {
   canonicaliseOrigin,
   isAbsoluteUrl,
@@ -17,6 +25,7 @@ export type EnvironmentConfig = {
   features: {
     requireEmailVerification: boolean;
     requireAdminApproval: boolean;
+    inviteOnly: boolean;
   };
 };
 
@@ -105,7 +114,12 @@ const readBooleanFlag = (
     return defaultValue;
   }
 
-  const parsed = parseBooleanFlagValue(raw);
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) {
+    return defaultValue;
+  }
+
+  const parsed = parseBooleanFlagValue(trimmed);
   if (parsed === null) {
     issues.push({ key, message: booleanErrorMessage(key) });
     return defaultValue;
@@ -212,11 +226,17 @@ export const parseEnvironment = (env: Record<string, string | undefined>): Envir
     'FEATURE_REQUIRE_EMAIL_VERIFICATION',
     env.FEATURE_REQUIRE_EMAIL_VERIFICATION,
     issues,
-    false,
+    true,
   );
   const requireAdminApproval = readBooleanFlag(
     'FEATURE_REQUIRE_ADMIN_APPROVAL',
     env.FEATURE_REQUIRE_ADMIN_APPROVAL,
+    issues,
+    false,
+  );
+  const inviteOnly = readBooleanFlag(
+    'FEATURE_INVITE_ONLY',
+    env.FEATURE_INVITE_ONLY,
     issues,
     false,
   );
@@ -251,6 +271,7 @@ export const parseEnvironment = (env: Record<string, string | undefined>): Envir
     features: {
       requireEmailVerification,
       requireAdminApproval,
+      inviteOnly,
     },
   };
 };

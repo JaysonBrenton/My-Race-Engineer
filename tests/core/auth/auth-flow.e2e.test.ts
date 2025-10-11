@@ -1,3 +1,11 @@
+/**
+ * Filename: tests/core/auth/auth-flow.e2e.test.ts
+ * Purpose: Exercise end-to-end auth flows across registration and login domain services.
+ * Author: Jayson Brenton
+ * Date: 2025-10-11
+ * License: MIT
+ */
+
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import test from 'node:test';
@@ -29,6 +37,7 @@ test('registration requires verification before login succeeds when enabled', as
   }
 
   assert.equal(registerResult.nextStep, 'verify-email');
+  assert.equal(registerResult.user.status, 'pending');
   assert.equal(env.registerMailer.sent.length, 1);
   assert.equal(env.verificationTokens.tokens.length, 1);
 
@@ -84,6 +93,7 @@ test('admin approval blocks login until status becomes active', async () => {
   }
 
   assert.equal(registerResult.nextStep, 'await-approval');
+  assert.equal(registerResult.user.status, 'pending');
   assert.equal(env.sessionRepository.createdSessions.length, 0);
 
   const loginWhilePending = await env.loginService.login({

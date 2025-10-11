@@ -1,3 +1,11 @@
+/**
+ * Filename: tests/core/auth/registerUserService.test.ts
+ * Purpose: Validate registration domain service behaviour across feature flag combinations.
+ * Author: Jayson Brenton
+ * Date: 2025-10-11
+ * License: MIT
+ */
+
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import test from 'node:test';

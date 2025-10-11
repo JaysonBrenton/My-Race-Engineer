@@ -1,3 +1,11 @@
+/**
+ * Filename: src/core/app/services/auth/loginUser.ts
+ * Purpose: Authenticate users, enforce policy gates, and mint session tokens for credential logins.
+ * Author: Jayson Brenton
+ * Date: 2025-10-11
+ * License: MIT
+ */
+
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 
 import type { Logger, PasswordHasher, UserRepository, UserSessionRepository } from '@core/app';
@@ -45,6 +53,7 @@ export class LoginUserService {
     private readonly logger: Logger,
     private readonly options: {
       requireEmailVerification: boolean;
+      requireAdminApproval: boolean;
       defaultSessionTtlMs?: number;
       shortSessionTtlMs?: number;
     },
@@ -105,7 +114,7 @@ export class LoginUserService {
       return { ok: false, reason: 'email-not-verified' };
     }
 
-    if (user.status === 'pending') {
+    if (user.status === 'pending' && this.options.requireAdminApproval) {
       // Pending accounts are typically awaiting manual approval.  We downgrade
       // the log level to info because this is an expected control-flow branch.
       this.logger.info('Login blocked because account is pending.', {

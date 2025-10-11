@@ -1,3 +1,11 @@
+/**
+ * Filename: tests/app/auth/form-submission.test.ts
+ * Purpose: Validate auth server action flows for registration and login forms.
+ * Author: Jayson Brenton
+ * Date: 2025-10-11
+ * License: MIT
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -5,6 +13,7 @@ import {
   createRegisterAction,
   type RegisterActionDependencies,
 } from '../../../src/app/(auth)/auth/register/actions.impl';
+import { INITIAL_REGISTER_STATE } from '../../../src/app/(auth)/auth/register/state';
 import {
   createLoginAction,
   type LoginActionDependencies,
@@ -439,6 +448,55 @@ test('registerAction redirects with verify-email-awaiting-approval when both che
     assert.ok(prefill);
     assert.deepEqual(JSON.parse(prefill), { email: 'user@example.com' });
   }
+});
+
+test('registerAction redirects with verify-email when only verification is required', async () => {
+  const { deps } = createRegisterDeps({
+    registerUserService: {
+      register: async () => ({
+        ok: true as const,
+        nextStep: 'verify-email' as const,
+        user: {
+          id: 'user-verify',
+          name: 'Example User',
+          email: 'user@example.com',
+          status: 'pending',
+          passwordHash: 'hash',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          emailVerifiedAt: null,
+        },
+      }),
+    },
+  });
+  const registerAction = createRegisterAction(deps);
+  const formData = new FormData();
+  formData.set('name', 'Example User');
+  formData.set('email', 'user@example.com');
+  formData.set('password', 'Str0ngPassword!23');
+  formData.set('confirmPassword', 'Str0ngPassword!23');
+  formData.set('formToken', 'token');
+
+  try {
+    await registerAction(formData);
+    assert.fail('Expected registration action to redirect for email verification.');
+  } catch (error) {
+    assert.ok(error instanceof RedirectCaptured);
+    const url = new URL(`https://app.local${error.location}`);
+    assert.equal(url.pathname, '/auth/login');
+    assert.equal(url.searchParams.get('status'), 'verify-email');
+    const prefill = url.searchParams.get('prefill');
+    assert.ok(prefill);
+    assert.deepEqual(JSON.parse(prefill), { email: 'user@example.com' });
+  }
+});
+
+test('initial register state emphasises verification without approval language', () => {
+  assert.ok(
+    INITIAL_REGISTER_STATE.status.message.toLowerCase().includes('verification'),
+    'initial message should mention verification',
+  );
+  assert.equal(/approval/i.test(INITIAL_REGISTER_STATE.status.message), false);
 });
 
 test('loginAction redirects back to the form when the token is invalid', async () => {

@@ -1,7 +1,16 @@
+/**
+ * Filename: src/app/api/dev/auth-debug/route.ts
+ * Purpose: Provide development diagnostics for auth configuration and feature flag states.
+ * Author: Jayson Brenton
+ * Date: 2025-10-11
+ * License: MIT
+ */
+
 import { NextResponse } from 'next/server';
 
 import { parseAllowedOrigins } from '@/core/security/origin';
 import { FORM_TOKEN_TTL_MS } from '@/lib/auth/formTokens';
+import { getEnvironment } from '@/server/config/environment';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,9 +28,8 @@ export function GET() {
   }
 
   const allowedOrigins = parseAllowedOrigins(process.env);
-  const requireEmailVerification =
-    process.env.FEATURE_REQUIRE_EMAIL_VERIFICATION?.toLowerCase() === 'true';
-  const requireAdminApproval = process.env.FEATURE_REQUIRE_ADMIN_APPROVAL?.toLowerCase() === 'true';
+  const environment = getEnvironment();
+  const { requireEmailVerification, requireAdminApproval, inviteOnly } = environment.features;
 
   return NextResponse.json(
     {
@@ -30,6 +38,7 @@ export function GET() {
       tokenTtlMs: FORM_TOKEN_TTL_MS,
       requireEmailVerification,
       requireAdminApproval,
+      inviteOnly,
     },
     { status: 200, headers: baseHeaders },
   );

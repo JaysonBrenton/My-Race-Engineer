@@ -2,7 +2,7 @@
  * Filename: src/app/(auth)/auth/register/page.tsx
  * Purpose: Render the registration form with safe prefills, inline error states, and cache disabling.
  * Author: Jayson Brenton
- * Date: 2025-03-18
+ * Date: 2025-10-11
  * License: MIT License
  */
 
@@ -28,7 +28,7 @@ import { registerAction } from './actions';
 
 const PAGE_TITLE = 'Create your My Race Engineer account';
 const PAGE_DESCRIPTION =
-  'Bring your team onboard with secure access to telemetry dashboards and collaboration tools.';
+  'Self-serve registration with email verification keeps your team ready for telemetry insights.';
 
 export function generateMetadata(): Metadata {
   // Registration is SEO-addressable because we link to it from marketing content. We
@@ -156,8 +156,8 @@ export default function RegisterPage({ searchParams }: RegisterPageProps) {
             Create your account
           </h1>
           <p className={styles.description}>
-            Bring your team onboard with secure access to telemetry dashboards and collaboration
-            tools.
+            Create an account and verify your email to start analysing pace, consistency, and race
+            trends with your crew.
           </p>
         </header>
         <form

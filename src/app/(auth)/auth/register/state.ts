@@ -2,7 +2,7 @@
  * Filename: src/app/(auth)/auth/register/state.ts
  * Purpose: Share registration form state shapes and helpers across server actions, routes, and UI.
  * Author: Jayson Brenton
- * Date: 2025-03-18
+ * Date: 2025-10-11
  * License: MIT License
  */
 
@@ -35,7 +35,8 @@ export type RegisterActionState = {
 export const INITIAL_REGISTER_STATE: RegisterActionState = {
   status: {
     tone: 'info',
-    message: 'Fill out the fields below to create your account.',
+    message:
+      'Fill out the fields below to create your account. We will email a verification link to finish setup.',
   },
   values: {
     name: '',

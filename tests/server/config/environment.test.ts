@@ -1,3 +1,11 @@
+/**
+ * Filename: tests/server/config/environment.test.ts
+ * Purpose: Ensure environment configuration parsing and validation behave as expected.
+ * Author: Jayson Brenton
+ * Date: 2025-10-11
+ * License: MIT
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -17,6 +25,7 @@ test('parseEnvironment returns canonicalised configuration', () => {
     NEXT_PUBLIC_BASE_URL: 'https://public.example.com',
     FEATURE_REQUIRE_EMAIL_VERIFICATION: '1',
     FEATURE_REQUIRE_ADMIN_APPROVAL: '0',
+    FEATURE_INVITE_ONLY: 'false',
   });
 
   assert.equal(config.appUrl.toString(), 'https://example.com/');
@@ -26,6 +35,7 @@ test('parseEnvironment returns canonicalised configuration', () => {
   assert.equal(config.nextPublicBaseUrl?.toString(), 'https://public.example.com/');
   assert.equal(config.features.requireEmailVerification, true);
   assert.equal(config.features.requireAdminApproval, false);
+  assert.equal(config.features.inviteOnly, false);
 });
 
 test('parseEnvironment falls back to APP_URL origin when ALLOWED_ORIGINS is missing', () => {
@@ -37,6 +47,9 @@ test('parseEnvironment falls back to APP_URL origin when ALLOWED_ORIGINS is miss
   assert.deepEqual(config.allowedOrigins, ['https://example.com']);
   assert.equal(config.trustProxy, false);
   assert.equal(config.nextPublicBaseUrl, null);
+  assert.equal(config.features.requireEmailVerification, true);
+  assert.equal(config.features.requireAdminApproval, false);
+  assert.equal(config.features.inviteOnly, false);
 });
 
 test('parseEnvironment surfaces validation issues for invalid entries', () => {
