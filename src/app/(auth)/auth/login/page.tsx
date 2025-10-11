@@ -171,6 +171,16 @@ const buildStatusMessage = (
         message:
           'This account has been suspended. Contact support if you believe this is an error.',
       };
+    case 'session-expired':
+      return {
+        tone: 'error' as const,
+        message: 'Your session expired. Please sign in again to continue.',
+      };
+    case 'session-invalid':
+      return {
+        tone: 'error' as const,
+        message: 'Your session is no longer valid. Sign in again to resume.',
+      };
     case 'rate-limited':
       return {
         tone: 'error' as const,
