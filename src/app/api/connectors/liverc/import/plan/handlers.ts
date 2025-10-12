@@ -7,6 +7,7 @@ import { z } from 'zod';
 
 import { liveRcImportPlanService } from '@/dependencies/liverc';
 import { applicationLogger } from '@/dependencies/logger';
+import { liveRcImportPlanStore, type LiveRcImportPlanStore } from '../planStore';
 
 const baseHeaders = {
   'Cache-Control': 'no-store',
@@ -25,11 +26,13 @@ type PlanService = Pick<LiveRcImportPlanService, 'createPlan'>;
 type ResolvedDependencies = {
   service: PlanService;
   logger: Logger;
+  planStore: LiveRcImportPlanStore;
 };
 
 const defaultDependencies: ResolvedDependencies = {
   service: liveRcImportPlanService,
   logger: applicationLogger,
+  planStore: liveRcImportPlanStore,
 };
 
 export type ImportPlanRouteDependencies = Partial<ResolvedDependencies>;
@@ -139,6 +142,29 @@ export const createImportPlanRouteHandlers = (
 
     try {
       const plan = await dependencies.service.createPlan(parsed.data);
+
+      try {
+        await dependencies.planStore.save({ planId: plan.planId, request: parsed.data, plan });
+      } catch (storeError) {
+        requestLogger.error('Failed to persist LiveRC import plan.', {
+          event: 'liverc.importPlan.persistence_failed',
+          outcome: 'failure',
+          planId: plan.planId,
+          error: storeError,
+        });
+
+        return buildJsonResponse(
+          500,
+          {
+            error: {
+              code: 'PLAN_PERSISTENCE_FAILED',
+              message: 'Unable to persist LiveRC import plan.',
+            },
+            requestId,
+          },
+          requestId,
+        );
+      }
 
       requestLogger.info('LiveRC import plan generated.', {
         event: 'liverc.importPlan.success',
