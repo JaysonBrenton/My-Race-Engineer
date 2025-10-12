@@ -78,7 +78,8 @@ export const createImportPlanRouteHandlers = (
     ...overrides,
   };
 
-  const buildRequestLogger = (requestId: string) => withRequestContext(dependencies.logger, { requestId });
+  const buildRequestLogger = (requestId: string) =>
+    withRequestContext(dependencies.logger, { requestId });
 
   const OPTIONS: RouteHandler = () =>
     new Response(null, {

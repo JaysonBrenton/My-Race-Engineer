@@ -158,7 +158,10 @@ export class LiveRcJobQueue {
       });
 
       try {
-        await this.dependencies.repository.markJobFailed(job.jobId, 'LiveRC summary import failed.');
+        await this.dependencies.repository.markJobFailed(
+          job.jobId,
+          'LiveRC summary import failed.',
+        );
       } catch (markError) {
         this.dependencies.logger?.error?.('LiveRC job runner failed to mark job as failed.', {
           event: 'liverc.jobRunner.job_mark_failed',

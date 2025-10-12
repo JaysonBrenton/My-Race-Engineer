@@ -62,11 +62,7 @@ type DriverSummaryDetail = {
 };
 
 const normaliseDriverNameKey = (value: string) =>
-  value
-    .normalize('NFKC')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
+  value.normalize('NFKC').replace(/\s+/g, ' ').trim().toLowerCase();
 
 export class LiveRcSummaryImporter {
   constructor(private readonly dependencies: Dependencies) {}
@@ -94,7 +90,12 @@ export class LiveRcSummaryImporter {
       const sessionRef = this.resolveSessionUrl(summary, baseOrigin);
 
       try {
-        const result = await this.processSession({ summary, sessionRef, eventMeta, eventId: event.id });
+        const result = await this.processSession({
+          summary,
+          sessionRef,
+          eventMeta,
+          eventId: event.id,
+        });
         sessionsImported += result.sessionImported ? 1 : 0;
         resultRowsImported += result.resultRowsImported;
         lapsImported += result.lapsImported;
@@ -220,8 +221,8 @@ export class LiveRcSummaryImporter {
       for (const detail of driverDetailsById.values()) {
         const hasLapOverride = driverLapCounts.has(detail.driver.id);
         const lapsValue = hasLapOverride
-          ? driverLapCounts.get(detail.driver.id) ?? 0
-          : detail.summary.laps ?? null;
+          ? (driverLapCounts.get(detail.driver.id) ?? 0)
+          : (detail.summary.laps ?? null);
 
         await this.dependencies.resultRowRepository.upsertBySessionAndDriver({
           sessionId: session.id,
@@ -277,17 +278,24 @@ export class LiveRcSummaryImporter {
     }
   }
 
-  private deriveSessionSlugContext(sessionSlugSegments: string[]): { roundSlug: string; raceSlug: string } {
+  private deriveSessionSlugContext(sessionSlugSegments: string[]): {
+    roundSlug: string;
+    raceSlug: string;
+  } {
     if (sessionSlugSegments.length <= 2) {
       const fallback = sessionSlugSegments[sessionSlugSegments.length - 1] ?? 'race';
       return { roundSlug: 'main', raceSlug: fallback };
     }
 
     const tail = sessionSlugSegments.slice(2);
-    const raceSlug = tail[tail.length - 1] ?? sessionSlugSegments[sessionSlugSegments.length - 1] ?? 'race';
+    const raceSlug =
+      tail[tail.length - 1] ?? sessionSlugSegments[sessionSlugSegments.length - 1] ?? 'race';
     const roundSlugSource = tail.length > 1 ? tail.slice(0, -1).join('/') : tail[0];
 
-    return { roundSlug: roundSlugSource && roundSlugSource.length > 0 ? roundSlugSource : 'main', raceSlug };
+    return {
+      roundSlug: roundSlugSource && roundSlugSource.length > 0 ? roundSlugSource : 'main',
+      raceSlug,
+    };
   }
 
   private async importSessionLaps(params: {
@@ -345,10 +353,7 @@ export class LiveRcSummaryImporter {
       return { lapsImported: 0, lapsSkipped: 0, driversWithLaps: 0, driverLapCounts: new Map() };
     }
 
-    const grouped = new Map<
-      string,
-      { driverName: string; laps: LiveRcRaceResultLap[] }
-    >();
+    const grouped = new Map<string, { driverName: string; laps: LiveRcRaceResultLap[] }>();
 
     for (const lap of raceResultLaps) {
       const entryId = lap.entryId.trim();
@@ -418,7 +423,11 @@ export class LiveRcSummaryImporter {
 
       lapInputs.sort((a, b) => a.lapNumber - b.lapNumber);
 
-      await this.dependencies.lapRepository.replaceForEntrant(entrant.id, params.session.id, lapInputs);
+      await this.dependencies.lapRepository.replaceForEntrant(
+        entrant.id,
+        params.session.id,
+        lapInputs,
+      );
 
       lapsImported += lapInputs.length;
       if (lapInputs.length > 0) {

@@ -54,11 +54,7 @@ export class PrismaImportPlanRepository implements ImportPlanRepository {
       return null;
     }
 
-    const orConditions = [
-      { sourceEventId: ref },
-      { sourceUrl: ref },
-      { providerEventId: ref },
-    ];
+    const orConditions = [{ sourceEventId: ref }, { sourceUrl: ref }, { providerEventId: ref }];
 
     if (!isLikelyUrl(ref)) {
       for (const candidateUrl of buildCandidateUrls(ref)) {
@@ -131,5 +127,4 @@ export class PrismaImportPlanRepository implements ImportPlanRepository {
       entrantCount,
     };
   }
-
 }

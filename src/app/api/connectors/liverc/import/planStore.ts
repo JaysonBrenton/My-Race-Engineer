@@ -14,10 +14,10 @@ export interface LiveRcImportPlanStore {
 class InMemoryLiveRcImportPlanStore implements LiveRcImportPlanStore {
   private plans = new Map<string, StoredImportPlan>();
 
-  async save(entry: StoredImportPlan): Promise<void> {
+  save(entry: StoredImportPlan): Promise<void> {
     const trimmedPlanId = entry.planId.trim();
     if (!trimmedPlanId) {
-      return;
+      return Promise.resolve();
     }
 
     this.plans.set(trimmedPlanId, {
@@ -25,15 +25,16 @@ class InMemoryLiveRcImportPlanStore implements LiveRcImportPlanStore {
       request: entry.request,
       plan: entry.plan,
     });
+    return Promise.resolve();
   }
 
-  async get(planId: string): Promise<StoredImportPlan | null> {
+  get(planId: string): Promise<StoredImportPlan | null> {
     const trimmedPlanId = planId.trim();
     if (!trimmedPlanId) {
-      return null;
+      return Promise.resolve(null);
     }
 
-    return this.plans.get(trimmedPlanId) ?? null;
+    return Promise.resolve(this.plans.get(trimmedPlanId) ?? null);
   }
 }
 

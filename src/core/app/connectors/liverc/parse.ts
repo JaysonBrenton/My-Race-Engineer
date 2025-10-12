@@ -158,8 +158,11 @@ export function parseSessionResultsFromHtml(
     root.querySelector("meta[property='og:url']")?.getAttribute('content') ??
     null;
 
-  const canonicalUrl = canonicalCandidate ? normaliseAbsoluteUrl(canonicalCandidate, fallbackUrl) : fallbackUrl ?? null;
-  const sessionName = normaliseText(root.querySelector('h1')?.textContent ?? '') || (canonicalUrl ?? '');
+  const canonicalUrl = canonicalCandidate
+    ? normaliseAbsoluteUrl(canonicalCandidate, fallbackUrl)
+    : (fallbackUrl ?? null);
+  const sessionName =
+    normaliseText(root.querySelector('h1')?.textContent ?? '') || (canonicalUrl ?? '');
 
   const table = findResultsTable(root);
   if (!table) {
@@ -206,18 +209,20 @@ export function parseSessionResultsFromHtml(
 function findNearestHeading(element: ParsedHTMLElement): ParsedHTMLElement | null {
   let current: ParsedHTMLElement | null = element;
   while (current) {
-    let sibling = current.previousElementSibling as ParsedHTMLElement | null;
+    let sibling: ParsedHTMLElement | null | undefined = current.previousElementSibling;
     while (sibling) {
-      if (isHeading(sibling)) {
-        return sibling;
+      if (sibling instanceof ParsedHTMLElement) {
+        if (isHeading(sibling)) {
+          return sibling;
+        }
+
+        const nested = sibling.querySelector(HEADING_SELECTOR);
+        if (nested instanceof ParsedHTMLElement) {
+          return nested;
+        }
       }
 
-      const nested = sibling.querySelector(HEADING_SELECTOR) as ParsedHTMLElement | null;
-      if (nested) {
-        return nested;
-      }
-
-      sibling = sibling.previousElementSibling as ParsedHTMLElement | null;
+      sibling = sibling.previousElementSibling;
     }
 
     const parentNode: unknown = current.parentNode;
@@ -312,11 +317,21 @@ function normaliseHeaderKey(raw: string | null | undefined): string | null {
     return 'heat';
   }
 
-  if (value.includes('time') || value.includes('finish') || value.includes('completed') || value.includes('done')) {
+  if (
+    value.includes('time') ||
+    value.includes('finish') ||
+    value.includes('completed') ||
+    value.includes('done')
+  ) {
     return 'completed';
   }
 
-  if (value.includes('race') || value.includes('event') || value.includes('title') || value.includes('session')) {
+  if (
+    value.includes('race') ||
+    value.includes('event') ||
+    value.includes('title') ||
+    value.includes('session')
+  ) {
     return 'title';
   }
 
@@ -398,7 +413,10 @@ function parseIsoCandidate(candidate: string | undefined | null): string | undef
     }
   }
 
-  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(normalized) || /[zZ]|[+-]\d{2}:?\d{2}$/.test(normalized)) {
+  if (
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(normalized) ||
+    /[zZ]|[+-]\d{2}:?\d{2}$/.test(normalized)
+  ) {
     const timestamp = Date.parse(normalized);
     if (!Number.isNaN(timestamp)) {
       return new Date(timestamp).toISOString();
@@ -455,7 +473,10 @@ type ResultCellInfo = {
   element: ParsedHTMLElement;
 };
 
-function collectResultCellInfos(row: ParsedHTMLElement, headers: string[]): Map<string, ResultCellInfo> {
+function collectResultCellInfos(
+  row: ParsedHTMLElement,
+  headers: string[],
+): Map<string, ResultCellInfo> {
   const infos = new Map<string, ResultCellInfo>();
   const cells = row.querySelectorAll('td');
 
