@@ -16,6 +16,7 @@ type RepositoryState = ImportPlanEventState | null;
 const createService = (options: {
   client?: Record<string, unknown>;
   repositoryState?: RepositoryState;
+  includeExistingEvents?: boolean;
 } = {}) => {
   type ServiceDependencies = ConstructorParameters<typeof LiveRcImportPlanService>[0];
 
@@ -43,7 +44,10 @@ const createService = (options: {
   const client = { ...defaultClient, ...(options.client ?? {}) } as ServiceDependencies['client'];
   const repository = defaultRepository as ServiceDependencies['repository'];
 
-  return new LiveRcImportPlanService({ client, repository });
+  return new LiveRcImportPlanService(
+    { client, repository },
+    { includeExistingEvents: options.includeExistingEvents },
+  );
 };
 
 test('LiveRC import plan service marks new events and estimates counts via heuristics', async () => {
@@ -75,7 +79,7 @@ test('LiveRC import plan service reports existing when sessions and laps are pre
     entrantCount: 22,
   };
 
-  const service = createService({ repositoryState });
+  const service = createService({ repositoryState, includeExistingEvents: true });
   const plan = await service.createPlan({ events: [{ eventRef: 'sample-event' }] });
   const item = plan.items[0];
 
@@ -83,6 +87,26 @@ test('LiveRC import plan service reports existing when sessions and laps are pre
   assert.equal(item.counts.sessions, 5);
   assert.ok(item.counts.drivers >= 24, 'expected driver estimate to respect catalogue data');
   assert.ok(item.counts.estimatedLaps >= 480, 'expected lap estimate to respect stored lap count');
+});
+
+test('LiveRC import plan service excludes existing events by default', async () => {
+  const repositoryState: ImportPlanEventState = {
+    event: {
+      id: 'evt-3',
+      source: { eventId: 'sample-event', url: 'https://liverc.com/results/sample-event' },
+      entriesCount: 18,
+      driversCount: 18,
+    },
+    sessionCount: 5,
+    sessionsWithLaps: 5,
+    lapCount: 480,
+    entrantCount: 18,
+  };
+
+  const service = createService({ repositoryState });
+  const plan = await service.createPlan({ events: [{ eventRef: 'sample-event' }] });
+
+  assert.equal(plan.items.length, 0);
 });
 
 test('LiveRC import plan service reports partial coverage when some sessions lack laps', async () => {

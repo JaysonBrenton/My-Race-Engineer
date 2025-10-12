@@ -36,6 +36,10 @@ type Dependencies = {
   repository: ImportPlanRepository;
 };
 
+type PlanServiceOptions = {
+  includeExistingEvents?: boolean;
+};
+
 type SessionHeuristic = {
   classKey: string;
   groupLabel: string;
@@ -50,7 +54,10 @@ type HeuristicSummary = {
 };
 
 export class LiveRcImportPlanService {
-  constructor(private readonly dependencies: Dependencies) {}
+  constructor(
+    private readonly dependencies: Dependencies,
+    private readonly options: PlanServiceOptions = {},
+  ) {}
 
   async createPlan(request: LiveRcImportPlanRequest): Promise<LiveRcImportPlan> {
     const items: LiveRcImportPlanItem[] = [];
@@ -84,10 +91,13 @@ export class LiveRcImportPlanService {
       });
     }
 
+    const includeExisting = this.options.includeExistingEvents ?? false;
+    const filteredItems = includeExisting ? items : items.filter((item) => item.status !== 'EXISTING');
+
     return {
       planId: randomUUID(),
       generatedAt: new Date().toISOString(),
-      items,
+      items: filteredItems,
     };
   }
 }

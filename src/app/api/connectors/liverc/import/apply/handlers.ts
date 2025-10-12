@@ -31,8 +31,8 @@ const baseHeaders = {
   'X-Robots-Tag': 'noindex, nofollow',
 } as const;
 
-export const MAX_EVENTS_PER_PLAN = 12;
-export const MAX_TOTAL_ESTIMATED_LAPS = 10_000;
+export const MAX_EVENTS_PER_PLAN = 50;
+export const MAX_TOTAL_ESTIMATED_LAPS = 200_000;
 
 const defaultDependencies: ResolvedDependencies = {
   planService: liveRcImportPlanService,
@@ -75,6 +75,41 @@ const computeTotals = (plan: { items: { counts: { estimatedLaps: number } }[] })
   return { eventCount, estimatedLaps };
 };
 
+const formatInteger = (value: number) => new Intl.NumberFormat('en-US').format(value);
+
+const buildGuardrailMessage = (totals: { eventCount: number; estimatedLaps: number }) => {
+  const eventOverage = Math.max(0, totals.eventCount - MAX_EVENTS_PER_PLAN);
+  const lapOverage = Math.max(0, totals.estimatedLaps - MAX_TOTAL_ESTIMATED_LAPS);
+  const suggestedChunks = Math.max(
+    eventOverage > 0 ? Math.ceil(totals.eventCount / MAX_EVENTS_PER_PLAN) : 1,
+    lapOverage > 0 ? Math.ceil(totals.estimatedLaps / MAX_TOTAL_ESTIMATED_LAPS) : 1,
+  );
+
+  const actions: string[] = [];
+  if (eventOverage > 0) {
+    actions.push(`remove at least ${formatInteger(eventOverage)} event${eventOverage === 1 ? '' : 's'}`);
+  }
+  if (lapOverage > 0) {
+    actions.push(
+      `drop enough high-lap sessions to stay under ${formatInteger(MAX_TOTAL_ESTIMATED_LAPS)} estimated laps`,
+    );
+  }
+
+  let message = 'Selected LiveRC events exceed import guardrails.';
+  if (actions.length > 0) {
+    message += ` Please ${actions.join(' and ')}.`;
+  }
+
+  if (suggestedChunks > 1) {
+    const approxEventsPerChunk = Math.max(1, Math.ceil(totals.eventCount / suggestedChunks));
+    message += ` Or split the plan into ${suggestedChunks} apply jobs of about ${formatInteger(
+      approxEventsPerChunk,
+    )} events each.`;
+  }
+
+  return { message, eventOverage, lapOverage, suggestedChunks: suggestedChunks > 1 ? suggestedChunks : 1 };
+};
+
 export const createImportApplyRouteHandlers = (
   overrides: ImportApplyRouteDependencies = {},
 ): ApplyRouteHandlers => {
@@ -97,6 +132,7 @@ export const createImportApplyRouteHandlers = (
   const POST: RouteHandler = async (request) => {
     const requestId = request.headers.get('x-request-id') ?? randomUUID();
     const requestLogger = buildRequestLogger(requestId);
+    const requestStartedAt = Date.now();
 
     let rawBody: unknown;
     try {
@@ -202,6 +238,7 @@ export const createImportApplyRouteHandlers = (
 
     const totals = computeTotals(plan);
     if (totals.eventCount > MAX_EVENTS_PER_PLAN || totals.estimatedLaps > MAX_TOTAL_ESTIMATED_LAPS) {
+      const guardrailMessage = buildGuardrailMessage(totals);
       requestLogger.warn('LiveRC import plan exceeds guardrails.', {
         event: 'liverc.importApply.guardrails_exceeded',
         outcome: 'rejected',
@@ -211,6 +248,21 @@ export const createImportApplyRouteHandlers = (
           maxEvents: MAX_EVENTS_PER_PLAN,
           maxEstimatedLaps: MAX_TOTAL_ESTIMATED_LAPS,
         },
+        suggestions: {
+          eventOverage: guardrailMessage.eventOverage,
+          lapOverage: guardrailMessage.lapOverage,
+          chunkCount: guardrailMessage.suggestedChunks,
+        },
+      });
+
+      requestLogger.debug('TODO ingest.apply telemetry hook', {
+        event: 'liverc.telemetry.todo',
+        metric: 'ingest.apply',
+        outcome: 'rejected',
+        durationMs: Date.now() - requestStartedAt,
+        planId,
+        eventCount: totals.eventCount,
+        estimatedLaps: totals.estimatedLaps,
       });
 
       return buildJsonResponse(
@@ -218,13 +270,19 @@ export const createImportApplyRouteHandlers = (
         {
           error: {
             code: 'PLAN_GUARDRAILS_EXCEEDED',
-            message: 'Selected LiveRC events exceed import guardrails.',
+            message: guardrailMessage.message,
             details: {
               eventCount: totals.eventCount,
               estimatedLaps: totals.estimatedLaps,
               limits: {
                 maxEvents: MAX_EVENTS_PER_PLAN,
                 maxEstimatedLaps: MAX_TOTAL_ESTIMATED_LAPS,
+              },
+              suggestions: {
+                trimEvents: guardrailMessage.eventOverage > 0 ? guardrailMessage.eventOverage : undefined,
+                trimEstimatedLaps:
+                  guardrailMessage.lapOverage > 0 ? guardrailMessage.lapOverage : undefined,
+                chunkCount: guardrailMessage.suggestedChunks,
               },
             },
           },
@@ -246,6 +304,17 @@ export const createImportApplyRouteHandlers = (
       requestLogger.info('LiveRC import job enqueued from plan.', {
         event: 'liverc.importApply.success',
         outcome: 'accepted',
+        planId,
+        jobId: job.jobId,
+        eventCount: totals.eventCount,
+        estimatedLaps: totals.estimatedLaps,
+      });
+
+      requestLogger.debug('TODO ingest.apply telemetry hook', {
+        event: 'liverc.telemetry.todo',
+        metric: 'ingest.apply',
+        outcome: 'accepted',
+        durationMs: Date.now() - requestStartedAt,
         planId,
         jobId: job.jobId,
         eventCount: totals.eventCount,

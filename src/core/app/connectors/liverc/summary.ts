@@ -127,110 +127,147 @@ export class LiveRcSummaryImporter {
     lapsSkipped: number;
   }> {
     const { summary, sessionRef, eventMeta, eventId } = input;
-    const sessionHtml = await this.dependencies.client.getSessionPage(sessionRef);
-    const sessionResults = parseSessionResultsFromHtml(sessionHtml, sessionRef);
-    const resolvedSessionUrl = sessionResults.canonicalUrl ?? sessionRef;
+    const sessionStartedAt = Date.now();
 
-    const sessionUrl = new URL(resolvedSessionUrl, eventMeta.canonicalUrl);
-    const pathSegments = sessionUrl.pathname.split('/').filter(Boolean);
-    const resultsIndex = pathSegments.indexOf('results');
-
-    if (resultsIndex === -1 || pathSegments.length <= resultsIndex + 2) {
-      throw new Error('LiveRC session URL is missing expected segments.');
-    }
-
-    const eventSlug = pathSegments[resultsIndex + 1] ?? eventMeta.eventSlug;
-    const classSlug = pathSegments[resultsIndex + 2];
-    const sessionSlugSegments = pathSegments.slice(resultsIndex + 1);
-    const sourceSessionId = sessionSlugSegments.join('/');
-
-    const raceClass = await this.dependencies.raceClassRepository.upsertBySource({
+    this.dependencies.logger?.debug?.('TODO ingest.session.start telemetry hook', {
+      event: 'liverc.telemetry.todo',
+      metric: 'ingest.session.start',
+      sessionRef,
       eventId,
-      classCode: classSlug,
-      sourceUrl: `${sessionUrl.origin}/results/${eventSlug}/${classSlug}`,
-      name: summary.className,
+      className: summary.className,
+      sessionType: summary.type,
     });
 
-    const session = await this.dependencies.sessionRepository.upsertBySource({
-      eventId,
-      raceClassId: raceClass.id,
-      sourceSessionId,
-      sourceUrl: sessionUrl.toString(),
-      name: summary.title || sessionResults.sessionName,
-      scheduledStart: parseOptionalDate(summary.completedAt),
-    });
+    try {
+      const sessionHtml = await this.dependencies.client.getSessionPage(sessionRef);
+      const sessionResults = parseSessionResultsFromHtml(sessionHtml, sessionRef);
+      const resolvedSessionUrl = sessionResults.canonicalUrl ?? sessionRef;
 
-    const driverLookupByKey = new Map<string, DriverSummaryDetail>();
-    const driverDetailsById = new Map<string, DriverSummaryDetail>();
+      const sessionUrl = new URL(resolvedSessionUrl, eventMeta.canonicalUrl);
+      const pathSegments = sessionUrl.pathname.split('/').filter(Boolean);
+      const resultsIndex = pathSegments.indexOf('results');
 
-    for (const row of sessionResults.resultRows) {
-      const driverName = row.driverName.trim();
-      if (!driverName) {
-        continue;
+      if (resultsIndex === -1 || pathSegments.length <= resultsIndex + 2) {
+        throw new Error('LiveRC session URL is missing expected segments.');
       }
 
-      const driver = await this.dependencies.driverRepository.upsertByDisplayName({
-        displayName: driverName,
+      const eventSlug = pathSegments[resultsIndex + 1] ?? eventMeta.eventSlug;
+      const classSlug = pathSegments[resultsIndex + 2];
+      const sessionSlugSegments = pathSegments.slice(resultsIndex + 1);
+      const sourceSessionId = sessionSlugSegments.join('/');
+
+      const raceClass = await this.dependencies.raceClassRepository.upsertBySource({
+        eventId,
+        classCode: classSlug,
+        sourceUrl: `${sessionUrl.origin}/results/${eventSlug}/${classSlug}`,
+        name: summary.className,
       });
 
-      const key = normaliseDriverNameKey(driverName);
-      const detail = driverLookupByKey.get(key) ?? { driver, summary: row };
-      if (!driverLookupByKey.has(key)) {
-        driverLookupByKey.set(key, detail);
+      const session = await this.dependencies.sessionRepository.upsertBySource({
+        eventId,
+        raceClassId: raceClass.id,
+        sourceSessionId,
+        sourceUrl: sessionUrl.toString(),
+        name: summary.title || sessionResults.sessionName,
+        scheduledStart: parseOptionalDate(summary.completedAt),
+      });
+
+      const driverLookupByKey = new Map<string, DriverSummaryDetail>();
+      const driverDetailsById = new Map<string, DriverSummaryDetail>();
+
+      for (const row of sessionResults.resultRows) {
+        const driverName = row.driverName.trim();
+        if (!driverName) {
+          continue;
+        }
+
+        const driver = await this.dependencies.driverRepository.upsertByDisplayName({
+          displayName: driverName,
+        });
+
+        const key = normaliseDriverNameKey(driverName);
+        const detail = driverLookupByKey.get(key) ?? { driver, summary: row };
+        if (!driverLookupByKey.has(key)) {
+          driverLookupByKey.set(key, detail);
+        }
+
+        driverDetailsById.set(driver.id, detail);
       }
 
-      driverDetailsById.set(driver.id, detail);
-    }
+      const { roundSlug, raceSlug } = this.deriveSessionSlugContext(sessionSlugSegments);
 
-    const { roundSlug, raceSlug } = this.deriveSessionSlugContext(sessionSlugSegments);
-
-    const lapImport = await this.importSessionLaps({
-      sessionHtml,
-      sessionUrl,
-      session,
-      raceClass,
-      driverLookupByKey,
-      eventSlug,
-      classSlug,
-      roundSlug,
-      raceSlug,
-    });
-
-    const driverLapCounts = lapImport.driverLapCounts;
-
-    for (const detail of driverDetailsById.values()) {
-      const hasLapOverride = driverLapCounts.has(detail.driver.id);
-      const lapsValue = hasLapOverride
-        ? driverLapCounts.get(detail.driver.id) ?? 0
-        : detail.summary.laps ?? null;
-
-      await this.dependencies.resultRowRepository.upsertBySessionAndDriver({
-        sessionId: session.id,
-        driverId: detail.driver.id,
-        position: detail.summary.position ?? null,
-        carNumber: detail.summary.carNumber ?? null,
-        laps: lapsValue,
-        totalTimeMs: detail.summary.totalTimeMs ?? null,
-        behindMs: detail.summary.behindMs ?? null,
-        fastestLapMs: detail.summary.fastestLapMs ?? null,
-        fastestLapNum: detail.summary.fastestLapNum ?? null,
-        avgLapMs: detail.summary.avgLapMs ?? null,
-        avgTop5Ms: detail.summary.avgTop5Ms ?? null,
-        avgTop10Ms: detail.summary.avgTop10Ms ?? null,
-        avgTop15Ms: detail.summary.avgTop15Ms ?? null,
-        top3ConsecMs: detail.summary.top3ConsecMs ?? null,
-        stdDevMs: detail.summary.stdDevMs ?? null,
-        consistencyPct: detail.summary.consistencyPct ?? null,
+      const lapImport = await this.importSessionLaps({
+        sessionHtml,
+        sessionUrl,
+        session,
+        raceClass,
+        driverLookupByKey,
+        eventSlug,
+        classSlug,
+        roundSlug,
+        raceSlug,
       });
-    }
 
-    return {
-      sessionImported: true,
-      resultRowsImported: driverDetailsById.size,
-      lapsImported: lapImport.lapsImported,
-      driversWithLaps: lapImport.driversWithLaps,
-      lapsSkipped: lapImport.lapsSkipped,
-    };
+      const driverLapCounts = lapImport.driverLapCounts;
+
+      for (const detail of driverDetailsById.values()) {
+        const hasLapOverride = driverLapCounts.has(detail.driver.id);
+        const lapsValue = hasLapOverride
+          ? driverLapCounts.get(detail.driver.id) ?? 0
+          : detail.summary.laps ?? null;
+
+        await this.dependencies.resultRowRepository.upsertBySessionAndDriver({
+          sessionId: session.id,
+          driverId: detail.driver.id,
+          position: detail.summary.position ?? null,
+          carNumber: detail.summary.carNumber ?? null,
+          laps: lapsValue,
+          totalTimeMs: detail.summary.totalTimeMs ?? null,
+          behindMs: detail.summary.behindMs ?? null,
+          fastestLapMs: detail.summary.fastestLapMs ?? null,
+          fastestLapNum: detail.summary.fastestLapNum ?? null,
+          avgLapMs: detail.summary.avgLapMs ?? null,
+          avgTop5Ms: detail.summary.avgTop5Ms ?? null,
+          avgTop10Ms: detail.summary.avgTop10Ms ?? null,
+          avgTop15Ms: detail.summary.avgTop15Ms ?? null,
+          top3ConsecMs: detail.summary.top3ConsecMs ?? null,
+          stdDevMs: detail.summary.stdDevMs ?? null,
+          consistencyPct: detail.summary.consistencyPct ?? null,
+        });
+      }
+
+      const result = {
+        sessionImported: true,
+        resultRowsImported: driverDetailsById.size,
+        lapsImported: lapImport.lapsImported,
+        driversWithLaps: lapImport.driversWithLaps,
+        lapsSkipped: lapImport.lapsSkipped,
+      };
+
+      this.dependencies.logger?.debug?.('TODO ingest.session.finish telemetry hook', {
+        event: 'liverc.telemetry.todo',
+        metric: 'ingest.session.finish',
+        outcome: 'success',
+        sessionRef,
+        eventId,
+        durationMs: Date.now() - sessionStartedAt,
+        counts: result,
+      });
+
+      return result;
+    } catch (error) {
+      this.dependencies.logger?.debug?.('TODO ingest.session.finish telemetry hook', {
+        event: 'liverc.telemetry.todo',
+        metric: 'ingest.session.finish',
+        outcome: 'failure',
+        sessionRef,
+        eventId,
+        durationMs: Date.now() - sessionStartedAt,
+        error,
+      });
+
+      throw error;
+    }
   }
 
   private deriveSessionSlugContext(sessionSlugSegments: string[]): { roundSlug: string; raceSlug: string } {
