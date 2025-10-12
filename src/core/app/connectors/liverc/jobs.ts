@@ -1,3 +1,9 @@
+/**
+ * Author: Jayson Brenton
+ * Date: 2025-10-12
+ * Purpose: Permit debug-level logging in LiveRC job pipeline without behavior change.
+ */
+
 import { createHash } from 'node:crypto';
 
 import type { Logger } from '@core/app/ports/logger';
@@ -17,7 +23,7 @@ type SummaryImporter = Pick<LiveRcSummaryImporter, 'ingestEventSummary'>;
 export type LiveRcJobQueueDependencies = {
   repository: ImportJobRepository;
   summaryImporter: SummaryImporter;
-  logger?: Pick<Logger, 'error' | 'info' | 'warn'>;
+  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>;
 };
 
 export type EnqueueJobItemInput = {
