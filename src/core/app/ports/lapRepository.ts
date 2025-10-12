@@ -4,6 +4,7 @@ export type LapUpsertInput = {
   id: string;
   entrantId: string;
   sessionId: string;
+  driverId?: string | null;
   lapNumber: number;
   lapTimeMs: number;
 };

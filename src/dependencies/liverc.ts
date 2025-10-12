@@ -40,6 +40,8 @@ const liveRcSummaryImporter = new LiveRcSummaryImporter({
   sessionRepository,
   driverRepository,
   resultRowRepository,
+  entrantRepository,
+  lapRepository,
   logger: applicationLogger,
 });
 

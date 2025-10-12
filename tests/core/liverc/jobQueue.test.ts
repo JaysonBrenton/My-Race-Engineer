@@ -70,7 +70,7 @@ test('LiveRC job queue processes event items and updates counts', async () => {
   const summaryImporter: StubSummaryImporter = {
     async ingestEventSummary() {
       importerCalls += 1;
-      return { sessionsImported: 2, resultRowsImported: 4 };
+      return { sessionsImported: 2, resultRowsImported: 4, lapsImported: 8, driversWithLaps: 4, lapsSkipped: 0 };
     },
   };
 
@@ -91,7 +91,7 @@ test('LiveRC job queue processes event items and updates counts', async () => {
     itemId: 'item-1',
     state: 'SUCCEEDED',
     message: null,
-    counts: { sessionsImported: 2, resultRowsImported: 4 },
+    counts: { sessionsImported: 2, resultRowsImported: 4, lapsImported: 8, driversWithLaps: 4, lapsSkipped: 0 },
   });
   assert.ok(progressUpdates.some((entry) => entry.jobId === 'job-1' && entry.progress === 100));
   assert.equal(repositoryState.markedSucceeded, 1);

@@ -8,6 +8,10 @@ import type {
   DriverUpsertInput,
   EventRepository,
   EventUpsertInput,
+  EntrantRepository,
+  EntrantUpsertInput,
+  LapRepository,
+  LapUpsertInput,
   RaceClassRepository,
   RaceClassUpsertInput,
   ResultRowRepository,
@@ -15,7 +19,7 @@ import type {
   SessionRepository,
   SessionUpsertInput,
 } from '../../../src/core/app';
-import type { Driver, Event, RaceClass, ResultRow, Session } from '../../../src/core/domain';
+import type { Driver, Entrant, Event, RaceClass, ResultRow, Session } from '../../../src/core/domain';
 import { LiveRcSummaryImporter } from '../../../src/core/app';
 
 const fixturesDir = path.join(__dirname, '..', '..', '..', 'fixtures', 'liverc', 'html');
@@ -33,6 +37,8 @@ type StoredSession = Identified<Session>;
 type StoredDriver = Identified<Driver>;
 
 type StoredResultRow = Identified<ResultRow>;
+
+type StoredEntrant = Identified<Entrant>;
 
 class InMemoryEventRepository implements EventRepository {
   private readonly bySource = new Map<string, StoredEvent>();
@@ -252,6 +258,139 @@ class InMemoryDriverRepository implements DriverRepository {
   }
 }
 
+class InMemoryEntrantRepository implements EntrantRepository {
+  private readonly byId = new Map<string, StoredEntrant>();
+
+  private readonly bySourceKey = new Map<string, StoredEntrant>();
+
+  private idCounter = 1;
+
+  async getById(id: string): Promise<Entrant | null> {
+    return this.byId.get(id) ?? null;
+  }
+
+  async findBySourceEntrantId(params: {
+    eventId: string;
+    raceClassId: string;
+    sessionId: string;
+    sourceEntrantId: string;
+  }): Promise<Entrant | null> {
+    return this.bySourceKey.get(this.buildKey(params)) ?? null;
+  }
+
+  async listBySession(sessionId: string): Promise<Entrant[]> {
+    return Array.from(this.byId.values()).filter((entrant) => entrant.sessionId === sessionId);
+  }
+
+  async upsertBySource(input: EntrantUpsertInput): Promise<Entrant> {
+    const key = this.buildKey({
+      eventId: input.eventId,
+      raceClassId: input.raceClassId,
+      sessionId: input.sessionId,
+      sourceEntrantId: input.sourceEntrantId ?? '',
+    });
+
+    const existing = this.bySourceKey.get(key);
+    const now = new Date();
+
+    if (existing) {
+      const updated: StoredEntrant = {
+        ...existing,
+        displayName: input.displayName,
+        carNumber: input.carNumber ?? null,
+        source: {
+          entrantId: input.sourceEntrantId ?? existing.source.entrantId ?? null,
+          transponderId: input.sourceTransponderId ?? existing.source.transponderId ?? null,
+        },
+        updatedAt: now,
+      };
+      this.byId.set(updated.id, updated);
+      this.bySourceKey.set(key, updated);
+      return updated;
+    }
+
+    const created: StoredEntrant = {
+      id: `ent-${this.idCounter++}`,
+      eventId: input.eventId,
+      raceClassId: input.raceClassId,
+      sessionId: input.sessionId,
+      displayName: input.displayName,
+      carNumber: input.carNumber ?? null,
+      source: {
+        entrantId: input.sourceEntrantId ?? null,
+        transponderId: input.sourceTransponderId ?? null,
+      },
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.byId.set(created.id, created);
+    this.bySourceKey.set(key, created);
+    return created;
+  }
+
+  private buildKey(params: {
+    eventId: string;
+    raceClassId: string;
+    sessionId: string;
+    sourceEntrantId: string;
+  }) {
+    return `${params.eventId}:${params.raceClassId}:${params.sessionId}:${params.sourceEntrantId}`;
+  }
+
+  get size(): number {
+    return this.byId.size;
+  }
+
+  get stored(): StoredEntrant[] {
+    return Array.from(this.byId.values());
+  }
+}
+
+class InMemoryLapRepository implements LapRepository {
+  private readonly byEntrant = new Map<string, LapUpsertInput[]>();
+
+  async listByEntrant(entrantId: string) {
+    const stored = this.byEntrant.get(entrantId) ?? [];
+    return stored.map((lap) => ({
+      id: lap.id,
+      entrantId: lap.entrantId,
+      sessionId: lap.sessionId,
+      lapNumber: lap.lapNumber,
+      lapTime: { milliseconds: lap.lapTimeMs },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }));
+  }
+
+  async replaceForEntrant(
+    entrantId: string,
+    _sessionId: string,
+    laps: ReadonlyArray<LapUpsertInput>,
+  ): Promise<void> {
+    this.byEntrant.set(entrantId, laps.map((lap) => ({ ...lap })));
+  }
+
+  getLapInputs(entrantId: string): LapUpsertInput[] {
+    return this.byEntrant.get(entrantId) ?? [];
+  }
+
+  get size(): number {
+    return this.byEntrant.size;
+  }
+
+  get totalLapCount(): number {
+    let total = 0;
+    for (const laps of this.byEntrant.values()) {
+      total += laps.length;
+    }
+    return total;
+  }
+
+  get entrants(): string[] {
+    return Array.from(this.byEntrant.keys());
+  }
+}
+
 class InMemoryResultRowRepository implements ResultRowRepository {
   private readonly byKey = new Map<string, StoredResultRow>();
 
@@ -320,6 +459,37 @@ const createSummaryImporter = async () => {
     ['https://www.liverc.com/results/sample-event/pro-truggy/main/a-main', truggySessionHtml],
   ]);
 
+  const jsonByUrl = new Map<string, unknown>([
+    [
+      'https://www.liverc.com/results/sample-event/pro-buggy/main/a-main.json',
+      {
+        event_id: 'sample-event',
+        class_id: 'pro-buggy',
+        race_id: 'a-main',
+        laps: [
+          { entry_id: 'ryan-maifield', driver_name: 'Ryan Maifield', lap: 1, lap_time: 29.123 },
+          { entry_id: 'ryan-maifield', driver_name: 'Ryan Maifield', lap: 2, lap_time: 29.321 },
+          { entry_id: 'spencer-rivkin', driver_name: 'Spencer Rivkin', lap: 1, lap_time: 29.45 },
+          { entry_id: 'spencer-rivkin', driver_name: 'Spencer Rivkin', lap: 2, lap_time: 29.632 },
+        ],
+      },
+    ],
+    [
+      'https://www.liverc.com/results/sample-event/pro-truggy/main/a-main.json',
+      {
+        event_id: 'sample-event',
+        class_id: 'pro-truggy',
+        race_id: 'a-main',
+        laps: [
+          { entry_id: 'dakotah-phend', driver_name: 'Dakotah Phend', lap: 1, lap_time: 32.0 },
+          { entry_id: 'dakotah-phend', driver_name: 'Dakotah Phend', lap: 2, lap_time: 32.204 },
+          { entry_id: 'ty-tessmann', driver_name: 'Ty Tessmann', lap: 1, lap_time: 32.41 },
+          { entry_id: 'ty-tessmann', driver_name: 'Ty Tessmann', lap: 2, lap_time: 32.598 },
+        ],
+      },
+    ],
+  ]);
+
   const client = {
     async getEventOverview(url: string) {
       return htmlByUrl.get(url) ?? eventHtml;
@@ -332,11 +502,21 @@ const createSummaryImporter = async () => {
       }
       return match;
     },
-    resolveJsonUrlFromHtml() {
+    resolveJsonUrlFromHtml(html: string) {
+      if (html.includes('pro-buggy')) {
+        return 'https://www.liverc.com/results/sample-event/pro-buggy/main/a-main.json';
+      }
+      if (html.includes('pro-truggy')) {
+        return 'https://www.liverc.com/results/sample-event/pro-truggy/main/a-main.json';
+      }
       return null;
     },
-    async fetchJson() {
-      throw new Error('Not implemented in summary importer test client.');
+    async fetchJson(url: string) {
+      const data = jsonByUrl.get(url);
+      if (!data) {
+        throw new Error(`Missing fixture for JSON URL: ${url}`);
+      }
+      return data;
     },
   };
 
@@ -345,6 +525,8 @@ const createSummaryImporter = async () => {
   const sessionRepository = new InMemorySessionRepository();
   const driverRepository = new InMemoryDriverRepository();
   const resultRowRepository = new InMemoryResultRowRepository();
+  const entrantRepository = new InMemoryEntrantRepository();
+  const lapRepository = new InMemoryLapRepository();
 
   const importer = new LiveRcSummaryImporter({
     client,
@@ -353,6 +535,8 @@ const createSummaryImporter = async () => {
     sessionRepository,
     driverRepository,
     resultRowRepository,
+    entrantRepository,
+    lapRepository,
   });
 
   return {
@@ -362,28 +546,55 @@ const createSummaryImporter = async () => {
     sessionRepository,
     driverRepository,
     resultRowRepository,
+    entrantRepository,
+    lapRepository,
   };
 };
 
-test('LiveRC summary importer ingests sessions and result rows idempotently', async () => {
-  const { importer, eventRepository, raceClassRepository, sessionRepository, driverRepository, resultRowRepository } =
-    await createSummaryImporter();
+test('LiveRC summary importer ingests sessions, laps, and result rows idempotently', async () => {
+  const {
+    importer,
+    eventRepository,
+    raceClassRepository,
+    sessionRepository,
+    driverRepository,
+    resultRowRepository,
+    entrantRepository,
+    lapRepository,
+  } = await createSummaryImporter();
 
   const firstRun = await importer.ingestEventSummary('https://www.liverc.com/results/sample-event');
   assert.equal(firstRun.sessionsImported, 2);
   assert.equal(firstRun.resultRowsImported, 4);
+  assert.equal(firstRun.lapsImported, 8);
+  assert.equal(firstRun.driversWithLaps, 4);
+  assert.equal(firstRun.lapsSkipped, 0);
   assert.equal(eventRepository.size, 1);
   assert.equal(raceClassRepository.size, 2);
   assert.equal(sessionRepository.size, 2);
   assert.equal(driverRepository.size, 4);
   assert.equal(resultRowRepository.size, 4);
+  assert.equal(entrantRepository.size, 4);
+  assert.equal(lapRepository.size, 4);
+  assert.equal(lapRepository.totalLapCount, 8);
+
+  const entrantIds = entrantRepository.stored.map((entrant) => entrant.id);
+  for (const entrantId of entrantIds) {
+    assert.equal(lapRepository.getLapInputs(entrantId).length, 2);
+  }
 
   const secondRun = await importer.ingestEventSummary('https://www.liverc.com/results/sample-event');
   assert.equal(secondRun.sessionsImported, 2);
   assert.equal(secondRun.resultRowsImported, 4);
+  assert.equal(secondRun.lapsImported, 8);
+  assert.equal(secondRun.driversWithLaps, 4);
+  assert.equal(secondRun.lapsSkipped, 0);
   assert.equal(eventRepository.size, 1);
   assert.equal(raceClassRepository.size, 2);
   assert.equal(sessionRepository.size, 2);
   assert.equal(driverRepository.size, 4);
   assert.equal(resultRowRepository.size, 4);
+  assert.equal(entrantRepository.size, 4);
+  assert.equal(lapRepository.size, 4);
+  assert.equal(lapRepository.totalLapCount, 8);
 });
