@@ -511,12 +511,12 @@ const createSummaryImporter = async () => {
       }
       return null;
     },
-    async fetchJson(url: string) {
+    async fetchJson<T>(url: string): Promise<T> {
       const data = jsonByUrl.get(url);
       if (!data) {
         throw new Error(`Missing fixture for JSON URL: ${url}`);
       }
-      return data;
+      return data as T;
     },
   };
 
