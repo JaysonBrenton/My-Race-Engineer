@@ -1,3 +1,9 @@
+/**
+ * Author: Jayson Brenton
+ * Date: 2025-10-12
+ * Purpose: Permit debug-level logging in LiveRC job pipeline without behavior change.
+ */
+
 import type {
   DriverRepository,
   EntrantRepository,
@@ -20,6 +26,7 @@ import {
   extractEventMetadataFromHtml,
   parseSessionResultsFromHtml,
   type LiveRcEventSessionSummary,
+  type LiveRcSessionResultRowSummary,
 } from './parse';
 
 export type LiveRcSummaryImportCounts = {
