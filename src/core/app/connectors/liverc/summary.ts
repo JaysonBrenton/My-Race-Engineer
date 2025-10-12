@@ -19,6 +19,7 @@ import type { Logger } from '@core/app/ports/logger';
 
 import type { Driver, RaceClass, Session } from '@core/domain';
 import { mapRaceResultResponse } from '../../liverc/responseMappers';
+import { appendJsonSuffix } from './client';
 import { buildLapId } from './lapId';
 
 import {
@@ -320,8 +321,7 @@ export class LiveRcSummaryImporter {
 
     let jsonUrl = this.dependencies.client.resolveJsonUrlFromHtml(params.sessionHtml);
     if (!jsonUrl) {
-      const trimmed = params.sessionUrl.toString().replace(/\/$/, '');
-      jsonUrl = `${trimmed}.json`;
+      jsonUrl = appendJsonSuffix(params.sessionUrl.toString());
     }
 
     let raceResultLaps: LiveRcRaceResultLap[] = [];

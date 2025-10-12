@@ -423,7 +423,7 @@ const parseRetryAfter = (headerValue: string): number => {
   return delta > 0 ? delta : 0;
 };
 
-const appendJsonSuffix = (url: string): string => {
+export const appendJsonSuffix = (url: string): string => {
   const [base, query = ''] = url.split('?');
   const stripped = base.replace(/\/+$/, '');
   const withSuffix = `${stripped}.json`;

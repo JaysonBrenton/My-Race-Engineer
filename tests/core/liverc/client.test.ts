@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-import { HttpLiveRcClient } from '../../../src/core/app/connectors/liverc/client';
+import { HttpLiveRcClient, appendJsonSuffix } from '../../../src/core/app/connectors/liverc/client';
 
 const client = new HttpLiveRcClient();
 
@@ -29,5 +29,17 @@ test('resolveJsonUrlFromHtml falls back to canonical link when alternate is miss
     jsonUrl,
     'https://www.liverc.com/results/sample-event/sample-class/main/sample-final.json',
     'expected resolveJsonUrlFromHtml to derive JSON URL from canonical link',
+  );
+});
+
+test('appendJsonSuffix preserves query strings and removes trailing slashes', () => {
+  const url = 'https://www.liverc.com/results/?p=view_event&id=123&c_id=456';
+
+  const result = appendJsonSuffix(url);
+
+  assert.equal(
+    result,
+    'https://www.liverc.com/results.json?p=view_event&id=123&c_id=456',
+    'expected query parameters to remain intact when appending .json suffix',
   );
 });
