@@ -1,14 +1,23 @@
 import { createHash } from 'node:crypto';
 
 import type { Logger } from '@core/app/ports/logger';
-import type { ImportJobRecord, ImportJobRepository } from '@core/app/ports/importJobRepository';
+import type {
+  ImportJobRecord,
+  ImportJobRepository,
+  UpdateImportJobItemInput,
+} from '@core/app/ports/importJobRepository';
+
+import type { LiveRcSummaryImporter, LiveRcSummaryImportCounts } from './summary';
 
 const DEFAULT_POLL_INTERVAL_MS = 1_000;
 const DEFAULT_PROCESSING_DELAY_MS = 250;
 
+type SummaryImporter = Pick<LiveRcSummaryImporter, 'ingestEventSummary'>;
+
 export type LiveRcJobQueueDependencies = {
   repository: ImportJobRepository;
-  logger?: Pick<Logger, 'error'>;
+  summaryImporter: SummaryImporter;
+  logger?: Pick<Logger, 'error' | 'info' | 'warn'>;
 };
 
 export type EnqueueJobItemInput = {
@@ -132,13 +141,106 @@ export class LiveRcJobQueue {
 
   private async processJob(job: ImportJobRecord) {
     try {
-      await waitFor(this.processingDelayMs);
+      await this.processJobItems(job);
       await this.dependencies.repository.markJobSucceeded(job.jobId);
     } catch (error) {
       this.dependencies.logger?.error?.('LiveRC job runner failed to finalise job.', {
         event: 'liverc.jobRunner.job_failed',
         outcome: 'failure',
         jobId: job.jobId,
+        error,
+      });
+
+      try {
+        await this.dependencies.repository.markJobFailed(job.jobId, 'LiveRC summary import failed.');
+      } catch (markError) {
+        this.dependencies.logger?.error?.('LiveRC job runner failed to mark job as failed.', {
+          event: 'liverc.jobRunner.job_mark_failed',
+          outcome: 'failure',
+          jobId: job.jobId,
+          error: markError,
+        });
+      }
+    }
+  }
+
+  private async processJobItems(job: ImportJobRecord) {
+    const totalItems = job.items.length;
+
+    if (totalItems === 0) {
+      await this.dependencies.repository.updateJobProgress(job.jobId, 100);
+      return;
+    }
+
+    let processed = 0;
+
+    for (const item of job.items) {
+      await waitFor(this.processingDelayMs);
+
+      let counts: LiveRcSummaryImportCounts;
+
+      try {
+        this.dependencies.logger?.info?.('LiveRC summary import started for event.', {
+          event: 'liverc.jobRunner.item_started',
+          outcome: 'running',
+          jobId: job.jobId,
+          itemId: item.id,
+          targetRef: item.targetRef,
+        });
+
+        counts = await this.dependencies.summaryImporter.ingestEventSummary(item.targetRef);
+      } catch (error) {
+        await this.safeUpdateJobItem({
+          jobId: job.jobId,
+          itemId: item.id,
+          state: 'FAILED',
+          message: 'Failed to import LiveRC event summary.',
+        });
+
+        this.dependencies.logger?.warn?.('LiveRC summary import failed for event.', {
+          event: 'liverc.jobRunner.item_failed',
+          outcome: 'failure',
+          jobId: job.jobId,
+          itemId: item.id,
+          targetRef: item.targetRef,
+          error,
+        });
+
+        throw error;
+      }
+
+      await this.safeUpdateJobItem({
+        jobId: job.jobId,
+        itemId: item.id,
+        state: 'SUCCEEDED',
+        message: null,
+        counts,
+      });
+
+      processed += 1;
+      const progress = Math.round((processed / totalItems) * 100);
+      await this.dependencies.repository.updateJobProgress(job.jobId, progress);
+
+      this.dependencies.logger?.info?.('LiveRC summary import completed for event.', {
+        event: 'liverc.jobRunner.item_succeeded',
+        outcome: 'success',
+        jobId: job.jobId,
+        itemId: item.id,
+        targetRef: item.targetRef,
+        counts,
+      });
+    }
+  }
+
+  private async safeUpdateJobItem(input: UpdateImportJobItemInput) {
+    try {
+      await this.dependencies.repository.updateJobItem(input);
+    } catch (error) {
+      this.dependencies.logger?.error?.('LiveRC job runner failed to update job item.', {
+        event: 'liverc.jobRunner.item_update_failed',
+        outcome: 'failure',
+        jobId: input.jobId,
+        itemId: input.itemId,
         error,
       });
     }

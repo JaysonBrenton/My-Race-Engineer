@@ -4,6 +4,8 @@ export * from './prisma/prismaEventRepository';
 export * from './prisma/prismaLapRepository';
 export * from './prisma/prismaRaceClassRepository';
 export * from './prisma/prismaSessionRepository';
+export * from './prisma/prismaDriverRepository';
+export * from './prisma/prismaResultRowRepository';
 export * from './prisma/prismaImportPlanRepository';
 export * from './prisma/prismaImportJobRepository';
 export * from './prisma/prismaUserRepository';
