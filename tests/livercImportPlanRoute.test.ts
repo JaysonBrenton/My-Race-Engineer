@@ -4,6 +4,10 @@ import test from 'node:test';
 import { LiveRcClientError } from '../src/core/app/connectors/liverc/client';
 import { createImportPlanRouteHandlers } from '../src/app/api/connectors/liverc/import/plan/handlers';
 import type { ImportPlanRouteDependencies } from '../src/app/api/connectors/liverc/import/plan/handlers';
+import type { LiveRcImportPlanStore, StoredImportPlan } from '../src/app/api/connectors/liverc/import/planStore';
+import { liveRcImportJobQueue } from '../src/dependencies/liverc';
+
+liveRcImportJobQueue.stop();
 import type { Logger, LoggerContext, LogLevel, LiveRcImportPlan } from '../src/core/app';
 
 type CapturedLog = {
@@ -48,6 +52,21 @@ const createStubLogger = (): StubLogger => {
   return { logger: build(), logs, contexts, children };
 };
 
+const createStubPlanStore = () => {
+  const saved: StoredImportPlan[] = [];
+
+  const store: LiveRcImportPlanStore = {
+    async save(entry) {
+      saved.push(entry);
+    },
+    async get() {
+      return null;
+    },
+  };
+
+  return { store, saved };
+};
+
 test('POST /api/connectors/liverc/import/plan returns plan data and logs success', async () => {
   const stubLogger = createStubLogger();
   const plan: LiveRcImportPlan = {
@@ -62,6 +81,8 @@ test('POST /api/connectors/liverc/import/plan returns plan data and logs success
     ],
   };
 
+  const { store, saved } = createStubPlanStore();
+
   const dependencies: ImportPlanRouteDependencies = {
     service: {
       async createPlan(request) {
@@ -70,6 +91,7 @@ test('POST /api/connectors/liverc/import/plan returns plan data and logs success
       },
     },
     logger: stubLogger.logger,
+    planStore: store,
   };
 
   const handlers = createImportPlanRouteHandlers(dependencies);
@@ -97,11 +119,16 @@ test('POST /api/connectors/liverc/import/plan returns plan data and logs success
   const successLog = stubLogger.logs.find((log) => log.context?.event === 'liverc.importPlan.success');
   assert.ok(successLog, 'expected success log');
   assert.equal(successLog?.context?.planId, 'plan-123');
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0]?.planId, 'plan-123');
+  assert.deepEqual(saved[0]?.plan, plan);
+  assert.deepEqual(saved[0]?.request, { events: [{ eventRef: 'sample-event' }] });
 });
 
 test('POST /api/connectors/liverc/import/plan validates payloads', async () => {
   const stubLogger = createStubLogger();
-  const handlers = createImportPlanRouteHandlers({ logger: stubLogger.logger });
+  const { store } = createStubPlanStore();
+  const handlers = createImportPlanRouteHandlers({ logger: stubLogger.logger, planStore: store });
 
   const request = new Request('http://localhost/api/connectors/liverc/import/plan', {
     method: 'POST',
@@ -122,6 +149,8 @@ test('POST /api/connectors/liverc/import/plan validates payloads', async () => {
 
 test('POST /api/connectors/liverc/import/plan maps LiveRC client failures', async () => {
   const stubLogger = createStubLogger();
+  const { store } = createStubPlanStore();
+
   const dependencies: ImportPlanRouteDependencies = {
     service: {
       async createPlan() {
@@ -134,6 +163,7 @@ test('POST /api/connectors/liverc/import/plan maps LiveRC client failures', asyn
       },
     },
     logger: stubLogger.logger,
+    planStore: store,
   };
 
   const handlers = createImportPlanRouteHandlers(dependencies);
