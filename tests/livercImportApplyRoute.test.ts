@@ -186,6 +186,10 @@ test('POST /api/connectors/liverc/import/apply rejects plans that exceed guardra
   assert.equal(payload.error.code, 'PLAN_GUARDRAILS_EXCEEDED');
   assert.equal(payload.error.details.limits.maxEvents, MAX_EVENTS_PER_PLAN);
   assert.equal(payload.error.details.limits.maxEstimatedLaps, MAX_TOTAL_ESTIMATED_LAPS);
+  assert.equal(payload.error.details.suggestions.chunkCount, 2);
+  assert.equal(payload.error.details.suggestions.trimEvents, 1);
+  assert.equal(payload.error.details.suggestions.trimEstimatedLaps, 4000);
+  assert.match(payload.error.message, /split the plan into 2 apply jobs/i);
 
   const guardrailLog = stubLogger.logs.find((log) => log.context?.event === 'liverc.importApply.guardrails_exceeded');
   assert.ok(guardrailLog, 'expected guardrail log');

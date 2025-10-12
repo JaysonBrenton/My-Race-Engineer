@@ -92,6 +92,7 @@ export const createImportPlanRouteHandlers = (
   const POST: RouteHandler = async (request) => {
     const requestId = request.headers.get('x-request-id') ?? randomUUID();
     const requestLogger = buildRequestLogger(requestId);
+    const requestStartedAt = Date.now();
 
     let rawBody: unknown;
     try {
@@ -173,6 +174,16 @@ export const createImportPlanRouteHandlers = (
         eventCount: plan.items.length,
       });
 
+      requestLogger.debug('TODO ingest.plan telemetry hook', {
+        event: 'liverc.telemetry.todo',
+        metric: 'ingest.plan',
+        outcome: 'success',
+        durationMs: Date.now() - requestStartedAt,
+        planId: plan.planId,
+        requestedEvents: parsed.data.events.length,
+        includedEvents: plan.items.length,
+      });
+
       return buildJsonResponse(
         200,
         {
@@ -190,6 +201,16 @@ export const createImportPlanRouteHandlers = (
           status: error.status,
           url: error.url,
           details: error.details,
+        });
+
+        requestLogger.debug('TODO ingest.plan telemetry hook', {
+          event: 'liverc.telemetry.todo',
+          metric: 'ingest.plan',
+          outcome: 'failure',
+          durationMs: Date.now() - requestStartedAt,
+          requestedEvents: parsed.data.events.length,
+          errorCode: error.code,
+          errorStatus: error.status,
         });
 
         return buildJsonResponse(
@@ -210,6 +231,14 @@ export const createImportPlanRouteHandlers = (
         event: 'liverc.importPlan.unexpected_error',
         outcome: 'failure',
         error,
+      });
+
+      requestLogger.debug('TODO ingest.plan telemetry hook', {
+        event: 'liverc.telemetry.todo',
+        metric: 'ingest.plan',
+        outcome: 'failure',
+        durationMs: Date.now() - requestStartedAt,
+        requestedEvents: parsed.data.events.length,
       });
 
       return buildJsonResponse(

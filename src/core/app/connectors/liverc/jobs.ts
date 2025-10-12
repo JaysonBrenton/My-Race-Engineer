@@ -178,6 +178,15 @@ export class LiveRcJobQueue {
       await waitFor(this.processingDelayMs);
 
       let counts: LiveRcSummaryImportCounts;
+      const eventStartedAt = Date.now();
+
+      this.dependencies.logger?.debug?.('TODO ingest.event.start telemetry hook', {
+        event: 'liverc.telemetry.todo',
+        metric: 'ingest.event.start',
+        jobId: job.jobId,
+        itemId: item.id,
+        targetRef: item.targetRef,
+      });
 
       try {
         this.dependencies.logger?.info?.('LiveRC summary import started for event.', {
@@ -206,6 +215,17 @@ export class LiveRcJobQueue {
           error,
         });
 
+        this.dependencies.logger?.debug?.('TODO ingest.event.finish telemetry hook', {
+          event: 'liverc.telemetry.todo',
+          metric: 'ingest.event.finish',
+          outcome: 'failure',
+          jobId: job.jobId,
+          itemId: item.id,
+          targetRef: item.targetRef,
+          durationMs: Date.now() - eventStartedAt,
+          error,
+        });
+
         throw error;
       }
 
@@ -227,6 +247,17 @@ export class LiveRcJobQueue {
         jobId: job.jobId,
         itemId: item.id,
         targetRef: item.targetRef,
+        counts,
+      });
+
+      this.dependencies.logger?.debug?.('TODO ingest.event.finish telemetry hook', {
+        event: 'liverc.telemetry.todo',
+        metric: 'ingest.event.finish',
+        outcome: 'success',
+        jobId: job.jobId,
+        itemId: item.id,
+        targetRef: item.targetRef,
+        durationMs: Date.now() - eventStartedAt,
         counts,
       });
     }
