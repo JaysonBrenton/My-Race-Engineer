@@ -1,5 +1,4 @@
-const DEFAULT_USER_AGENT =
-  'MyRaceEngineer.LiveRcClient/0.1 (+https://myraceengineer.example)';
+const DEFAULT_USER_AGENT = 'MyRaceEngineer.LiveRcClient/0.1 (+https://myraceengineer.example)';
 
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_INITIAL_RETRY_DELAY_MS = 750;
@@ -432,10 +431,7 @@ const appendJsonSuffix = (url: string): string => {
 };
 
 const extractAttribute = (tag: string, attribute: string): string | null => {
-  const pattern = new RegExp(
-    `${attribute}\\s*=\\s*(\"([^\"]*)\"|'([^']*)'|([^\s\"'>]+))`,
-    'i',
-  );
+  const pattern = new RegExp(`${attribute}\\s*=\\s*(\"([^\"]*)\"|'([^']*)'|([^\s\"'>]+))`, 'i');
   const match = tag.match(pattern);
   if (!match) {
     return null;

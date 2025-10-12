@@ -63,7 +63,8 @@ const planIdSchema = z.object({
     .min(1, 'Plan identifier is required.'),
 });
 
-const normaliseEstimatedLaps = (value: number | undefined) => (Number.isFinite(value) ? (value as number) : 0);
+const normaliseEstimatedLaps = (value: number | undefined) =>
+  Number.isFinite(value) ? (value as number) : 0;
 
 const computeTotals = (plan: { items: { counts: { estimatedLaps: number } }[] }) => {
   const eventCount = plan.items.length;
@@ -87,7 +88,9 @@ const buildGuardrailMessage = (totals: { eventCount: number; estimatedLaps: numb
 
   const actions: string[] = [];
   if (eventOverage > 0) {
-    actions.push(`remove at least ${formatInteger(eventOverage)} event${eventOverage === 1 ? '' : 's'}`);
+    actions.push(
+      `remove at least ${formatInteger(eventOverage)} event${eventOverage === 1 ? '' : 's'}`,
+    );
   }
   if (lapOverage > 0) {
     actions.push(
@@ -107,7 +110,12 @@ const buildGuardrailMessage = (totals: { eventCount: number; estimatedLaps: numb
     )} events each.`;
   }
 
-  return { message, eventOverage, lapOverage, suggestedChunks: suggestedChunks > 1 ? suggestedChunks : 1 };
+  return {
+    message,
+    eventOverage,
+    lapOverage,
+    suggestedChunks: suggestedChunks > 1 ? suggestedChunks : 1,
+  };
 };
 
 export const createImportApplyRouteHandlers = (
@@ -118,7 +126,8 @@ export const createImportApplyRouteHandlers = (
     ...overrides,
   };
 
-  const buildRequestLogger = (requestId: string) => withRequestContext(dependencies.logger, requestId);
+  const buildRequestLogger = (requestId: string) =>
+    withRequestContext(dependencies.logger, requestId);
 
   const OPTIONS: RouteHandler = () =>
     new Response(null, {
@@ -237,7 +246,10 @@ export const createImportApplyRouteHandlers = (
     }
 
     const totals = computeTotals(plan);
-    if (totals.eventCount > MAX_EVENTS_PER_PLAN || totals.estimatedLaps > MAX_TOTAL_ESTIMATED_LAPS) {
+    if (
+      totals.eventCount > MAX_EVENTS_PER_PLAN ||
+      totals.estimatedLaps > MAX_TOTAL_ESTIMATED_LAPS
+    ) {
       const guardrailMessage = buildGuardrailMessage(totals);
       requestLogger.warn('LiveRC import plan exceeds guardrails.', {
         event: 'liverc.importApply.guardrails_exceeded',
@@ -279,7 +291,8 @@ export const createImportApplyRouteHandlers = (
                 maxEstimatedLaps: MAX_TOTAL_ESTIMATED_LAPS,
               },
               suggestions: {
-                trimEvents: guardrailMessage.eventOverage > 0 ? guardrailMessage.eventOverage : undefined,
+                trimEvents:
+                  guardrailMessage.eventOverage > 0 ? guardrailMessage.eventOverage : undefined,
                 trimEstimatedLaps:
                   guardrailMessage.lapOverage > 0 ? guardrailMessage.lapOverage : undefined,
                 chunkCount: guardrailMessage.suggestedChunks,
@@ -321,18 +334,15 @@ export const createImportApplyRouteHandlers = (
         estimatedLaps: totals.estimatedLaps,
       });
 
-      return new Response(
-        JSON.stringify({ data: { jobId: job.jobId }, requestId }),
-        {
-          status: 202,
-          headers: {
-            ...baseHeaders,
-            'content-type': 'application/json',
-            'x-request-id': requestId,
-            Location: `/api/connectors/liverc/jobs/${job.jobId}`,
-          },
+      return new Response(JSON.stringify({ data: { jobId: job.jobId }, requestId }), {
+        status: 202,
+        headers: {
+          ...baseHeaders,
+          'content-type': 'application/json',
+          'x-request-id': requestId,
+          Location: `/api/connectors/liverc/jobs/${job.jobId}`,
         },
-      );
+      });
     } catch (error) {
       requestLogger.error('Failed to enqueue LiveRC import job from plan.', {
         event: 'liverc.importApply.enqueue_failed',

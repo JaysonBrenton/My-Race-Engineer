@@ -14,4 +14,3 @@ export const buildLapId = (parts: LapIdParts) =>
       `${parts.eventId}|${parts.sessionId}|${parts.raceId}|${parts.driverId}|${parts.lapNumber}`,
     )
     .digest('hex');
-

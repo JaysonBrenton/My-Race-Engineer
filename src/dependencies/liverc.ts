@@ -55,14 +55,17 @@ export const liveRcImportService = new LiveRcImportService({
   logger: applicationLogger,
 });
 
-export const liveRcImportPlanService = new LiveRcImportPlanService({
-  client: liveRcHtmlClient,
-  repository: importPlanRepository,
-}, {
-  includeExistingEvents:
-    process.env.LIVERC_INCLUDE_EXISTING_EVENTS === '1' ||
-    process.env.LIVERC_INCLUDE_EXISTING_EVENTS?.toLowerCase() === 'true',
-});
+export const liveRcImportPlanService = new LiveRcImportPlanService(
+  {
+    client: liveRcHtmlClient,
+    repository: importPlanRepository,
+  },
+  {
+    includeExistingEvents:
+      process.env.LIVERC_INCLUDE_EXISTING_EVENTS === '1' ||
+      process.env.LIVERC_INCLUDE_EXISTING_EVENTS?.toLowerCase() === 'true',
+  },
+);
 
 export const liveRcImportJobQueue = new LiveRcJobQueue({
   repository: importJobRepository,

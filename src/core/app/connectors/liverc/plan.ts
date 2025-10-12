@@ -92,7 +92,9 @@ export class LiveRcImportPlanService {
     }
 
     const includeExisting = this.options.includeExistingEvents ?? false;
-    const filteredItems = includeExisting ? items : items.filter((item) => item.status !== 'EXISTING');
+    const filteredItems = includeExisting
+      ? items
+      : items.filter((item) => item.status !== 'EXISTING');
 
     return {
       planId: randomUUID(),
@@ -131,7 +133,9 @@ const deriveStatus = (
     return 'EXISTING';
   }
 
-  return hasSessions || eventState.sessionsWithLaps > 0 || eventState.lapCount > 0 ? 'PARTIAL' : 'NEW';
+  return hasSessions || eventState.sessionsWithLaps > 0 || eventState.lapCount > 0
+    ? 'PARTIAL'
+    : 'NEW';
 };
 
 const buildHeuristicSummary = (sessions: LiveRcEventSessionSummary[]): HeuristicSummary => {
