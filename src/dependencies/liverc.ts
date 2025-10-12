@@ -1,4 +1,9 @@
-import { LiveRcImportPlanService, LiveRcImportService, LiveRcJobQueue } from '@core/app';
+import {
+  LiveRcImportPlanService,
+  LiveRcImportService,
+  LiveRcJobQueue,
+  LiveRcSummaryImporter,
+} from '@core/app';
 import { HttpLiveRcClient } from '@core/app/connectors/liverc/client';
 import {
   LiveRcHttpClient,
@@ -9,6 +14,8 @@ import {
   PrismaImportJobRepository,
   PrismaRaceClassRepository,
   PrismaSessionRepository,
+  PrismaDriverRepository,
+  PrismaResultRowRepository,
   isPrismaClientInitializationError,
 } from '@core/infra';
 
@@ -23,6 +30,18 @@ const entrantRepository = new PrismaEntrantRepository();
 const lapRepository = new PrismaLapRepository();
 const importPlanRepository = new PrismaImportPlanRepository();
 const importJobRepository = new PrismaImportJobRepository();
+const driverRepository = new PrismaDriverRepository();
+const resultRowRepository = new PrismaResultRowRepository();
+
+const liveRcSummaryImporter = new LiveRcSummaryImporter({
+  client: liveRcHtmlClient,
+  eventRepository,
+  raceClassRepository,
+  sessionRepository,
+  driverRepository,
+  resultRowRepository,
+  logger: applicationLogger,
+});
 
 export const liveRcImportService = new LiveRcImportService({
   liveRcClient: liveRcJsonClient,
@@ -41,6 +60,7 @@ export const liveRcImportPlanService = new LiveRcImportPlanService({
 
 export const liveRcImportJobQueue = new LiveRcJobQueue({
   repository: importJobRepository,
+  summaryImporter: liveRcSummaryImporter,
   logger: applicationLogger,
 });
 
@@ -54,6 +74,9 @@ export const liveRcDependencies = {
   lapRepository,
   importPlanRepository,
   importJobRepository,
+  driverRepository,
+  resultRowRepository,
+  summaryImporter: liveRcSummaryImporter,
   jobQueue: liveRcImportJobQueue,
   logger: applicationLogger,
 };

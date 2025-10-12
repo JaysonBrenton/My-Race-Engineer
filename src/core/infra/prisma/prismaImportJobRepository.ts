@@ -2,6 +2,7 @@ import type {
   CreateImportJobInput,
   ImportJobRecord,
   ImportJobRepository,
+  UpdateImportJobItemInput,
 } from '@core/app/ports/importJobRepository';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
@@ -222,6 +223,59 @@ export class PrismaImportJobRepository implements ImportJobRepository {
       });
 
       await updateItemsState(tx, jobId, 'SUCCEEDED');
+    });
+  }
+
+  async markJobFailed(jobId: string, message: string): Promise<void> {
+    const prisma = getPrismaClient();
+
+    await prisma.$transaction(async (tx) => {
+      await tx.importJob.update({
+        where: { id: jobId },
+        data: { state: 'FAILED', message },
+      });
+
+      await tx.importJobItem.updateMany({
+        where: { jobId, NOT: { state: 'SUCCEEDED' } },
+        data: { state: 'FAILED', message },
+      });
+    });
+  }
+
+  async updateJobProgress(jobId: string, progressPct: number): Promise<void> {
+    const prisma = getPrismaClient();
+    const clamped = Math.max(0, Math.min(100, progressPct));
+
+    await prisma.importJob.update({
+      where: { id: jobId },
+      data: { progressPct: clamped },
+    });
+  }
+
+  async updateJobItem(input: UpdateImportJobItemInput): Promise<void> {
+    const prisma = getPrismaClient();
+
+    const data: Prisma.ImportJobItemUpdateInput = {};
+
+    if (input.state) {
+      data.state = input.state;
+    }
+
+    if (input.message !== undefined) {
+      data.message = input.message;
+    }
+
+    if (input.counts !== undefined) {
+      data.countsJson = toJsonInput(input.counts);
+    }
+
+    if (Object.keys(data).length === 0) {
+      return;
+    }
+
+    await prisma.importJobItem.update({
+      where: { id: input.itemId },
+      data,
     });
   }
 }

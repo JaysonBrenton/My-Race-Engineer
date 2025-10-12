@@ -7,13 +7,8 @@ import {
   MAX_TOTAL_ESTIMATED_LAPS,
 } from '../src/app/api/connectors/liverc/import/apply/handlers';
 import type { ImportApplyRouteDependencies } from '../src/app/api/connectors/liverc/import/apply/handlers';
-import type {
-  LiveRcImportPlan,
-  LiveRcImportPlanRequest,
-  LiveRcImportPlanStore,
-  StoredImportPlan,
-} from '../src/app/api/connectors/liverc/import/planStore';
-import type { Logger, LoggerContext, LogLevel } from '../src/core/app';
+import type { LiveRcImportPlan, LiveRcImportPlanRequest, Logger, LoggerContext, LogLevel } from '../src/core/app';
+import type { LiveRcImportPlanStore, StoredImportPlan } from '../src/app/api/connectors/liverc/import/planStore';
 import { liveRcImportJobQueue } from '../src/dependencies/liverc';
 
 liveRcImportJobQueue.stop();
@@ -100,7 +95,7 @@ test('POST /api/connectors/liverc/import/apply enqueues job when guardrails pass
 
   stubPlanStore.setPlan('plan-apply-1', { request: { events: [{ eventRef: 'event-1' }, { eventRef: 'event-2' }] }, plan });
 
-  const enqueueCalls: { planId: string; items: { eventRef: string; counts: unknown }[] }[] = [];
+  const enqueueCalls: { planId: string; items: { eventRef: string; counts?: unknown }[] }[] = [];
 
   const dependencies: ImportApplyRouteDependencies = {
     logger: stubLogger.logger,
@@ -135,7 +130,10 @@ test('POST /api/connectors/liverc/import/apply enqueues job when guardrails pass
   assert.equal(enqueueCalls[0]?.planId, 'plan-apply-1');
   assert.deepEqual(
     enqueueCalls[0]?.items,
-    plan.items.map((item) => ({ eventRef: item.eventRef, counts: item.counts })),
+    plan.items.map((item): { eventRef: string; counts?: unknown } => ({
+      eventRef: item.eventRef,
+      counts: item.counts,
+    })),
   );
 
   const successLog = stubLogger.logs.find((log) => log.context?.event === 'liverc.importApply.success');
@@ -158,7 +156,9 @@ test('POST /api/connectors/liverc/import/apply rejects plans that exceed guardra
   };
 
   stubPlanStore.setPlan('plan-big', {
-    request: { events: overflowingPlan.items.map((item) => ({ eventRef: item.eventRef })) },
+    request: {
+      events: overflowingPlan.items.map((item): { eventRef: string } => ({ eventRef: item.eventRef })),
+    },
     plan: overflowingPlan,
   });
 

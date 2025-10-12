@@ -10,6 +10,36 @@ export type LiveRcEventSessionSummary = {
   completedAt?: string;
 };
 
+export type LiveRcEventMetadata = {
+  canonicalUrl: string;
+  eventSlug: string;
+  eventName: string;
+};
+
+export type LiveRcSessionResultRowSummary = {
+  driverName: string;
+  position?: number | null;
+  carNumber?: string | null;
+  laps?: number | null;
+  totalTimeMs?: number | null;
+  behindMs?: number | null;
+  fastestLapMs?: number | null;
+  fastestLapNum?: number | null;
+  avgLapMs?: number | null;
+  avgTop5Ms?: number | null;
+  avgTop10Ms?: number | null;
+  avgTop15Ms?: number | null;
+  top3ConsecMs?: number | null;
+  stdDevMs?: number | null;
+  consistencyPct?: number | null;
+};
+
+export type LiveRcSessionResults = {
+  sessionName: string;
+  canonicalUrl: string | null;
+  resultRows: LiveRcSessionResultRowSummary[];
+};
+
 const HEADING_SELECTOR = 'h1, h2, h3, h4, h5, h6';
 
 export function enumerateSessionsFromEventHtml(html: string): LiveRcEventSessionSummary[] {
@@ -85,6 +115,92 @@ export function enumerateSessionsFromEventHtml(html: string): LiveRcEventSession
   }
 
   return sessions;
+}
+
+export function extractEventMetadataFromHtml(
+  html: string,
+  fallbackUrl: string,
+): LiveRcEventMetadata {
+  const root = parse(html, {
+    lowerCaseTagName: false,
+    blockTextElements: {
+      script: true,
+      style: true,
+    },
+  });
+
+  const canonicalCandidate =
+    root.querySelector("link[rel='canonical']")?.getAttribute('href') ??
+    root.querySelector("meta[property='og:url']")?.getAttribute('content') ??
+    fallbackUrl;
+
+  const canonicalUrl = normaliseAbsoluteUrl(canonicalCandidate, fallbackUrl);
+  const eventName = normaliseText(root.querySelector('h1')?.textContent ?? '') || canonicalUrl;
+  const eventSlug = extractPathSegment(canonicalUrl, 1);
+
+  return { canonicalUrl, eventSlug, eventName };
+}
+
+export function parseSessionResultsFromHtml(
+  html: string,
+  fallbackUrl?: string,
+): LiveRcSessionResults {
+  const root = parse(html, {
+    lowerCaseTagName: false,
+    blockTextElements: {
+      script: true,
+      style: true,
+    },
+  });
+
+  const canonicalCandidate =
+    root.querySelector("link[rel='canonical']")?.getAttribute('href') ??
+    root.querySelector("meta[property='og:url']")?.getAttribute('content') ??
+    null;
+
+  const canonicalUrl = canonicalCandidate ? normaliseAbsoluteUrl(canonicalCandidate, fallbackUrl) : fallbackUrl ?? null;
+  const sessionName = normaliseText(root.querySelector('h1')?.textContent ?? '') || (canonicalUrl ?? '');
+
+  const table = findResultsTable(root);
+  if (!table) {
+    return { sessionName, canonicalUrl, resultRows: [] };
+  }
+
+  const headers = readHeaderLabels(table);
+  const bodyRows = table.querySelectorAll('tbody tr');
+  const resultRows: LiveRcSessionResultRowSummary[] = [];
+
+  for (const row of bodyRows) {
+    if (!isDataRow(row)) {
+      continue;
+    }
+
+    const infos = collectResultCellInfos(row, headers);
+    const driverName = infos.get('driver')?.text ?? '';
+    if (!driverName) {
+      continue;
+    }
+
+    resultRows.push({
+      driverName,
+      position: parseInteger(infos.get('position')?.text),
+      carNumber: normaliseOptionalText(infos.get('carNumber')?.text),
+      laps: parseInteger(infos.get('laps')?.text),
+      totalTimeMs: parseDurationToMilliseconds(infos.get('totalTime')?.text),
+      behindMs: parseBehindToMilliseconds(infos.get('behind')?.text),
+      fastestLapMs: parseDurationToMilliseconds(infos.get('fastestLap')?.text),
+      fastestLapNum: parseInteger(infos.get('fastestLapNum')?.text),
+      avgLapMs: parseDurationToMilliseconds(infos.get('avgLap')?.text),
+      avgTop5Ms: parseDurationToMilliseconds(infos.get('avgTop5')?.text),
+      avgTop10Ms: parseDurationToMilliseconds(infos.get('avgTop10')?.text),
+      avgTop15Ms: parseDurationToMilliseconds(infos.get('avgTop15')?.text),
+      top3ConsecMs: parseDurationToMilliseconds(infos.get('top3Consec')?.text),
+      stdDevMs: parseDurationToMilliseconds(infos.get('stdDev')?.text),
+      consistencyPct: parsePercentage(infos.get('consistency')?.text),
+    });
+  }
+
+  return { sessionName, canonicalUrl, resultRows };
 }
 
 function findNearestHeading(element: ParsedHTMLElement): ParsedHTMLElement | null {
@@ -310,4 +426,258 @@ function isDataRow(row: ParsedHTMLElement): boolean {
 
 function normaliseText(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
+}
+
+function normaliseOptionalText(value: string | undefined): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const normalized = normaliseText(value);
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+function findResultsTable(root: ParsedHTMLElement): ParsedHTMLElement | null {
+  const tables = root.querySelectorAll('table');
+  for (const table of tables) {
+    const headers = readHeaderLabels(table).map((header) => header.toLowerCase());
+    if (headers.some((header) => header.includes('driver'))) {
+      return table;
+    }
+  }
+
+  return null;
+}
+
+type ResultCellInfo = {
+  key: string | null;
+  text: string;
+  element: ParsedHTMLElement;
+};
+
+function collectResultCellInfos(row: ParsedHTMLElement, headers: string[]): Map<string, ResultCellInfo> {
+  const infos = new Map<string, ResultCellInfo>();
+  const cells = row.querySelectorAll('td');
+
+  cells.forEach((cell, index) => {
+    const headerLabel = headers[index] ?? '';
+    const key = normaliseResultHeaderKey(
+      cell.getAttribute('data-label') ?? cell.getAttribute('aria-label') ?? headerLabel,
+    );
+    const text = normaliseText(cell.textContent ?? '');
+    const info: ResultCellInfo = { key, text, element: cell };
+
+    if (!key) {
+      return;
+    }
+
+    if (!infos.has(key)) {
+      infos.set(key, info);
+    }
+  });
+
+  return infos;
+}
+
+function normaliseResultHeaderKey(raw: string | null | undefined): string | null {
+  if (!raw) {
+    return null;
+  }
+
+  const value = normaliseText(raw).toLowerCase();
+  if (!value) {
+    return null;
+  }
+
+  if (value.includes('pos')) {
+    return 'position';
+  }
+
+  if (value.includes('driver')) {
+    return 'driver';
+  }
+
+  if (value.includes('car')) {
+    return 'carNumber';
+  }
+
+  if (value === 'laps' || value.includes('lap count')) {
+    return 'laps';
+  }
+
+  if (value.includes('race') || value.includes('total')) {
+    return 'totalTime';
+  }
+
+  if (value.includes('interval') || value.includes('behind')) {
+    return 'behind';
+  }
+
+  if (value.includes('fast') && value.includes('#')) {
+    return 'fastestLapNum';
+  }
+
+  if (value.includes('fast') && value.includes('lap')) {
+    return 'fastestLap';
+  }
+
+  if (value.includes('avg') && value.includes('top 5')) {
+    return 'avgTop5';
+  }
+
+  if (value.includes('avg') && value.includes('top 10')) {
+    return 'avgTop10';
+  }
+
+  if (value.includes('avg') && value.includes('top 15')) {
+    return 'avgTop15';
+  }
+
+  if (value.includes('avg') && value.includes('lap')) {
+    return 'avgLap';
+  }
+
+  if (value.includes('top 3') && value.includes('con')) {
+    return 'top3Consec';
+  }
+
+  if (value.includes('std') && value.includes('dev')) {
+    return 'stdDev';
+  }
+
+  if (value.includes('consistency')) {
+    return 'consistency';
+  }
+
+  return null;
+}
+
+function parseInteger(raw: string | undefined): number | undefined {
+  if (!raw) {
+    return undefined;
+  }
+
+  const match = raw.match(/-?\d+/);
+  if (!match) {
+    return undefined;
+  }
+
+  const value = Number.parseInt(match[0] ?? '', 10);
+  return Number.isNaN(value) ? undefined : value;
+}
+
+function parseDurationToMilliseconds(raw: string | undefined): number | undefined {
+  if (!raw) {
+    return undefined;
+  }
+
+  const value = raw.replace(/[^0-9:+.\-]/g, '').trim();
+  if (!value) {
+    return undefined;
+  }
+
+  const segments = value.split(':');
+  if (segments.length === 1) {
+    const seconds = Number.parseFloat(segments[0] ?? '');
+    return Number.isNaN(seconds) ? undefined : Math.round(seconds * 1000);
+  }
+
+  let totalSeconds = 0;
+  let multiplier = 1;
+
+  const lastSegment = segments.pop();
+  const seconds = Number.parseFloat(lastSegment ?? '');
+  if (Number.isNaN(seconds)) {
+    return undefined;
+  }
+
+  totalSeconds += seconds;
+  multiplier = 60;
+
+  while (segments.length > 0) {
+    const segment = segments.pop();
+    const part = Number.parseInt(segment ?? '', 10);
+    if (Number.isNaN(part)) {
+      return undefined;
+    }
+
+    totalSeconds += part * multiplier;
+    multiplier *= 60;
+  }
+
+  return Math.round(totalSeconds * 1000);
+}
+
+function parseBehindToMilliseconds(raw: string | undefined): number | undefined {
+  if (!raw) {
+    return undefined;
+  }
+
+  if (/lap/i.test(raw)) {
+    return undefined;
+  }
+
+  const normalised = raw.replace(/^\+/, '').trim();
+  return parseDurationToMilliseconds(normalised);
+}
+
+function parsePercentage(raw: string | undefined): number | undefined {
+  if (!raw) {
+    return undefined;
+  }
+
+  const match = raw.match(/-?\d+(?:\.\d+)?/);
+  if (!match) {
+    return undefined;
+  }
+
+  const value = Number.parseFloat(match[0] ?? '');
+  return Number.isNaN(value) ? undefined : value;
+}
+
+function extractPathSegment(url: string, offsetFromResults: number): string {
+  const segments = getResultPathSegments(url);
+  const resultsIndex = segments.indexOf('results');
+
+  if (resultsIndex === -1) {
+    throw new Error('LiveRC URL is missing /results/ segment.');
+  }
+
+  const targetIndex = resultsIndex + offsetFromResults;
+  const segment = segments[targetIndex];
+
+  if (!segment) {
+    throw new Error('LiveRC URL is missing expected path segment.');
+  }
+
+  return segment;
+}
+
+function getResultPathSegments(url: string): string[] {
+  try {
+    const parsed = new URL(url);
+    return parsed.pathname.split('/').filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function normaliseAbsoluteUrl(candidate: string | null | undefined, fallbackUrl?: string): string {
+  try {
+    if (candidate) {
+      return new URL(candidate, fallbackUrl).toString();
+    }
+
+    if (fallbackUrl) {
+      return new URL(fallbackUrl).toString();
+    }
+  } catch {
+    // ignore failures and fall back below
+  }
+
+  if (fallbackUrl) {
+    return fallbackUrl;
+  }
+
+  throw new Error('LiveRC URL could not be normalised.');
 }

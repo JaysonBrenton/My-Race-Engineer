@@ -15,6 +15,14 @@ export type ImportJobItemRecord = {
   counts?: unknown;
 };
 
+export type UpdateImportJobItemInput = {
+  jobId: string;
+  itemId: string;
+  state?: ImportJobItemState;
+  message?: string | null;
+  counts?: unknown;
+};
+
 export type ImportJobRecord = {
   jobId: string;
   state: ImportJobState;
@@ -41,4 +49,7 @@ export interface ImportJobRepository {
   getJob(jobId: string): Promise<ImportJobRecord | null>;
   takeNextQueuedJob(): Promise<ImportJobRecord | null>;
   markJobSucceeded(jobId: string): Promise<void>;
+  markJobFailed(jobId: string, message: string): Promise<void>;
+  updateJobProgress(jobId: string, progressPct: number): Promise<void>;
+  updateJobItem(input: UpdateImportJobItemInput): Promise<void>;
 }
