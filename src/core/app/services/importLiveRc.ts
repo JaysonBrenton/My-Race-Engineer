@@ -1,5 +1,3 @@
-import { createHash } from 'node:crypto';
-
 import type {
   EntrantRepository,
   EntrantUpsertInput,
@@ -18,6 +16,7 @@ import type {
   SessionUpsertInput,
 } from '@core/app';
 import { parseRaceResultPayload, type LiveRcRaceContext } from '../liverc/responseMappers';
+import { buildLapId } from '../connectors/liverc/lapId';
 import { buildUploadNamespaceSeed, type UploadNamespaceMetadata } from '../liverc/uploadNamespace';
 
 import {
@@ -88,19 +87,6 @@ const parseDateOrNull = (value: string | undefined): Date | null => {
 };
 
 const normalizeDisplayName = (value: string) => normalizeWhitespace(value.normalize('NFC'));
-
-const buildLapId = (parts: {
-  eventId: string;
-  sessionId: string;
-  raceId: string;
-  driverId: string;
-  lapNumber: number;
-}) =>
-  createHash('sha256')
-    .update(
-      `${parts.eventId}|${parts.sessionId}|${parts.raceId}|${parts.driverId}|${parts.lapNumber}`,
-    )
-    .digest('hex');
 
 export type UploadImportMetadata = UploadNamespaceMetadata & {
   namespaceSeed?: string;

@@ -45,6 +45,7 @@ export class PrismaLapRepository implements LapRepository {
           id: lap.id,
           entrantId: lap.entrantId,
           sessionId: lap.sessionId,
+          driverId: lap.driverId ?? null,
           lapNumber: lap.lapNumber,
           lapTimeMs: lap.lapTimeMs,
         })),

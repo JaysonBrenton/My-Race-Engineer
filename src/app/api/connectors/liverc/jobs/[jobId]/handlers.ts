@@ -55,20 +55,64 @@ const buildJsonResponse = (status: number, payload: unknown, requestId: string) 
 const withRequestContext = (logger: Logger, requestId: string) =>
   logger.withContext({ requestId, route: '/api/connectors/liverc/jobs/[jobId]' });
 
-const normaliseJob = (job: LiveRcJobStatus) => ({
-  jobId: job.jobId,
-  state: job.state,
-  progressPct: job.progressPct,
-  message: job.message,
-  items: job.items.map((item) => ({
-    id: item.id,
-    targetType: item.targetType,
-    targetRef: item.targetRef,
-    state: item.state,
-    message: item.message,
-    counts: item.counts,
-  })),
-});
+const safeNumber = (value: unknown): number =>
+  typeof value === 'number' && Number.isFinite(value) ? value : 0;
+
+const aggregateCounts = (items: LiveRcJobStatus['items']) => {
+  let sessionsImported = 0;
+  let resultRowsImported = 0;
+  let lapsImported = 0;
+  let driversWithLaps = 0;
+  let lapsSkipped = 0;
+
+  for (const item of items) {
+    if (!item.counts || typeof item.counts !== 'object') {
+      continue;
+    }
+
+    const counts = item.counts as Record<string, unknown>;
+    sessionsImported += safeNumber(counts.sessionsImported);
+    resultRowsImported += safeNumber(counts.resultRowsImported);
+    lapsImported += safeNumber(counts.lapsImported);
+    driversWithLaps += safeNumber(counts.driversWithLaps);
+    lapsSkipped += safeNumber(counts.lapsSkipped);
+  }
+
+  return { sessionsImported, resultRowsImported, lapsImported, driversWithLaps, lapsSkipped };
+};
+
+const summariseItems = (items: LiveRcJobStatus['items']) => {
+  const total = items.length;
+  const completed = items.filter((item) => item.state === 'SUCCEEDED').length;
+
+  return { total, completed };
+};
+
+const normaliseJob = (job: LiveRcJobStatus) => {
+  const counts = aggregateCounts(job.items);
+  const itemSummary = summariseItems(job.items);
+
+  return {
+    jobId: job.jobId,
+    state: job.state,
+    progressPct: job.progressPct,
+    message: job.message,
+    counts,
+    progress: {
+      percentage: job.progressPct,
+      completedItems: itemSummary.completed,
+      totalItems: itemSummary.total,
+    },
+    items: job.items.map((item) => ({
+      id: item.id,
+      targetType: item.targetType,
+      targetRef: item.targetRef,
+      state: item.state,
+      message: item.message,
+      counts: item.counts,
+    })),
+  };
+};
 
 export const createJobStatusRouteHandlers = (
   overrides: JobStatusRouteDependencies = {},
