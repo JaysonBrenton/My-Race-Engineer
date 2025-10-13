@@ -228,13 +228,20 @@ Expect a `303` redirect to `/auth/login?error=invalid-origin` and `x-auth-origin
 - `npm run dev` — start Next in dev on `:3001`
 - `npm run build` — typecheck + build  
 - `npm run start` — start production build (`.next/`)  
-- `npm run lint` — ESLint (with Prettier)  
-- `npm run typecheck` — `tsc --noEmit`  
-- `npm run prisma:generate` — Prisma client generate  
-- `npm run prisma:migrate:dev` — dev migrations  
-- `npm run prisma:migrate:deploy` — apply pending migrations in prod  
+- `npm run lint` — ESLint (with Prettier)
+- `npm run typecheck` — `tsc --noEmit`
+- `npm run prisma:generate` — Prisma client generate
+- `npm run prisma:migrate:dev` — dev migrations
+- `npm run prisma:migrate:deploy` — apply pending migrations in prod
+- `npm run test:auth` — core auth service coverage (registration, origin guard, session validation)
+- `npm run test:auth:e2e` — isolates the cross-service auth happy path
+- `npm run test:cookie:unit` — cookie storage strategy unit tests
+- `npm run test:seo` — metadata and SEO assertions
+- `npm run test:e2e` — Playwright browser + raw POST auth flows
 
 **PR gates:** `typecheck`, `lint`, `build` (and tests when present) must pass.
+
+See the [automated test suite catalog](docs/guides/test-suite-catalog.md) for detailed coverage, setup notes, and direct commands for every spec.
 
 ---
 
