@@ -18,6 +18,14 @@ import {
   createLoginAction,
   type LoginActionDependencies,
 } from '../../../src/app/(auth)/auth/login/actions.impl';
+import {
+  createRequestPasswordResetAction,
+  type RequestPasswordResetDependencies,
+} from '../../../src/app/(auth)/auth/reset-password/actions.impl';
+import {
+  createConfirmPasswordResetAction,
+  type ConfirmPasswordResetDependencies,
+} from '../../../src/app/(auth)/auth/reset-password/confirm/actions.impl';
 import type { Logger } from '../../../src/core/app';
 
 type RedirectTarget = string;
@@ -227,6 +235,93 @@ const createLoginDeps = (overrides: Partial<LoginActionDependencies> = {}): Logi
     deps: { ...defaultDeps, ...overrides },
     cookiesSet,
     redirectCalls,
+  };
+};
+
+type ResetRequestDepsResult = {
+  deps: RequestPasswordResetDependencies;
+  redirectCalls: RedirectTarget[];
+  startInvocations: Array<{ email: string }>;
+};
+
+const createPasswordResetRequestDeps = (
+  overrides: Partial<RequestPasswordResetDependencies> = {},
+): ResetRequestDepsResult => {
+  const redirectCalls: RedirectTarget[] = [];
+  const startInvocations: Array<{ email: string }> = [];
+  const logger = createLogger();
+  const defaultDeps: RequestPasswordResetDependencies = {
+    headers: () =>
+      new Headers({
+        origin: 'https://app.local',
+        'x-request-id': 'reset-request',
+        'user-agent': 'node:test',
+      }),
+    redirect: (destination: string | URL) => {
+      const location = typeof destination === 'string' ? destination : destination.toString();
+      redirectCalls.push(location);
+      throw new RedirectCaptured(location);
+    },
+    guardAuthPostOrigin: () => {},
+    checkPasswordResetRateLimit: () => ({ ok: true }),
+    validateAuthFormToken: () => ({ ok: true, issuedAt: new Date() }),
+    extractClientIdentifier: () => '198.51.100.10',
+    startPasswordResetService: {
+      start: async ({ email }) => {
+        startInvocations.push({ email });
+      },
+    },
+    logger,
+  };
+
+  return {
+    deps: { ...defaultDeps, ...overrides },
+    redirectCalls,
+    startInvocations,
+  };
+};
+
+type ResetConfirmDepsResult = {
+  deps: ConfirmPasswordResetDependencies;
+  redirectCalls: RedirectTarget[];
+  confirmInvocations: Array<{ token: string; newPassword: string }>;
+};
+
+const createPasswordResetConfirmDeps = (
+  overrides: Partial<ConfirmPasswordResetDependencies> = {},
+): ResetConfirmDepsResult => {
+  const redirectCalls: RedirectTarget[] = [];
+  const confirmInvocations: Array<{ token: string; newPassword: string }> = [];
+  const logger = createLogger();
+  const defaultDeps: ConfirmPasswordResetDependencies = {
+    headers: () =>
+      new Headers({
+        origin: 'https://app.local',
+        'x-request-id': 'reset-confirm',
+        'user-agent': 'node:test',
+      }),
+    redirect: (destination: string | URL) => {
+      const location = typeof destination === 'string' ? destination : destination.toString();
+      redirectCalls.push(location);
+      throw new RedirectCaptured(location);
+    },
+    guardAuthPostOrigin: () => {},
+    checkPasswordResetConfirmRateLimit: () => ({ ok: true }),
+    validateAuthFormToken: () => ({ ok: true, issuedAt: new Date() }),
+    extractClientIdentifier: () => '203.0.113.5',
+    confirmPasswordResetService: {
+      confirm: async ({ token, newPassword }) => {
+        confirmInvocations.push({ token, newPassword });
+        return { ok: true as const };
+      },
+    },
+    logger,
+  };
+
+  return {
+    deps: { ...defaultDeps, ...overrides },
+    redirectCalls,
+    confirmInvocations,
   };
 };
 
@@ -597,4 +692,200 @@ test('loginAction mints a session cookie and redirects to the dashboard on succe
   assert.equal(cookie.value, 'session-token');
   assert.equal(cookie.secure, false);
   assert.equal(cookie.expires?.toISOString(), expiresAt.toISOString());
+});
+
+test('requestPasswordResetAction normalises email and redirects with status=sent', async () => {
+  const { deps, startInvocations } = createPasswordResetRequestDeps();
+  const action = createRequestPasswordResetAction(deps);
+  const formData = new FormData();
+  formData.set('email', ' USER@example.com ');
+  formData.set('formToken', 'token');
+
+  try {
+    await action(formData);
+    assert.fail('Expected password reset request action to redirect.');
+  } catch (error) {
+    assert.ok(error instanceof RedirectCaptured);
+    const url = new URL(`https://app.local${error.location}`);
+    assert.equal(url.pathname, '/auth/reset-password');
+    assert.equal(url.searchParams.get('status'), 'sent');
+  }
+
+  assert.deepEqual(startInvocations, [{ email: 'user@example.com' }]);
+});
+
+test('requestPasswordResetAction stops processing when the guard rejects the origin', async () => {
+  let startCalled = false;
+  const { deps } = createPasswordResetRequestDeps({
+    guardAuthPostOrigin: (_headers, onFailure) => {
+      onFailure();
+    },
+    startPasswordResetService: {
+      start: async () => {
+        startCalled = true;
+      },
+    },
+  });
+  const action = createRequestPasswordResetAction(deps);
+  const formData = new FormData();
+  formData.set('email', 'user@example.com');
+  formData.set('formToken', 'token');
+
+  try {
+    await action(formData);
+    assert.fail('Expected password reset request action to redirect on invalid origin.');
+  } catch (error) {
+    assert.ok(error instanceof RedirectCaptured);
+    const url = new URL(`https://app.local${error.location}`);
+    assert.equal(url.pathname, '/auth/reset-password');
+    assert.equal(url.searchParams.get('error'), 'invalid-origin');
+  }
+
+  assert.equal(startCalled, false);
+});
+
+test('requestPasswordResetAction surfaces server errors when the service throws', async () => {
+  const { deps } = createPasswordResetRequestDeps({
+    startPasswordResetService: {
+      start: async () => {
+        throw new Error('mail driver offline');
+      },
+    },
+  });
+  const action = createRequestPasswordResetAction(deps);
+  const formData = new FormData();
+  formData.set('email', 'user@example.com');
+  formData.set('formToken', 'token');
+
+  try {
+    await action(formData);
+    assert.fail('Expected password reset request action to redirect on service error.');
+  } catch (error) {
+    assert.ok(error instanceof RedirectCaptured);
+    const url = new URL(`https://app.local${error.location}`);
+    assert.equal(url.pathname, '/auth/reset-password');
+    assert.equal(url.searchParams.get('error'), 'server-error');
+  }
+});
+
+test('requestPasswordResetAction rejects invalid form tokens', async () => {
+  const { deps } = createPasswordResetRequestDeps({
+    validateAuthFormToken: () => ({ ok: false, reason: 'missing' }),
+  });
+  const action = createRequestPasswordResetAction(deps);
+  const formData = new FormData();
+  formData.set('email', 'user@example.com');
+
+  try {
+    await action(formData);
+    assert.fail('Expected password reset request action to redirect when the token is invalid.');
+  } catch (error) {
+    assert.ok(error instanceof RedirectCaptured);
+    const url = new URL(`https://app.local${error.location}`);
+    assert.equal(url.pathname, '/auth/reset-password');
+    assert.equal(url.searchParams.get('error'), 'invalid-token');
+  }
+});
+
+test('confirmPasswordResetAction confirms the reset and redirects to login', async () => {
+  const { deps, confirmInvocations } = createPasswordResetConfirmDeps();
+  const action = createConfirmPasswordResetAction(deps);
+  const formData = new FormData();
+  formData.set('token', 'reset-token');
+  formData.set('password', 'Str0ngPass!234');
+  formData.set('confirmPassword', 'Str0ngPass!234');
+  formData.set('formToken', 'token');
+
+  try {
+    await action(formData);
+    assert.fail('Expected password reset confirm action to redirect after success.');
+  } catch (error) {
+    assert.ok(error instanceof RedirectCaptured);
+    const url = new URL(`https://app.local${error.location}`);
+    assert.equal(url.pathname, '/auth/login');
+    assert.equal(url.searchParams.get('status'), 'password-reset-confirmed');
+  }
+
+  assert.deepEqual(confirmInvocations, [{ token: 'reset-token', newPassword: 'Str0ngPass!234' }]);
+});
+
+test('confirmPasswordResetAction returns weak-password errors to the user', async () => {
+  const { deps } = createPasswordResetConfirmDeps({
+    confirmPasswordResetService: {
+      confirm: async () => ({ ok: false as const, reason: 'weak-password' as const }),
+    },
+  });
+  const action = createConfirmPasswordResetAction(deps);
+  const formData = new FormData();
+  formData.set('token', 'reset-token');
+  formData.set('password', 'StrongPassw0rd!');
+  formData.set('confirmPassword', 'StrongPassw0rd!');
+  formData.set('formToken', 'token');
+
+  try {
+    await action(formData);
+    assert.fail('Expected password reset confirm action to redirect for weak passwords.');
+  } catch (error) {
+    assert.ok(error instanceof RedirectCaptured);
+    const url = new URL(`https://app.local${error.location}`);
+    assert.equal(url.pathname, '/auth/reset-password/confirm');
+    assert.equal(url.searchParams.get('error'), 'weak-password');
+    assert.equal(url.searchParams.get('token'), 'reset-token');
+  }
+});
+
+test('confirmPasswordResetAction handles invalid reset tokens returned by the service', async () => {
+  const { deps } = createPasswordResetConfirmDeps({
+    confirmPasswordResetService: {
+      confirm: async () => ({ ok: false as const, reason: 'invalid-token' as const }),
+    },
+  });
+  const action = createConfirmPasswordResetAction(deps);
+  const formData = new FormData();
+  formData.set('token', 'stale-token');
+  formData.set('password', 'Str0ngPass!234');
+  formData.set('confirmPassword', 'Str0ngPass!234');
+  formData.set('formToken', 'token');
+
+  try {
+    await action(formData);
+    assert.fail('Expected password reset confirm action to redirect for invalid tokens.');
+  } catch (error) {
+    assert.ok(error instanceof RedirectCaptured);
+    const url = new URL(`https://app.local${error.location}`);
+    assert.equal(url.pathname, '/auth/reset-password/confirm');
+    assert.equal(url.searchParams.get('error'), 'invalid-token');
+    assert.equal(url.searchParams.get('token'), null);
+  }
+});
+
+test('confirmPasswordResetAction validates payloads before invoking the service', async () => {
+  let confirmCalled = false;
+  const { deps } = createPasswordResetConfirmDeps({
+    confirmPasswordResetService: {
+      confirm: async () => {
+        confirmCalled = true;
+        return { ok: true as const };
+      },
+    },
+  });
+  const action = createConfirmPasswordResetAction(deps);
+  const formData = new FormData();
+  formData.set('token', 'reset-token');
+  formData.set('password', 'Str0ngPass!234');
+  formData.set('confirmPassword', 'Mismatch!234');
+  formData.set('formToken', 'token');
+
+  try {
+    await action(formData);
+    assert.fail('Expected password reset confirm action to redirect on validation errors.');
+  } catch (error) {
+    assert.ok(error instanceof RedirectCaptured);
+    const url = new URL(`https://app.local${error.location}`);
+    assert.equal(url.pathname, '/auth/reset-password/confirm');
+    assert.equal(url.searchParams.get('error'), 'validation');
+    assert.equal(url.searchParams.get('token'), 'reset-token');
+  }
+
+  assert.equal(confirmCalled, false);
 });
