@@ -2,11 +2,10 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 
 import { validateSessionTokenService } from '@/dependencies/auth';
+import { SESSION_COOKIE_NAME } from './constants';
 
 import type { ValidateSessionTokenFailureReason } from '@core/app';
 import type { User, UserSession } from '@core/domain';
-
-const SESSION_COOKIE_NAME = 'mre_session';
 
 type SessionValidationStatus =
   | { status: 'missing' }
