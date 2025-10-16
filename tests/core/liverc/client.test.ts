@@ -2,7 +2,11 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-import { HttpLiveRcClient, appendJsonSuffix } from '../../../src/core/app/connectors/liverc/client';
+import {
+  HttpLiveRcClient,
+  LiveRcClientError,
+  appendJsonSuffix,
+} from '../../../src/core/app/connectors/liverc/client';
 
 const client = new HttpLiveRcClient();
 
@@ -32,6 +36,38 @@ test('resolveJsonUrlFromHtml falls back to canonical link when alternate is miss
   );
 });
 
+test('resolveJsonUrlFromHtml supports caller-provided fallback patterns', () => {
+  const html = `
+    <html>
+      <body>
+        <div data-results-endpoint="//club.liverc.com/results/custom/event-1/pro-buggy/a-main"></div>
+      </body>
+    </html>
+  `;
+
+  const jsonUrl = client.resolveJsonUrlFromHtml(html, ['data-results-endpoint=["\'](?<url>[^"\']+)["\']']);
+
+  assert.equal(
+    jsonUrl,
+    'https://club.liverc.com/results/custom/event-1/pro-buggy/a-main',
+    'expected resolveJsonUrlFromHtml to honour the provided fallback pattern',
+  );
+});
+
+test('resolveJsonUrlFromHtml returns null when no absolute URLs can be resolved', () => {
+  const html = `
+    <html>
+      <body>
+        <div data-json-url="/relative/path/results"></div>
+      </body>
+    </html>
+  `;
+
+  const jsonUrl = client.resolveJsonUrlFromHtml(html);
+
+  assert.equal(jsonUrl, null, 'expected resolveJsonUrlFromHtml to skip unresolved relative URLs');
+});
+
 test('appendJsonSuffix preserves query strings and removes trailing slashes', () => {
   const url = 'https://www.liverc.com/results/?p=view_event&id=123&c_id=456';
 
@@ -41,5 +77,63 @@ test('appendJsonSuffix preserves query strings and removes trailing slashes', ()
     result,
     'https://www.liverc.com/results.json?p=view_event&id=123&c_id=456',
     'expected query parameters to remain intact when appending .json suffix',
+  );
+});
+
+test('fetchJson throws when upstream response is not JSON', async () => {
+  const responses: Response[] = [
+    new Response('<html></html>', {
+      status: 200,
+      headers: { 'content-type': 'text/html' },
+    }),
+  ];
+
+  const clientWithStubFetch = new HttpLiveRcClient({
+    fetchImpl: async () => {
+      const response = responses.shift();
+      if (!response) {
+        throw new Error('Unexpected additional fetch invocation');
+      }
+
+      return response;
+    },
+  });
+
+  await assert.rejects(
+    () => clientWithStubFetch.fetchJson('https://www.liverc.com/results/event.json'),
+    (error: unknown) => {
+      assert.ok(error instanceof LiveRcClientError, 'expected LiveRcClientError to be thrown');
+      assert.equal(error.code, 'INVALID_CONTENT_TYPE');
+      return true;
+    },
+  );
+});
+
+test('fetchJson wraps JSON parse failures in LiveRcClientError', async () => {
+  const responses: Response[] = [
+    new Response('{"event":', {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }),
+  ];
+
+  const clientWithStubFetch = new HttpLiveRcClient({
+    fetchImpl: async () => {
+      const response = responses.shift();
+      if (!response) {
+        throw new Error('Unexpected additional fetch invocation');
+      }
+
+      return response;
+    },
+  });
+
+  await assert.rejects(
+    () => clientWithStubFetch.fetchJson('https://www.liverc.com/results/event.json'),
+    (error: unknown) => {
+      assert.ok(error instanceof LiveRcClientError, 'expected LiveRcClientError to be thrown');
+      assert.equal(error.code, 'JSON_PARSE_FAILURE');
+      return true;
+    },
   );
 });
