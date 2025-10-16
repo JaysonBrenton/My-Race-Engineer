@@ -43,3 +43,15 @@ test('appendJsonSuffix preserves query strings and removes trailing slashes', ()
     'expected query parameters to remain intact when appending .json suffix',
   );
 });
+
+test('appendJsonSuffix avoids duplicating existing json suffix', () => {
+  const url = 'https://www.liverc.com/results/sample-event/sample-class/main/a-main.json?ref=1';
+
+  const result = appendJsonSuffix(url);
+
+  assert.equal(
+    result,
+    url,
+    'expected appendJsonSuffix to leave URLs with .json suffix unchanged',
+  );
+});

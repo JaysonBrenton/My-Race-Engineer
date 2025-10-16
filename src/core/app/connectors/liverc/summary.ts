@@ -60,7 +60,15 @@ type Dependencies = {
 type DriverSummaryDetail = {
   driver: Driver;
   summary: LiveRcSessionResultRowSummary;
+  sourceDriverId: string;
 };
+
+type PendingDriverSummary = {
+  summary: LiveRcSessionResultRowSummary;
+  rowKey: string;
+};
+
+const LIVERC_DRIVER_PROVIDER = 'LiveRC';
 
 const normaliseDriverNameKey = (value: string) =>
   value.normalize('NFKC').replace(/\s+/g, ' ').trim().toLowerCase();
@@ -181,27 +189,30 @@ export class LiveRcSummaryImporter {
         scheduledStart: parseOptionalDate(summary.completedAt),
       });
 
-      const driverLookupByKey = new Map<string, DriverSummaryDetail>();
-      const driverDetailsById = new Map<string, DriverSummaryDetail>();
+      const pendingSummariesByName = new Map<string, PendingDriverSummary[]>();
+      const allSummaries: PendingDriverSummary[] = [];
 
-      for (const row of sessionResults.resultRows) {
+      sessionResults.resultRows.forEach((row, index) => {
         const driverName = row.driverName.trim();
         if (!driverName) {
-          continue;
+          return;
         }
 
-        const driver = await this.dependencies.driverRepository.upsertByDisplayName({
-          displayName: driverName,
-        });
+        const pending: PendingDriverSummary = {
+          summary: { ...row, driverName },
+          rowKey: `${index}`,
+        };
+
+        allSummaries.push(pending);
 
         const key = normaliseDriverNameKey(driverName);
-        const detail = driverLookupByKey.get(key) ?? { driver, summary: row };
-        if (!driverLookupByKey.has(key)) {
-          driverLookupByKey.set(key, detail);
+        const bucket = pendingSummariesByName.get(key);
+        if (bucket) {
+          bucket.push(pending);
+        } else {
+          pendingSummariesByName.set(key, [pending]);
         }
-
-        driverDetailsById.set(driver.id, detail);
-      }
+      });
 
       const { roundSlug, raceSlug } = this.deriveSessionSlugContext(sessionSlugSegments);
 
@@ -210,14 +221,42 @@ export class LiveRcSummaryImporter {
         sessionUrl,
         session,
         raceClass,
-        driverLookupByKey,
+        summaryRowsByName: pendingSummariesByName,
         eventSlug,
         classSlug,
         roundSlug,
         raceSlug,
       });
 
+      const driverDetailsById = new Map(lapImport.driverDetailsById);
       const driverLapCounts = lapImport.driverLapCounts;
+
+      for (const pending of allSummaries) {
+        if (lapImport.consumedSummaryRowKeys.has(pending.rowKey)) {
+          continue;
+        }
+
+        const sourceDriverId = buildLiveRcFallbackDriverSourceId({
+          eventSlug,
+          classSlug,
+          sessionSourceId: session.source.sessionId,
+          rowKey: pending.rowKey,
+        });
+
+        const driver = await this.dependencies.driverRepository.upsertBySource({
+          provider: LIVERC_DRIVER_PROVIDER,
+          sourceDriverId,
+          displayName: pending.summary.driverName,
+        });
+
+        const detail: DriverSummaryDetail = {
+          driver,
+          summary: pending.summary,
+          sourceDriverId,
+        };
+
+        driverDetailsById.set(driver.id, detail);
+      }
 
       for (const detail of driverDetailsById.values()) {
         const hasLapOverride = driverLapCounts.has(detail.driver.id);
@@ -304,7 +343,7 @@ export class LiveRcSummaryImporter {
     sessionUrl: URL;
     session: Session;
     raceClass: RaceClass;
-    driverLookupByKey: Map<string, DriverSummaryDetail>;
+    summaryRowsByName: Map<string, PendingDriverSummary[]>;
     eventSlug: string;
     classSlug: string;
     roundSlug: string;
@@ -314,9 +353,18 @@ export class LiveRcSummaryImporter {
     lapsSkipped: number;
     driversWithLaps: number;
     driverLapCounts: Map<string, number>;
+    driverDetailsById: Map<string, DriverSummaryDetail>;
+    consumedSummaryRowKeys: Set<string>;
   }> {
-    if (params.driverLookupByKey.size === 0) {
-      return { lapsImported: 0, lapsSkipped: 0, driversWithLaps: 0, driverLapCounts: new Map() };
+    if (params.summaryRowsByName.size === 0) {
+      return {
+        lapsImported: 0,
+        lapsSkipped: 0,
+        driversWithLaps: 0,
+        driverLapCounts: new Map(),
+        driverDetailsById: new Map(),
+        consumedSummaryRowKeys: new Set(),
+      };
     }
 
     let jsonUrl = this.dependencies.client.resolveJsonUrlFromHtml(params.sessionHtml);
@@ -350,7 +398,14 @@ export class LiveRcSummaryImporter {
         error,
       });
 
-      return { lapsImported: 0, lapsSkipped: 0, driversWithLaps: 0, driverLapCounts: new Map() };
+      return {
+        lapsImported: 0,
+        lapsSkipped: 0,
+        driversWithLaps: 0,
+        driverLapCounts: new Map(),
+        driverDetailsById: new Map(),
+        consumedSummaryRowKeys: new Set(),
+      };
     }
 
     const grouped = new Map<string, { driverName: string; laps: LiveRcRaceResultLap[] }>();
@@ -372,12 +427,30 @@ export class LiveRcSummaryImporter {
     }
 
     const driverLapCounts = new Map<string, number>();
+    const driverDetailsById = new Map<string, DriverSummaryDetail>();
+    const consumedSummaryRowKeys = new Set<string>();
     let lapsImported = 0;
     let driversWithLaps = 0;
     let lapsSkipped = 0;
 
     for (const [entryId, group] of grouped.entries()) {
-      const detail = params.driverLookupByKey.get(normaliseDriverNameKey(group.driverName));
+      const normalizedName = normaliseDriverNameKey(group.driverName);
+      const pendingList = params.summaryRowsByName.get(normalizedName);
+      const pending = pendingList?.shift();
+
+      if (pendingList && pendingList.length === 0) {
+        params.summaryRowsByName.delete(normalizedName);
+      }
+
+      const detail = pending
+        ? await this.resolveDriverDetail({
+            pending,
+            entryId,
+            session: params.session,
+            eventSlug: params.eventSlug,
+            classSlug: params.classSlug,
+          })
+        : null;
 
       if (!detail) {
         this.dependencies.logger?.warn?.('Skipping LiveRC laps with no matching summary row.', {
@@ -389,6 +462,11 @@ export class LiveRcSummaryImporter {
         });
         lapsSkipped += group.laps.length;
         continue;
+      }
+
+      driverDetailsById.set(detail.driver.id, detail);
+      if (pending) {
+        consumedSummaryRowKeys.add(pending.rowKey);
       }
 
       const entrant = await this.dependencies.entrantRepository.upsertBySource({
@@ -409,6 +487,7 @@ export class LiveRcSummaryImporter {
           entrantId: entrant.id,
           sessionId: params.session.id,
           driverId: detail.driver.id,
+          driverSourceId: detail.sourceDriverId,
           eventId: raceResultMeta?.eventId ?? params.session.eventId,
           raceId: raceResultMeta?.raceId ?? params.session.source.sessionId,
         });
@@ -437,7 +516,41 @@ export class LiveRcSummaryImporter {
       driverLapCounts.set(detail.driver.id, lapInputs.length);
     }
 
-    return { lapsImported, lapsSkipped, driversWithLaps, driverLapCounts };
+    return {
+      lapsImported,
+      lapsSkipped,
+      driversWithLaps,
+      driverLapCounts,
+      driverDetailsById,
+      consumedSummaryRowKeys,
+    };
+  }
+
+  private async resolveDriverDetail(params: {
+    pending: PendingDriverSummary;
+    entryId: string;
+    session: Session;
+    eventSlug: string;
+    classSlug: string;
+  }): Promise<DriverSummaryDetail> {
+    const sourceDriverId = buildLiveRcDriverSourceId({
+      eventSlug: params.eventSlug,
+      classSlug: params.classSlug,
+      sessionSourceId: params.session.source.sessionId,
+      entryId: params.entryId,
+    });
+
+    const driver = await this.dependencies.driverRepository.upsertBySource({
+      provider: LIVERC_DRIVER_PROVIDER,
+      sourceDriverId,
+      displayName: params.pending.summary.driverName,
+    });
+
+    return {
+      driver,
+      summary: params.pending.summary,
+      sourceDriverId,
+    };
   }
 
   private mapLapToUpsert(params: {
@@ -445,6 +558,7 @@ export class LiveRcSummaryImporter {
     entrantId: string;
     sessionId: string;
     driverId: string;
+    driverSourceId: string;
     eventId: string;
     raceId: string;
   }): LapUpsertInput | null {
@@ -459,7 +573,7 @@ export class LiveRcSummaryImporter {
         eventId: params.eventId,
         sessionId: params.sessionId,
         raceId: params.raceId,
-        driverId: params.lap.entryId,
+        driverId: params.driverSourceId,
         lapNumber: params.lap.lapNumber,
       }),
       entrantId: params.entrantId,
@@ -482,4 +596,30 @@ function parseOptionalDate(value: string | undefined): Date | null {
   }
 
   return date;
+}
+
+function buildLiveRcDriverSourceId(params: {
+  eventSlug: string;
+  classSlug: string;
+  sessionSourceId: string;
+  entryId: string;
+}): string {
+  return [params.eventSlug, params.classSlug, params.sessionSourceId, params.entryId]
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length > 0)
+    .join('|');
+}
+
+function buildLiveRcFallbackDriverSourceId(params: {
+  eventSlug: string;
+  classSlug: string;
+  sessionSourceId: string;
+  rowKey: string;
+}): string {
+  return buildLiveRcDriverSourceId({
+    eventSlug: params.eventSlug,
+    classSlug: params.classSlug,
+    sessionSourceId: params.sessionSourceId,
+    entryId: `fallback:${params.rowKey}`,
+  });
 }

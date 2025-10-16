@@ -269,6 +269,7 @@ const createPasswordResetRequestDeps = (
     startPasswordResetService: {
       start: async ({ email }) => {
         startInvocations.push({ email });
+        return { ok: true as const };
       },
     },
     logger,
@@ -723,6 +724,7 @@ test('requestPasswordResetAction stops processing when the guard rejects the ori
     startPasswordResetService: {
       start: async () => {
         startCalled = true;
+        return { ok: true as const };
       },
     },
   });

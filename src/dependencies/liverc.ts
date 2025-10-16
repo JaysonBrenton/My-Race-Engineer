@@ -73,6 +73,10 @@ export const liveRcImportJobQueue = new LiveRcJobQueue({
   logger: applicationLogger,
 });
 
+export const startLiveRcImportJobQueue = () => liveRcImportJobQueue.start();
+
+export const stopLiveRcImportJobQueue = () => liveRcImportJobQueue.stop();
+
 export const liveRcDependencies = {
   liveRcJsonClient,
   liveRcHtmlClient,

@@ -57,7 +57,6 @@ export class LiveRcJobQueue {
   ) {
     this.pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
     this.processingDelayMs = options.processingDelayMs ?? DEFAULT_PROCESSING_DELAY_MS;
-    this.start();
   }
 
   async enqueueJob(planId: string, items: EnqueueJobItemInput[]): Promise<{ jobId: string }> {

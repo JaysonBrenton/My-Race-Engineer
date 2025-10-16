@@ -139,6 +139,8 @@ model Club {
 model Driver {
   id          String   @id @default(cuid())
   displayName String
+  provider    String   @default("Manual")
+  sourceDriverId String?
   transponder String?  @unique
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -146,6 +148,8 @@ model Driver {
   aliases    DriverAlias[]
   resultRows ResultRow[]
   laps       Lap[]
+
+  @@unique([provider, sourceDriverId])
 }
 
 model DriverAlias {
