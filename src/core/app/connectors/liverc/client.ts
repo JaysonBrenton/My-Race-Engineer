@@ -426,7 +426,8 @@ const parseRetryAfter = (headerValue: string): number => {
 export const appendJsonSuffix = (url: string): string => {
   const [base, query = ''] = url.split('?');
   const stripped = base.replace(/\/+$/, '');
-  const withSuffix = `${stripped}.json`;
+  const hasJsonSuffix = stripped.toLowerCase().endsWith('.json');
+  const withSuffix = hasJsonSuffix ? stripped : `${stripped}.json`;
   return query ? `${withSuffix}?${query}` : withSuffix;
 };
 

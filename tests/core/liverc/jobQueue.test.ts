@@ -81,6 +81,8 @@ test('LiveRC job queue processes event items and updates counts', async () => {
     { pollIntervalMs: 5, processingDelayMs: 0 },
   );
 
+  queue.start();
+
   await new Promise((resolve) => setTimeout(resolve, 50));
   queue.stop();
 

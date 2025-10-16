@@ -5,6 +5,7 @@ import test from 'node:test';
 
 import type {
   DriverRepository,
+  DriverSourceUpsertInput,
   DriverUpsertInput,
   EventRepository,
   EventUpsertInput,
@@ -218,17 +219,21 @@ class InMemorySessionRepository implements SessionRepository {
 }
 
 class InMemoryDriverRepository implements DriverRepository {
-  private readonly byName = new Map<string, StoredDriver>();
+  private readonly byId = new Map<string, StoredDriver>();
+
+  private readonly bySource = new Map<string, StoredDriver>();
+
+  private readonly byDisplayName = new Map<string, StoredDriver>();
 
   private idCounter = 1;
 
   async findByDisplayName(displayName: string): Promise<Driver | null> {
-    return this.byName.get(displayName.toLowerCase()) ?? null;
+    return this.byDisplayName.get(displayName.toLowerCase()) ?? null;
   }
 
   async upsertByDisplayName(input: DriverUpsertInput): Promise<Driver> {
     const key = input.displayName.toLowerCase();
-    const existing = this.byName.get(key);
+    const existing = this.byDisplayName.get(key);
     const now = new Date();
 
     if (existing) {
@@ -238,23 +243,78 @@ class InMemoryDriverRepository implements DriverRepository {
         transponder: input.transponder ?? existing.transponder ?? null,
         updatedAt: now,
       };
-      this.byName.set(key, updated);
+      this.storeDriver(updated);
       return updated;
     }
 
     const created: StoredDriver = {
       id: `drv-${this.idCounter++}`,
       displayName: input.displayName,
+      provider: 'Manual',
+      sourceDriverId: null,
       transponder: input.transponder ?? null,
       createdAt: now,
       updatedAt: now,
     };
-    this.byName.set(key, created);
+    this.storeDriver(created);
     return created;
   }
 
+  async upsertBySource(input: DriverSourceUpsertInput): Promise<Driver> {
+    const key = this.buildSourceKey(input.provider, input.sourceDriverId);
+    const existing = this.bySource.get(key);
+    const now = new Date();
+
+    if (existing) {
+      const updated: StoredDriver = {
+        ...existing,
+        displayName: input.displayName,
+        transponder: input.transponder ?? existing.transponder ?? null,
+        updatedAt: now,
+      };
+      this.storeDriver(updated);
+      return updated;
+    }
+
+    const created: StoredDriver = {
+      id: `drv-${this.idCounter++}`,
+      displayName: input.displayName,
+      provider: input.provider,
+      sourceDriverId: input.sourceDriverId,
+      transponder: input.transponder ?? null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.storeDriver(created);
+    return created;
+  }
+
+  private buildSourceKey(provider: string, sourceDriverId: string) {
+    return `${provider}:${sourceDriverId}`;
+  }
+
+  private storeDriver(driver: StoredDriver) {
+    this.byId.set(driver.id, driver);
+
+    if (driver.sourceDriverId) {
+      this.bySource.set(this.buildSourceKey(driver.provider, driver.sourceDriverId), driver);
+    }
+
+    for (const [key, existing] of this.byDisplayName.entries()) {
+      if (existing.id === driver.id && key !== driver.displayName.toLowerCase()) {
+        this.byDisplayName.delete(key);
+      }
+    }
+
+    this.byDisplayName.set(driver.displayName.toLowerCase(), driver);
+  }
+
   get size(): number {
-    return this.byName.size;
+    return this.byId.size;
+  }
+
+  get stored(): StoredDriver[] {
+    return Array.from(this.byId.values());
   }
 }
 
@@ -597,4 +657,211 @@ test('LiveRC summary importer ingests sessions, laps, and result rows idempotent
   assert.equal(entrantRepository.size, 4);
   assert.equal(lapRepository.size, 4);
   assert.equal(lapRepository.totalLapCount, 8);
+});
+
+test('LiveRC summary importer keeps duplicate display names separate', async () => {
+  const eventHtml = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Duplicate Drivers - LiveRC</title>
+    <link rel="canonical" href="https://www.liverc.com/results/duplicate-event" />
+  </head>
+  <body>
+    <h1>Duplicate Drivers Event</h1>
+    <section class="card event-section">
+      <header class="card-header">
+        <h2>Main Events</h2>
+      </header>
+      <div class="card-body">
+        <table class="table table-striped event-table">
+          <thead>
+            <tr>
+              <th>Race</th>
+              <th>Class</th>
+              <th>Heat</th>
+              <th>Completed</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td data-label="Race">
+                <a href="https://www.liverc.com/results/duplicate-event/spec-truggy/main/a-main">Spec Truggy A Main</a>
+              </td>
+              <td data-label="Class">Spec Truggy</td>
+              <td data-label="Heat">A Main</td>
+              <td data-label="Completed">
+                <time datetime="2024-05-11T18:30:00Z">May 11, 2024 6:30 PM UTC</time>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </body>
+</html>`;
+
+  const sessionHtml = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Spec Truggy A Main - LiveRC</title>
+    <link rel="canonical" href="https://www.liverc.com/results/duplicate-event/spec-truggy/main/a-main" />
+  </head>
+  <body>
+    <h1>Spec Truggy A Main</h1>
+    <table class="table table-striped race-results">
+      <thead>
+        <tr>
+          <th>Pos</th>
+          <th>Driver</th>
+          <th>Car #</th>
+          <th>Laps</th>
+          <th>Race Time</th>
+          <th>Interval</th>
+          <th>Fast Lap</th>
+          <th>Fast Lap #</th>
+          <th>Avg Lap</th>
+          <th>Avg Top 5</th>
+          <th>Avg Top 10</th>
+          <th>Avg Top 15</th>
+          <th>Top 3 Cons</th>
+          <th>Std Dev</th>
+          <th>Consistency</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td data-label="Pos">1</td>
+          <td data-label="Driver">Alex Morgan</td>
+          <td data-label="Car #">4</td>
+          <td data-label="Laps">30</td>
+          <td data-label="Race Time">15:12.000</td>
+          <td data-label="Interval">0.000</td>
+          <td data-label="Fast Lap">00:30.000</td>
+          <td data-label="Fast Lap #">5</td>
+          <td data-label="Avg Lap">30.400</td>
+          <td data-label="Avg Top 5">30.200</td>
+          <td data-label="Avg Top 10">30.310</td>
+          <td data-label="Avg Top 15">30.350</td>
+          <td data-label="Top 3 Cons">1:31.200</td>
+          <td data-label="Std Dev">0.150</td>
+          <td data-label="Consistency">98.2%</td>
+        </tr>
+        <tr>
+          <td data-label="Pos">2</td>
+          <td data-label="Driver">Alex Morgan</td>
+          <td data-label="Car #">7</td>
+          <td data-label="Laps">29</td>
+          <td data-label="Race Time">15:25.000</td>
+          <td data-label="Interval">+13.000</td>
+          <td data-label="Fast Lap">00:30.500</td>
+          <td data-label="Fast Lap #">6</td>
+          <td data-label="Avg Lap">31.000</td>
+          <td data-label="Avg Top 5">30.800</td>
+          <td data-label="Avg Top 10">30.950</td>
+          <td data-label="Avg Top 15">30.980</td>
+          <td data-label="Top 3 Cons">1:32.100</td>
+          <td data-label="Std Dev">0.220</td>
+          <td data-label="Consistency">97.6%</td>
+        </tr>
+      </tbody>
+    </table>
+  </body>
+</html>`;
+
+  const htmlByUrl = new Map<string, string>([
+    ['https://www.liverc.com/results/duplicate-event', eventHtml],
+    ['https://www.liverc.com/results/duplicate-event/spec-truggy/main/a-main', sessionHtml],
+  ]);
+
+  const jsonByUrl = new Map<string, unknown>([
+    [
+      'https://www.liverc.com/results/duplicate-event/spec-truggy/main/a-main.json',
+      {
+        event_id: 'duplicate-event',
+        class_id: 'spec-truggy',
+        race_id: 'a-main',
+        laps: [
+          { entry_id: 'alex-morgan-1', driver_name: 'Alex Morgan', lap: 1, lap_time: 30.0 },
+          { entry_id: 'alex-morgan-1', driver_name: 'Alex Morgan', lap: 2, lap_time: 30.2 },
+          { entry_id: 'alex-morgan-2', driver_name: 'Alex Morgan', lap: 1, lap_time: 30.5 },
+          { entry_id: 'alex-morgan-2', driver_name: 'Alex Morgan', lap: 2, lap_time: 30.6 },
+        ],
+      },
+    ],
+  ]);
+
+  const client = {
+    async getEventOverview(url: string) {
+      const match = htmlByUrl.get(url);
+      if (!match) {
+        throw new Error(`Missing duplicate-event fixture for URL: ${url}`);
+      }
+      return match;
+    },
+    async getSessionPage(url: string) {
+      const match = htmlByUrl.get(url);
+      if (!match) {
+        throw new Error(`Missing duplicate-event session fixture for URL: ${url}`);
+      }
+      return match;
+    },
+    resolveJsonUrlFromHtml(html: string) {
+      if (html.includes('Spec Truggy A Main')) {
+        return 'https://www.liverc.com/results/duplicate-event/spec-truggy/main/a-main.json';
+      }
+      return null;
+    },
+    async fetchJson<T>(url: string): Promise<T> {
+      const data = jsonByUrl.get(url);
+      if (!data) {
+        throw new Error(`Missing duplicate-event JSON fixture for URL: ${url}`);
+      }
+      return data as T;
+    },
+  };
+
+  const eventRepository = new InMemoryEventRepository();
+  const raceClassRepository = new InMemoryRaceClassRepository();
+  const sessionRepository = new InMemorySessionRepository();
+  const driverRepository = new InMemoryDriverRepository();
+  const resultRowRepository = new InMemoryResultRowRepository();
+  const entrantRepository = new InMemoryEntrantRepository();
+  const lapRepository = new InMemoryLapRepository();
+
+  const importer = new LiveRcSummaryImporter({
+    client,
+    eventRepository,
+    raceClassRepository,
+    sessionRepository,
+    driverRepository,
+    resultRowRepository,
+    entrantRepository,
+    lapRepository,
+  });
+
+  const result = await importer.ingestEventSummary('https://www.liverc.com/results/duplicate-event');
+
+  assert.equal(result.sessionsImported, 1);
+  assert.equal(result.resultRowsImported, 2);
+  assert.equal(result.lapsImported, 4);
+  assert.equal(result.driversWithLaps, 2);
+  assert.equal(result.lapsSkipped, 0);
+
+  assert.equal(driverRepository.size, 2);
+  const driverSourceIds = new Set(driverRepository.stored.map((driver) => driver.sourceDriverId));
+  assert.equal(driverSourceIds.size, 2);
+
+  assert.equal(resultRowRepository.size, 2);
+  assert.equal(entrantRepository.size, 2);
+  assert.equal(lapRepository.size, 2);
+  assert.equal(lapRepository.totalLapCount, 4);
+
+  for (const entrantId of lapRepository.entrants) {
+    const laps = lapRepository.getLapInputs(entrantId);
+    assert.equal(laps.length, 2);
+    const lapIds = new Set(laps.map((lap) => lap.id));
+    assert.equal(lapIds.size, 2, 'expected unique lap ids per entrant when drivers share a name');
+  }
 });
