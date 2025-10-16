@@ -8,6 +8,7 @@ import { validateAuthFormToken } from '@/lib/auth/formTokens';
 import { checkPasswordResetRateLimit } from '@/lib/rateLimit/authRateLimiter';
 import { extractClientIdentifier } from '@/lib/request/clientIdentifier';
 import { guardAuthPostOrigin } from '@/server/security/origin';
+import { createErrorLogContext } from './logging';
 import type { Logger } from '@core/app';
 
 type RateLimitResult = ReturnType<typeof checkPasswordResetRateLimit>;
@@ -65,7 +66,8 @@ const defaultDependencies: RequestPasswordResetDependencies = {
   logger: applicationLogger.withContext({ route: 'auth/reset-password/start-action' }),
 };
 
-const redirectTo = (target: string, deps: RequestPasswordResetDependencies): never => deps.redirect(target);
+const redirectTo = (target: string, deps: RequestPasswordResetDependencies): never =>
+  deps.redirect(target);
 
 export const createRequestPasswordResetAction = (
   deps: RequestPasswordResetDependencies = defaultDependencies,
@@ -90,7 +92,7 @@ export const createRequestPasswordResetAction = (
     const rateLimit: RateLimitResult = deps.checkPasswordResetRateLimit(identifier);
 
     if (!rateLimit.ok) {
-      redirectTo(
+      return redirectTo(
         buildRedirectUrl('/auth/reset-password', {
           error: 'rate-limited',
         }),
@@ -102,7 +104,7 @@ export const createRequestPasswordResetAction = (
     const tokenValidation = deps.validateAuthFormToken(token ?? null, 'password-reset');
 
     if (!tokenValidation.ok) {
-      redirectTo(
+      return redirectTo(
         buildRedirectUrl('/auth/reset-password', {
           error: 'invalid-token',
         }),
@@ -115,7 +117,7 @@ export const createRequestPasswordResetAction = (
     });
 
     if (!parseResult.success) {
-      redirectTo(
+      return redirectTo(
         buildRedirectUrl('/auth/reset-password', {
           error: 'validation',
           email: getFormValue(formData, 'email'),
@@ -128,13 +130,18 @@ export const createRequestPasswordResetAction = (
 
     try {
       await deps.startPasswordResetService.start({ email });
-    } catch (error) {
-      deps.logger.error('Unable to start password reset flow.', {
-        event: 'auth.password_reset.start_failed',
-        outcome: 'error',
-        error: error instanceof Error ? error.message : 'unknown-error',
-      });
-      redirectTo(
+    } catch (error: unknown) {
+      deps.logger.error(
+        'Unable to start password reset flow.',
+        createErrorLogContext(
+          {
+            event: 'auth.password_reset.start_failed',
+            outcome: 'error',
+          },
+          error,
+        ),
+      );
+      return redirectTo(
         buildRedirectUrl('/auth/reset-password', {
           error: 'server-error',
         }),
@@ -142,7 +149,7 @@ export const createRequestPasswordResetAction = (
       );
     }
 
-    redirectTo(
+    return redirectTo(
       buildRedirectUrl('/auth/reset-password', {
         status: 'sent',
       }),
