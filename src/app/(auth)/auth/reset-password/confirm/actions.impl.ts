@@ -8,7 +8,8 @@ import { validateAuthFormToken } from '@/lib/auth/formTokens';
 import { checkPasswordResetConfirmRateLimit } from '@/lib/rateLimit/authRateLimiter';
 import { extractClientIdentifier } from '@/lib/request/clientIdentifier';
 import { guardAuthPostOrigin } from '@/server/security/origin';
-import type { Logger } from '@core/app';
+import { createErrorLogContext } from '../logging';
+import type { ConfirmPasswordResetResult, Logger } from '@core/app';
 
 type RateLimitResult = ReturnType<typeof checkPasswordResetConfirmRateLimit>;
 
@@ -79,7 +80,8 @@ const defaultDependencies: ConfirmPasswordResetDependencies = {
   logger: applicationLogger.withContext({ route: 'auth/reset-password/confirm-action' }),
 };
 
-const redirectTo = (target: string, deps: ConfirmPasswordResetDependencies): never => deps.redirect(target);
+const redirectTo = (target: string, deps: ConfirmPasswordResetDependencies): never =>
+  deps.redirect(target);
 
 export const createConfirmPasswordResetAction = (
   deps: ConfirmPasswordResetDependencies = defaultDependencies,
@@ -107,7 +109,7 @@ export const createConfirmPasswordResetAction = (
     const rateLimit: RateLimitResult = deps.checkPasswordResetConfirmRateLimit(identifier);
 
     if (!rateLimit.ok) {
-      redirectTo(
+      return redirectTo(
         buildRedirectUrl('/auth/reset-password/confirm', {
           token: resetToken,
           error: 'rate-limited',
@@ -120,7 +122,7 @@ export const createConfirmPasswordResetAction = (
     const tokenValidation = deps.validateAuthFormToken(formToken ?? null, 'password-reset-confirm');
 
     if (!tokenValidation.ok) {
-      redirectTo(
+      return redirectTo(
         buildRedirectUrl('/auth/reset-password/confirm', {
           token: resetToken,
           error: 'invalid-token',
@@ -136,7 +138,7 @@ export const createConfirmPasswordResetAction = (
     });
 
     if (!parseResult.success) {
-      redirectTo(
+      return redirectTo(
         buildRedirectUrl('/auth/reset-password/confirm', {
           token: resetToken,
           error: 'validation',
@@ -147,31 +149,35 @@ export const createConfirmPasswordResetAction = (
 
     const { token, password } = parseResult.data;
 
-    let result;
+    let result: ConfirmPasswordResetResult;
     try {
       result = await deps.confirmPasswordResetService.confirm({
         token,
         newPassword: password,
       });
-    } catch (error) {
-      deps.logger.error('Unable to confirm password reset.', {
-        event: 'auth.password_reset.confirm_failed',
-        outcome: 'error',
-        error: error instanceof Error ? error.message : 'unknown-error',
-      });
-      redirectTo(
+    } catch (error: unknown) {
+      deps.logger.error(
+        'Unable to confirm password reset.',
+        createErrorLogContext(
+          {
+            event: 'auth.password_reset.confirm_failed',
+            outcome: 'error',
+          },
+          error,
+        ),
+      );
+      return redirectTo(
         buildRedirectUrl('/auth/reset-password/confirm', {
           token,
           error: 'server-error',
         }),
         deps,
       );
-      return;
     }
 
     if (!result.ok) {
       if (result.reason === 'weak-password') {
-        redirectTo(
+        return redirectTo(
           buildRedirectUrl('/auth/reset-password/confirm', {
             token,
             error: 'weak-password',
@@ -181,7 +187,7 @@ export const createConfirmPasswordResetAction = (
       }
 
       if (result.reason === 'invalid-token') {
-        redirectTo(
+        return redirectTo(
           buildRedirectUrl('/auth/reset-password/confirm', {
             error: 'invalid-token',
           }),
@@ -190,13 +196,19 @@ export const createConfirmPasswordResetAction = (
       }
 
       if (result.reason === 'user-not-found') {
-        deps.logger.error('Password reset token referenced missing user.', {
-          event: 'auth.password_reset.confirm_user_missing',
-          outcome: 'error',
-        });
+        deps.logger.error(
+          'Password reset token referenced missing user.',
+          createErrorLogContext(
+            {
+              event: 'auth.password_reset.confirm_user_missing',
+              outcome: 'error',
+            },
+            undefined,
+          ),
+        );
       }
 
-      redirectTo(
+      return redirectTo(
         buildRedirectUrl('/auth/reset-password/confirm', {
           token,
           error: 'server-error',
@@ -205,7 +217,7 @@ export const createConfirmPasswordResetAction = (
       );
     }
 
-    redirectTo(
+    return redirectTo(
       buildRedirectUrl('/auth/login', {
         status: 'password-reset-confirmed',
       }),
