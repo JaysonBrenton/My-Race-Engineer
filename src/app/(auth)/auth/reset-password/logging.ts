@@ -6,9 +6,6 @@ export type LoggableError = {
   stack?: string;
 };
 
-const isRecordWithMessage = (value: unknown): value is { message?: unknown } =>
-  typeof value === 'object' && value !== null;
-
 export const toLoggableError = (error: unknown): LoggableError => {
   if (error instanceof Error) {
     return {
@@ -18,36 +15,18 @@ export const toLoggableError = (error: unknown): LoggableError => {
     };
   }
 
-  if (typeof error === 'string') {
-    return {
-      name: 'Error',
-      message: error,
-    };
-  }
-
-  if (isRecordWithMessage(error) && typeof error.message === 'string') {
-    return {
-      name: 'Error',
-      message: error.message,
-    };
-  }
-
   return {
     name: 'UnknownError',
-    message: 'Unknown error',
+    message: typeof error === 'string' ? error : 'Unknown error',
   };
 };
 
 export const createErrorLogContext = (
   base: Omit<LoggerContext, 'error'>,
   error: unknown,
-): LoggerContext => {
-  if (error == null) {
-    return { ...base };
-  }
-
-  return {
-    ...base,
-    error: toLoggableError(error),
-  };
-};
+): LoggerContext => ({
+  ...base,
+  // The logger serialiser safely normalises unknown error inputs.
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+  error: toLoggableError(error),
+});
