@@ -66,6 +66,7 @@ Run each with `npx tsx --test <path>`.
 - `tests/core/liverc/importPlanService.test.ts` — checks how the importer builds work plans from user input. 【F:tests/core/liverc/importPlanService.test.ts†L1-L14】
 - `tests/core/liverc/jobQueue.test.ts` — ensures importer job queue deduplication and enqueue logic. 【F:tests/core/liverc/jobQueue.test.ts†L1-L17】
 - `tests/core/liverc/summaryImporter.test.ts` — covers summarised ingestion paths. 【F:tests/core/liverc/summaryImporter.test.ts†L1-L14】
+- `tests/core/liverc/lapId.test.ts` — verifies deterministic lap hashing to keep lap imports idempotent. 【F:tests/core/liverc/lapId.test.ts†L1-L35】
 
 ### LiveRC importer integration tests
 
