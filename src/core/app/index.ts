@@ -1,3 +1,11 @@
+/**
+ * Filename: src/core/app/index.ts
+ * Purpose: Barrel exports for application-layer ports, services, and shared utilities.
+ * Author: OpenAI ChatGPT (gpt-5-codex)
+ * Date: 2025-01-15
+ * License: MIT
+ */
+
 export * from './ports/logger';
 export * from './ports/entrantRepository';
 export * from './ports/eventRepository';
@@ -30,4 +38,5 @@ export * from './services/auth/verifyEmail';
 export * from './services/auth/startPasswordReset';
 export * from './services/auth/confirmPasswordReset';
 export * from './services/auth/validateSessionToken';
+export * from './services/auth/logoutUserSession';
 export * from './liverc/responseMappers';
