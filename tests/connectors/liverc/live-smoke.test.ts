@@ -12,6 +12,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+/**
+ * LIVERC_E2E opt-in instructions:
+ *   - macOS/Linux shells: `LIVERC_E2E=1 npm test -- tests/connectors/liverc/live-smoke.test.ts`
+ *   - Windows PowerShell: `$env:LIVERC_E2E = "1"; npm test -- tests/connectors/liverc/live-smoke.test.ts`
+ *   - Windows cmd.exe: `set LIVERC_E2E=1 && npm test -- tests/connectors/liverc/live-smoke.test.ts`
+ * Any other value (or unset) will skip the test. CI leaves it unset to avoid live calls by default.
+ */
 const isE2E = process.env.LIVERC_E2E === "1";
 const url = process.env.LIVERC_SMOKE_URL ?? "https://www.liverc.com/";
 
