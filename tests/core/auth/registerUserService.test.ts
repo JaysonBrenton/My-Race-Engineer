@@ -12,7 +12,7 @@ import test from 'node:test';
 
 import { RegisterUserService } from '../../../src/core/app/services/auth/registerUser';
 import { DuplicateUserEmailError } from '../../../src/core/app/errors/duplicateUserEmailError';
-import type { User } from '../../../src/core/domain';
+import type { CreateUserInput, User } from '../../../src/core/domain';
 import {
   DeterministicPasswordHasher,
   InMemoryLogger,
@@ -73,6 +73,7 @@ test('rejects weak passwords without touching persistence', async () => {
 
   const result = await service.register({
     name: 'Example User',
+    driverName: 'Example Driver',
     email: 'user@example.com',
     password: 'short',
   });
@@ -87,6 +88,7 @@ test('returns email-taken when repository already contains the address', async (
   const existingUser: User = {
     id: 'user-1',
     name: 'Existing User',
+    driverName: 'Existing Driver',
     email: 'user@example.com',
     passwordHash: 'hashed:password',
     status: 'active',
@@ -98,11 +100,43 @@ test('returns email-taken when repository already contains the address', async (
 
   const result = await service.register({
     name: 'Example User',
+    driverName: 'Another Driver',
     email: 'user@example.com',
     password: 'P@ssword12345',
   });
 
   assert.deepEqual(result, { ok: false, reason: 'email-taken' });
+});
+
+test('returns driver-name-taken with suggestions when driver name already exists', async () => {
+  const { service, repository } = buildService();
+  const existingUser: User = {
+    id: 'user-driver',
+    name: 'Existing User',
+    driverName: 'Existing Driver',
+    email: 'existing@example.com',
+    passwordHash: 'hashed:password',
+    status: 'active',
+    emailVerifiedAt: new Date('2024-12-31T00:00:00Z'),
+    createdAt: new Date('2024-12-01T00:00:00Z'),
+    updatedAt: new Date('2024-12-01T00:00:00Z'),
+  };
+  repository.seed(existingUser);
+
+  const result = await service.register({
+    name: 'Example User',
+    driverName: 'Existing Driver',
+    email: 'user@example.com',
+    password: 'P@ssword12345',
+  });
+
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.reason, 'driver-name-taken');
+    assert.ok(Array.isArray(result.suggestions));
+    assert.ok(result.suggestions.length > 0);
+    assert.ok(result.suggestions.every((suggestion) => suggestion !== 'Existing Driver'));
+  }
 });
 
 test('issues verification email and token when verification is required', async () => {
@@ -112,6 +146,7 @@ test('issues verification email and token when verification is required', async 
 
   const result = await service.register({
     name: 'Example User',
+    driverName: 'Example Driver',
     email: 'user@example.com',
     password: 'P@ssword12345',
   });
@@ -148,6 +183,7 @@ test('returns await-approval when admin approval is required', async () => {
 
   const result = await service.register({
     name: 'Example User',
+    driverName: 'Example Driver',
     email: 'user@example.com',
     password: 'P@ssword12345',
   });
@@ -169,6 +205,7 @@ test('creates a session when verification is not required', async () => {
 
   const result = await service.register({
     name: 'Example User',
+    driverName: 'Example Driver',
     email: 'user@example.com',
     password: 'P@ssword12345',
     rememberSession: true,
@@ -203,6 +240,7 @@ test('returns verify-email-await-approval when both verification and admin appro
 
   const result = await service.register({
     name: 'Example User',
+    driverName: 'Example Driver',
     email: 'user@example.com',
     password: 'P@ssword12345',
   });
@@ -221,7 +259,7 @@ test('returns verify-email-await-approval when both verification and admin appro
 
 test('maps unique constraint violations during creation to email-taken', async () => {
   class ThrowingUserRepository extends InMemoryUserRepository {
-    async create(): Promise<User> {
+    async create(_input: CreateUserInput): Promise<User> {
       throw new DuplicateUserEmailError('user@example.com');
     }
   }
@@ -231,6 +269,7 @@ test('maps unique constraint violations during creation to email-taken', async (
 
   const result = await service.register({
     name: 'Example User',
+    driverName: 'Example Driver',
     email: 'user@example.com',
     password: 'P@ssword12345',
   });
@@ -257,6 +296,7 @@ test('rolls back user creation when verification email dispatch fails', async ()
     () =>
       service.register({
         name: 'Example User',
+        driverName: 'Example Driver',
         email: 'user@example.com',
         password: 'P@ssword12345',
       }),

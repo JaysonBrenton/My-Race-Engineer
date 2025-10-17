@@ -19,7 +19,7 @@ import type {
   UserRepository,
   UserSessionRepository,
 } from '../../../../src/core/app';
-import { DuplicateUserEmailError } from '../../../../src/core/app';
+import { DuplicateUserDriverNameError, DuplicateUserEmailError } from '../../../../src/core/app';
 import { LoginUserService } from '../../../../src/core/app/services/auth/loginUser';
 import { RegisterUserService } from '../../../../src/core/app/services/auth/registerUser';
 import type {
@@ -39,11 +39,16 @@ export class InMemoryUserRepository implements UserRepository {
   public created: CreateUserInput | null = null;
   public usersByEmail = new Map<string, User>();
   public usersById = new Map<string, User>();
+  public usersByDriverName = new Map<string, User>();
 
   constructor(private readonly clock: TestClock = () => new Date()) {}
 
   async findByEmail(email: string): Promise<User | null> {
     return this.usersByEmail.get(email.toLowerCase()) ?? null;
+  }
+
+  async findByDriverName(driverName: string): Promise<User | null> {
+    return this.usersByDriverName.get(driverName) ?? null;
   }
 
   async findById(id: string): Promise<User | null> {
@@ -55,10 +60,15 @@ export class InMemoryUserRepository implements UserRepository {
       throw new DuplicateUserEmailError(input.email.toLowerCase());
     }
 
+    if (this.usersByDriverName.has(input.driverName)) {
+      throw new DuplicateUserDriverNameError(input.driverName);
+    }
+
     const createdAt = this.clock();
     const user: User = {
       id: input.id,
       name: input.name,
+      driverName: input.driverName,
       email: input.email.toLowerCase(),
       passwordHash: input.passwordHash,
       status: input.status,
@@ -69,6 +79,7 @@ export class InMemoryUserRepository implements UserRepository {
     this.created = input;
     this.usersByEmail.set(user.email, user);
     this.usersById.set(user.id, user);
+    this.usersByDriverName.set(user.driverName, user);
     return user;
   }
 
@@ -82,6 +93,7 @@ export class InMemoryUserRepository implements UserRepository {
     };
     this.usersById.set(userId, updated);
     this.usersByEmail.set(updated.email, updated);
+    this.usersByDriverName.set(updated.driverName, updated);
     return updated;
   }
 
@@ -95,6 +107,7 @@ export class InMemoryUserRepository implements UserRepository {
     };
     this.usersById.set(userId, updated);
     this.usersByEmail.set(updated.email, updated);
+    this.usersByDriverName.set(updated.driverName, updated);
     return updated;
   }
 
@@ -108,6 +121,7 @@ export class InMemoryUserRepository implements UserRepository {
     };
     this.usersById.set(userId, updated);
     this.usersByEmail.set(updated.email, updated);
+    this.usersByDriverName.set(updated.driverName, updated);
     return updated;
   }
 
@@ -119,11 +133,13 @@ export class InMemoryUserRepository implements UserRepository {
 
     this.usersById.delete(userId);
     this.usersByEmail.delete(user.email);
+    this.usersByDriverName.delete(user.driverName);
   }
 
   seed(user: User) {
     this.usersByEmail.set(user.email.toLowerCase(), user);
     this.usersById.set(user.id, user);
+    this.usersByDriverName.set(user.driverName, user);
   }
 }
 

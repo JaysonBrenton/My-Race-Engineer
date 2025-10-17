@@ -15,11 +15,12 @@ import type {
   UserRepository,
   Logger,
 } from '@core/app';
-import { DuplicateUserEmailError } from '@core/app';
+import { DuplicateUserDriverNameError, DuplicateUserEmailError } from '@core/app';
 import type { User } from '@core/domain';
 
 export type RegisterUserInput = {
   name: string;
+  driverName: string;
   email: string;
   password: string;
   rememberSession?: boolean;
@@ -32,6 +33,7 @@ export type RegisterUserInput = {
 
 export type RegisterUserResult =
   | { ok: false; reason: 'email-taken' | 'weak-password' }
+  | { ok: false; reason: 'driver-name-taken'; suggestions: string[] }
   | {
       ok: true;
       user: User;
@@ -108,6 +110,18 @@ export class RegisterUserService {
       return { ok: false, reason: 'email-taken' };
     }
 
+    const driverNameOwner = await this.userRepository.findByDriverName(input.driverName);
+
+    if (driverNameOwner) {
+      this.logger.info('Registration attempt for existing driver name rejected.', {
+        event: 'auth.registration.driver_name_taken',
+        outcome: 'conflict',
+        durationMs: this.clock().getTime() - requestStartedAt.getTime(),
+      });
+      const suggestions = await this.generateDriverNameSuggestions(input.driverName);
+      return { ok: false, reason: 'driver-name-taken', suggestions };
+    }
+
     const requireEmailVerification = this.options.requireEmailVerification;
     const requireAdminApproval = this.options.requireAdminApproval;
     const assignedRole = 'driver';
@@ -131,6 +145,7 @@ export class RegisterUserService {
         const createdUser = await deps.userRepository.create({
           id: randomUUID(),
           name: input.name,
+          driverName: input.driverName,
           email: input.email,
           passwordHash: await this.passwordHasher.hash(input.password),
           status: initialStatus,
@@ -181,6 +196,19 @@ export class RegisterUserService {
           durationMs: this.clock().getTime() - requestStartedAt.getTime(),
         });
         return { ok: false, reason: 'email-taken' };
+      }
+
+      if (error instanceof DuplicateUserDriverNameError) {
+        this.logger.info(
+          'Registration attempt failed due to duplicate driver name during creation.',
+          {
+            event: 'auth.registration.driver_name_taken',
+            outcome: 'conflict',
+            durationMs: this.clock().getTime() - requestStartedAt.getTime(),
+          },
+        );
+        const suggestions = await this.generateDriverNameSuggestions(input.driverName);
+        return { ok: false, reason: 'driver-name-taken', suggestions };
       }
 
       throw error;
@@ -293,5 +321,93 @@ export class RegisterUserService {
         error: errorPayload,
       });
     }
+  }
+
+  private async generateDriverNameSuggestions(requested: string, limit = 3): Promise<string[]> {
+    const trimmed = requested.trim();
+    if (!trimmed) {
+      return [];
+    }
+
+    const normalised = trimmed.replace(/\s+/g, ' ');
+    const baseWithoutTrailingNumber = normalised.replace(/\d+$/, '').trim() || normalised;
+    const candidateBases = Array.from(
+      new Set([
+        normalised,
+        baseWithoutTrailingNumber,
+        baseWithoutTrailingNumber.replace(/[-_]+$/, '').trim() || baseWithoutTrailingNumber,
+      ]),
+    ).filter((value) => value.length > 0);
+
+    const suggestions: string[] = [];
+    const seen = new Set<string>();
+    const ensureUniqueLower = (value: string) => {
+      const key = value.toLowerCase();
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    };
+
+    const tryAddCandidate = async (candidate: string) => {
+      const proposal = candidate.trim();
+      if (!proposal || !ensureUniqueLower(proposal)) {
+        return;
+      }
+
+      const existing = await this.userRepository.findByDriverName(proposal);
+      if (!existing) {
+        suggestions.push(proposal);
+      }
+    };
+
+    let suffix = 2;
+    let attempts = 0;
+    const maxAttempts = 60;
+
+    while (suggestions.length < limit && attempts < maxAttempts) {
+      for (const base of candidateBases) {
+        if (suggestions.length >= limit) {
+          break;
+        }
+
+        await tryAddCandidate(`${base} ${suffix}`);
+        attempts += 1;
+
+        if (suggestions.length >= limit || attempts >= maxAttempts) {
+          break;
+        }
+
+        await tryAddCandidate(`${base}${suffix}`);
+        attempts += 1;
+
+        if (suggestions.length >= limit || attempts >= maxAttempts) {
+          break;
+        }
+      }
+
+      suffix += 1;
+    }
+
+    if (suggestions.length >= limit) {
+      return suggestions.slice(0, limit);
+    }
+
+    while (suggestions.length < limit && attempts < maxAttempts) {
+      const randomSuffix = Math.floor(100 + Math.random() * 900);
+      for (const base of candidateBases) {
+        if (suggestions.length >= limit) {
+          break;
+        }
+        await tryAddCandidate(`${base} ${randomSuffix}`);
+        attempts += 1;
+        if (attempts >= maxAttempts) {
+          break;
+        }
+      }
+    }
+
+    return suggestions.slice(0, limit);
   }
 }

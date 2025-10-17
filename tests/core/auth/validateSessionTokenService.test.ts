@@ -17,6 +17,7 @@ const clock = createFixedClock(now);
 const buildUser = (overrides: Partial<User> = {}): User => ({
   id: 'user-1',
   name: 'Test User',
+  driverName: 'Test Driver',
   email: 'user@example.com',
   passwordHash: 'hash',
   status: 'active',

@@ -5,6 +5,7 @@ export type UserStatus = (typeof USER_STATUSES)[number];
 export type User = {
   id: string;
   name: string;
+  driverName: string;
   email: string;
   passwordHash: string;
   status: UserStatus;
@@ -16,6 +17,7 @@ export type User = {
 export type CreateUserInput = {
   id: string;
   name: string;
+  driverName: string;
   email: string;
   passwordHash: string;
   status: UserStatus;

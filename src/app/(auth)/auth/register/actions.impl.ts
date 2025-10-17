@@ -22,10 +22,16 @@ import { computeCookieSecure, type CookieSecureStrategy } from '@/server/runtime
 import { guardAuthPostOrigin } from '@/server/security/origin';
 import type { AuthActionDebugEvent } from '@/server/security/authDebug';
 
-import { buildPrefillParam, buildRedirectUrl, type RegisterErrorCode } from './state';
+import {
+  buildDriverNameSuggestionsParam,
+  buildPrefillParam,
+  buildRedirectUrl,
+  type RegisterErrorCode,
+} from './state';
 
 type RegistrationPrefillInput = {
   name?: string | null | undefined;
+  driverName?: string | null | undefined;
   email?: string | null | undefined;
 };
 
@@ -50,6 +56,11 @@ const registrationSchema = z
       .trim()
       .min(1, 'Enter your full name.')
       .max(120, 'Names must be 120 characters or fewer.'),
+    driverName: z
+      .string()
+      .trim()
+      .min(1, 'Enter your driver name.')
+      .max(60, 'Driver names must be 60 characters or fewer.'),
     email: z
       .string()
       .trim()
@@ -83,11 +94,13 @@ const getFormValue = (data: FormData, key: string) => {
 
 const extractPrefillValues = (data: FormData): RegistrationPrefillInput => ({
   name: getFormValue(data, 'name'),
+  driverName: getFormValue(data, 'driverName'),
   email: getFormValue(data, 'email'),
 });
 
 const normalisePrefillValues = (prefill: RegistrationPrefillInput) => ({
   name: typeof prefill.name === 'string' ? prefill.name.trim() : '',
+  driverName: typeof prefill.driverName === 'string' ? prefill.driverName.trim() : '',
   email: typeof prefill.email === 'string' ? prefill.email.trim() : '',
 });
 
@@ -201,12 +214,21 @@ export const createRegisterAction = (
           });
         };
 
-        const redirectToRegister = (errorCode: RegisterErrorCode): never => {
+        const redirectToRegister = (
+          errorCode: RegisterErrorCode,
+          options: { driverNameSuggestions?: string[] } = {},
+        ): never => {
+          const driverNameSuggestionsParam =
+            options.driverNameSuggestions && options.driverNameSuggestions.length > 0
+              ? buildDriverNameSuggestionsParam(options.driverNameSuggestions)
+              : undefined;
           const redirectUrl = buildRedirectUrl('/auth/register', {
             error: errorCode,
             prefill: buildPrefillParam(normalisedPrefills),
             name: normalisedPrefills.name || undefined,
+            driverName: normalisedPrefills.driverName || undefined,
             email: normalisedPrefills.email || undefined,
+            driverNameSuggestions: driverNameSuggestionsParam,
           });
 
           recordOutcome({ kind: 'redirect', target: redirectUrl, statusKey: errorCode });
@@ -310,6 +332,7 @@ export const createRegisterAction = (
 
         const parseResult = registrationSchema.safeParse({
           name: getFormValue(formData, 'name'),
+          driverName: getFormValue(formData, 'driverName'),
           email: getFormValue(formData, 'email'),
           password: getFormValue(formData, 'password'),
           confirmPassword: getFormValue(formData, 'confirmPassword'),
@@ -341,12 +364,17 @@ export const createRegisterAction = (
           result: 'ok',
         });
 
-        const { name, email, password } = parseResult.data;
+        const { name, driverName, email, password } = parseResult.data;
         const userAgent = headersList.get('user-agent');
         const emailFingerprint = deps.createLogFingerprint(email);
+        const driverNameFingerprint = deps.createLogFingerprint(driverName);
 
         if (emailFingerprint) {
           span.setAttribute('mre.auth.email_fingerprint', emailFingerprint);
+        }
+
+        if (driverNameFingerprint) {
+          span.setAttribute('mre.auth.driver_name_fingerprint', driverNameFingerprint);
         }
 
         logger.info('Registration payload validated.', {
@@ -354,12 +382,14 @@ export const createRegisterAction = (
           outcome: 'processing',
           clientFingerprint,
           emailFingerprint,
+          driverNameFingerprint,
         });
 
         let result: Awaited<ReturnType<typeof registerUserService.register>>;
         try {
           result = await deps.registerUserService.register({
             name,
+            driverName,
             email,
             password,
             rememberSession: true,
@@ -396,8 +426,14 @@ export const createRegisterAction = (
             outcome: 'rejected',
             clientFingerprint,
             emailFingerprint,
+            driverNameFingerprint,
             durationMs: Date.now() - requestStartedAt,
           });
+
+          if (result.reason === 'driver-name-taken') {
+            return redirectToRegister(result.reason, { driverNameSuggestions: result.suggestions });
+          }
+
           return redirectToRegister(result.reason);
         }
 

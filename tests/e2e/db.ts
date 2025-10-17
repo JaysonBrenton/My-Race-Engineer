@@ -17,11 +17,17 @@ export const deleteUserByEmail = (email: string) =>
 
 export const closeDb = () => prisma.$disconnect();
 
-export const createActiveUser = async (params: { name: string; email: string; password: string }) => {
+export const createActiveUser = async (params: {
+  name: string;
+  driverName: string;
+  email: string;
+  password: string;
+}) => {
   const passwordHash = await passwordHasher.hash(params.password);
   return prisma.user.create({
     data: {
       name: params.name,
+      driverName: params.driverName,
       email: params.email,
       passwordHash,
       status: 'ACTIVE',

@@ -35,7 +35,7 @@ export function RegisterForm({ action, initialState, formToken }: RegisterFormPr
   const [state, formAction] = useFormState(action, initialState);
   const inlineBannerMessage =
     state.errorCode && state.status.tone === 'error' ? state.status.message : null;
-  const formKey = `${state.values.name}|${state.values.email}|${state.status.tone}|${state.status.message}`;
+  const formKey = `${state.values.name}|${state.values.driverName}|${state.values.email}|${state.status.tone}|${state.status.message}`;
 
   return (
     <form
@@ -87,6 +87,38 @@ const FormFields = ({ formToken, state, inlineBannerMessage }: FormFieldsProps) 
         <p className={styles.helpText} id="auth-register-name-help">
           This name is displayed in dashboards and team rosters.
         </p>
+      </div>
+      <div className={styles.field}>
+        <label className={styles.label} htmlFor="auth-register-driver-name">
+          Driver name
+        </label>
+        <input
+          id="auth-register-driver-name"
+          name="driverName"
+          type="text"
+          autoComplete="nickname"
+          required
+          aria-required="true"
+          className={styles.input}
+          aria-describedby="auth-register-driver-name-help auth-register-status"
+          defaultValue={state.values.driverName}
+          disabled={isFormDisabled}
+        />
+        <p className={styles.helpText} id="auth-register-driver-name-help">
+          This driver name must be unique and will represent you in race telemetry.
+        </p>
+        {state.suggestedDriverNames?.length ? (
+          <div className={styles.suggestionGroup} role="note" aria-live="polite">
+            <p className={styles.suggestionHeading}>Suggested driver names</p>
+            <ul className={styles.suggestionList}>
+              {state.suggestedDriverNames.map((suggestion) => (
+                <li key={suggestion} className={styles.suggestionListItem}>
+                  {suggestion}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </div>
       <div className={styles.field}>
         <label className={styles.label} htmlFor="auth-register-email">

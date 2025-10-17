@@ -23,7 +23,12 @@ import {
   safeParseJsonRecord,
   type SearchParams,
 } from '../shared/search-params';
-import { buildStatusMessage, type RegisterErrorCode, type StatusMessage } from './state';
+import {
+  buildStatusMessage,
+  parseDriverNameSuggestionsParam,
+  type RegisterErrorCode,
+  type StatusMessage,
+} from './state';
 import { registerAction } from './actions';
 
 const PAGE_TITLE = 'Create your My Race Engineer account';
@@ -62,6 +67,7 @@ type RegisterPageProps = {
 
 type RegisterPrefill = {
   name?: string;
+  driverName?: string;
   email?: string;
 };
 
@@ -74,6 +80,7 @@ const buildPrefill = (raw: string | undefined): RegisterPrefill => {
 
   return {
     name: asOptionalTrimmedString(parsed.name),
+    driverName: asOptionalTrimmedString(parsed.driverName),
     email: asOptionalTrimmedString(parsed.email),
   };
 };
@@ -85,6 +92,7 @@ const parseErrorCode = (raw: string | undefined): RegisterErrorCode | undefined 
     case 'validation':
     case 'rate-limited':
     case 'email-taken':
+    case 'driver-name-taken':
     case 'weak-password':
     case 'server-error':
       return raw;
@@ -130,20 +138,28 @@ export default function RegisterPage({ searchParams }: RegisterPageProps) {
 
   const errorParam = firstParamValue(searchParams?.error);
   const errorCode = parseErrorCode(errorParam);
-  const status = configurationStatus ?? buildStatusMessage(errorCode);
-
   const parsedPrefill = buildPrefill(firstParamValue(searchParams?.prefill));
   const fallbackName = asOptionalTrimmedString(firstParamValue(searchParams?.name));
+  const fallbackDriverName = asOptionalTrimmedString(firstParamValue(searchParams?.driverName));
   const fallbackEmail = asOptionalTrimmedString(firstParamValue(searchParams?.email));
+  const driverNameSuggestions = parseDriverNameSuggestionsParam(
+    firstParamValue(searchParams?.driverNameSuggestions),
+  );
+
   const namePrefill = parsedPrefill.name ?? fallbackName ?? '';
+  const driverNamePrefill = parsedPrefill.driverName ?? fallbackDriverName ?? '';
   const emailPrefill = parsedPrefill.email ?? fallbackEmail ?? '';
 
-  const inlineBannerCandidate = errorCode ? buildStatusMessage(errorCode) : null;
+  const statusContext = configurationStatus ? undefined : { driverNameSuggestions };
+  const resolvedStatus = configurationStatus ?? buildStatusMessage(errorCode, statusContext);
+
+  const inlineBannerCandidate =
+    errorCode && !configurationStatus ? buildStatusMessage(errorCode, statusContext) : null;
   const inlineBannerMessage =
     inlineBannerCandidate && inlineBannerCandidate.tone === 'error'
       ? inlineBannerCandidate.message
       : null;
-  const statusClassName = getStatusClassName(status.tone);
+  const statusClassName = getStatusClassName(resolvedStatus.tone);
   const isFormDisabled = !formToken;
 
   return (
@@ -191,6 +207,38 @@ export default function RegisterPage({ searchParams }: RegisterPageProps) {
             <p className={styles.helpText} id="auth-register-name-help">
               This name is displayed in dashboards and team rosters.
             </p>
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="auth-register-driver-name">
+              Driver name
+            </label>
+            <input
+              id="auth-register-driver-name"
+              name="driverName"
+              type="text"
+              autoComplete="nickname"
+              required
+              aria-required="true"
+              className={styles.input}
+              aria-describedby="auth-register-driver-name-help auth-register-status"
+              defaultValue={driverNamePrefill}
+              disabled={isFormDisabled}
+            />
+            <p className={styles.helpText} id="auth-register-driver-name-help">
+              This driver name must be unique and will represent you in race telemetry.
+            </p>
+            {driverNameSuggestions.length > 0 ? (
+              <div className={styles.suggestionGroup} role="note" aria-live="polite">
+                <p className={styles.suggestionHeading}>Suggested driver names</p>
+                <ul className={styles.suggestionList}>
+                  {driverNameSuggestions.map((suggestion) => (
+                    <li key={suggestion} className={styles.suggestionListItem}>
+                      {suggestion}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </div>
           <div className={styles.field}>
             <label className={styles.label} htmlFor="auth-register-email">
@@ -265,7 +313,7 @@ export default function RegisterPage({ searchParams }: RegisterPageProps) {
             aria-live="polite"
             aria-atomic="true"
           >
-            {status.message}
+            {resolvedStatus.message}
           </p>
         </form>
       </article>
