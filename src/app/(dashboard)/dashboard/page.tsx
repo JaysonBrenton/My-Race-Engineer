@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
 
+import { requireAuthenticatedUser } from '@/lib/auth/serverSession';
+
 import styles from './page.module.css';
 
 const PAGE_TITLE = 'Telemetry dashboard';
@@ -12,12 +14,14 @@ export const metadata: Metadata = {
   description: PAGE_DESCRIPTION,
 };
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const { user } = await requireAuthenticatedUser();
+
   return (
     <section className={styles.container} aria-labelledby="dashboard-heading">
       <header className={styles.header}>
         <h1 className={styles.title} id="dashboard-heading">
-          Welcome back to your telemetry hub
+          Welcome back to your telemetry hub {user.driverName}
         </h1>
         <p className={styles.description}>{PAGE_DESCRIPTION}</p>
         <div className={styles.actions}>
