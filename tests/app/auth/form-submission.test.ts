@@ -423,7 +423,7 @@ test('registerAction redirects with validation error for mismatched passwords wi
   const formData = new FormData();
   formData.set('name', 'Example User');
   formData.set('driverName', 'Example Driver');
-  formData.set('email', 'user@example.com');
+  formData.set('identifier', 'user@example.com');
   formData.set('password', 'Str0ngPassword!23');
   formData.set('confirmPassword', 'WrongPassword!23');
   formData.set('formToken', 'token');
@@ -485,7 +485,7 @@ test('registerAction issues a session cookie and redirects on successful registr
   const formData = new FormData();
   formData.set('name', ' Example User ');
   formData.set('driverName', ' Example Driver ');
-  formData.set('email', 'User@example.com');
+  formData.set('identifier', 'User@example.com');
   formData.set('password', 'Str0ngPassword!23');
   formData.set('confirmPassword', 'Str0ngPassword!23');
   formData.set('formToken', 'token');
@@ -542,7 +542,7 @@ test('registerAction redirects with verify-email-awaiting-approval when both che
   const formData = new FormData();
   formData.set('name', 'Example User');
   formData.set('driverName', 'Example Driver');
-  formData.set('email', 'user@example.com');
+  formData.set('identifier', 'user@example.com');
   formData.set('password', 'Str0ngPassword!23');
   formData.set('confirmPassword', 'Str0ngPassword!23');
   formData.set('formToken', 'token');
@@ -557,7 +557,7 @@ test('registerAction redirects with verify-email-awaiting-approval when both che
     assert.equal(url.searchParams.get('status'), 'verify-email-awaiting-approval');
     const prefill = url.searchParams.get('prefill');
     assert.ok(prefill);
-    assert.deepEqual(JSON.parse(prefill), { email: 'user@example.com' });
+    assert.deepEqual(JSON.parse(prefill), { identifier: 'user@example.com' });
   }
 });
 
@@ -585,7 +585,7 @@ test('registerAction redirects with verify-email when only verification is requi
   const formData = new FormData();
   formData.set('name', 'Example User');
   formData.set('driverName', 'Example Driver');
-  formData.set('email', 'user@example.com');
+  formData.set('identifier', 'user@example.com');
   formData.set('password', 'Str0ngPassword!23');
   formData.set('confirmPassword', 'Str0ngPassword!23');
   formData.set('formToken', 'token');
@@ -600,7 +600,7 @@ test('registerAction redirects with verify-email when only verification is requi
     assert.equal(url.searchParams.get('status'), 'verify-email');
     const prefill = url.searchParams.get('prefill');
     assert.ok(prefill);
-    assert.deepEqual(JSON.parse(prefill), { email: 'user@example.com' });
+    assert.deepEqual(JSON.parse(prefill), { identifier: 'user@example.com' });
   }
 });
 
@@ -640,7 +640,7 @@ test('loginAction redirects back to the form when the token is invalid', async (
   });
   const loginAction = createLoginAction(deps);
   const formData = new FormData();
-  formData.set('email', 'user@example.com');
+  formData.set('identifier', 'user@example.com');
   formData.set('password', 'correct-horse-battery-staple');
 
   try {
@@ -683,7 +683,7 @@ test('loginAction mints a session cookie and redirects to the dashboard on succe
   });
   const loginAction = createLoginAction(deps);
   const formData = new FormData();
-  formData.set('email', 'User@example.com');
+  formData.set('identifier', 'User@example.com');
   formData.set('password', 'correct-horse-battery-staple');
   formData.set('remember', 'true');
   formData.set('formToken', 'token');
@@ -697,7 +697,7 @@ test('loginAction mints a session cookie and redirects to the dashboard on succe
   }
 
   assert.deepEqual(capturedLoginPayload, {
-    email: 'user@example.com',
+    identifier: { kind: 'email', value: 'user@example.com' },
     password: 'correct-horse-battery-staple',
     rememberSession: true,
     sessionContext: {
@@ -712,6 +712,56 @@ test('loginAction mints a session cookie and redirects to the dashboard on succe
   assert.equal(cookie.value, 'session-token');
   assert.equal(cookie.secure, false);
   assert.equal(cookie.expires?.toISOString(), expiresAt.toISOString());
+});
+
+test('loginAction accepts driver name identifiers', async () => {
+  let capturedLoginPayload: unknown;
+  const { deps } = createLoginDeps({
+    loginUserService: {
+      login: async (payload) => {
+        capturedLoginPayload = payload;
+        return {
+          ok: true as const,
+          sessionToken: 'session-token',
+          expiresAt: new Date(Date.now() + 30_000),
+          user: {
+            id: 'driver-login',
+            name: 'Driver User',
+            driverName: 'Example Driver',
+            email: 'driver@example.com',
+            status: 'active',
+            passwordHash: 'hash',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            emailVerifiedAt: new Date(),
+          },
+        };
+      },
+    },
+  });
+  const loginAction = createLoginAction(deps);
+  const formData = new FormData();
+  formData.set('identifier', 'Example Driver');
+  formData.set('password', 'correct-horse-battery-staple');
+  formData.set('formToken', 'token');
+
+  try {
+    await loginAction(formData);
+    assert.fail('Expected login action to redirect after success.');
+  } catch (error) {
+    assert.ok(error instanceof RedirectCaptured);
+    assert.equal(error.location, '/dashboard');
+  }
+
+  assert.deepEqual(capturedLoginPayload, {
+    identifier: { kind: 'driver-name', value: 'Example Driver' },
+    password: 'correct-horse-battery-staple',
+    rememberSession: false,
+    sessionContext: {
+      ipAddress: '203.0.113.50',
+      userAgent: 'node:test',
+    },
+  });
 });
 
 test('requestPasswordResetAction normalises email and redirects with status=sent', async () => {

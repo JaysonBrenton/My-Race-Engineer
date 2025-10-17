@@ -49,7 +49,7 @@ test('login establishes session for existing user', async ({ page, context }) =>
     await context.clearCookies();
 
     await page.goto('/auth/login');
-    await page.getByLabel(/email address/i).fill(email);
+    await page.getByLabel(/email address or driver name/i).fill(email);
     await page.getByLabel(/^password$/i).fill(strongPass);
     await page.getByRole('button', { name: /sign in/i }).click();
     await page.waitForLoadState('networkidle');

@@ -78,8 +78,11 @@ const buildPrefill = (raw: string | undefined) => {
     return {};
   }
 
+  const identifier =
+    asOptionalTrimmedString(parsed.identifier) ?? asOptionalTrimmedString(parsed.email);
+
   return {
-    email: asOptionalTrimmedString(parsed.email),
+    identifier,
   };
 };
 
@@ -147,7 +150,7 @@ const buildStatusMessage = (
     case 'invalid-credentials':
       return {
         tone: 'error' as const,
-        message: 'Incorrect email or password. Try again or reset your password.',
+        message: 'Incorrect email, driver name, or password. Try again or reset your password.',
       };
     case 'email-not-verified':
       return {
@@ -235,8 +238,9 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
   const errorCode = firstParamValue(searchParams?.error);
   const status = configurationStatus ?? buildStatusMessage(statusCode, errorCode);
   const parsedPrefill = buildPrefill(firstParamValue(searchParams?.prefill));
+  const fallbackIdentifier = asOptionalTrimmedString(firstParamValue(searchParams?.identifier));
   const fallbackEmail = asOptionalTrimmedString(firstParamValue(searchParams?.email));
-  const emailPrefill = parsedPrefill.email ?? fallbackEmail ?? '';
+  const identifierPrefill = parsedPrefill.identifier ?? fallbackIdentifier ?? fallbackEmail ?? '';
 
   const inlineBannerCandidate = errorCode ? buildStatusMessage(undefined, errorCode) : null;
   const inlineBannerMessage =
@@ -276,24 +280,24 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
           <div className={styles.field}>
             {/* Each input gets explicit labels and helper text to meet WCAG 2.2
                 accessibility requirements. */}
-            <label className={styles.label} htmlFor="auth-login-email">
-              Email address
+            <label className={styles.label} htmlFor="auth-login-identifier">
+              Email address or Driver Name
             </label>
             <input
-              id="auth-login-email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              inputMode="email"
+              id="auth-login-identifier"
+              name="identifier"
+              type="text"
+              autoComplete="username"
+              inputMode="text"
               required
               aria-required="true"
               className={styles.input}
-              aria-describedby="auth-login-email-help auth-login-status"
-              defaultValue={emailPrefill}
+              aria-describedby="auth-login-identifier-help auth-login-status"
+              defaultValue={identifierPrefill}
               disabled={isFormDisabled}
             />
-            <p className={styles.helpText} id="auth-login-email-help">
-              Use the email associated with your paddock or club account.
+            <p className={styles.helpText} id="auth-login-identifier-help">
+              Enter the email or driver name tied to your paddock or club account.
             </p>
           </div>
           <div className={styles.field}>

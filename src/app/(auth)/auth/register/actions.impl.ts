@@ -104,6 +104,24 @@ const normalisePrefillValues = (prefill: RegistrationPrefillInput) => ({
   email: typeof prefill.email === 'string' ? prefill.email.trim() : '',
 });
 
+const buildLoginPrefillParam = (value: string | null | undefined): string | undefined => {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return undefined;
+  }
+
+  try {
+    return JSON.stringify({ identifier: trimmed });
+  } catch {
+    return undefined;
+  }
+};
+
 type RegisterService = Pick<typeof registerUserService, 'register'>;
 
 export type RegisterActionDependencies = {
@@ -450,7 +468,7 @@ export const createRegisterAction = (
             {
               const target = buildRedirectUrl('/auth/login', {
                 status: 'verify-email',
-                prefill: buildPrefillParam({ email }),
+                prefill: buildLoginPrefillParam(email),
               });
               recordOutcome({ kind: 'redirect', target, statusKey: 'verify-email' });
               deps.redirect(target);
@@ -468,7 +486,7 @@ export const createRegisterAction = (
             {
               const target = buildRedirectUrl('/auth/login', {
                 status: 'verify-email-awaiting-approval',
-                prefill: buildPrefillParam({ email }),
+                prefill: buildLoginPrefillParam(email),
               });
               recordOutcome({
                 kind: 'redirect',
@@ -490,7 +508,7 @@ export const createRegisterAction = (
             {
               const target = buildRedirectUrl('/auth/login', {
                 status: 'awaiting-approval',
-                prefill: buildPrefillParam({ email }),
+                prefill: buildLoginPrefillParam(email),
               });
               recordOutcome({ kind: 'redirect', target, statusKey: 'awaiting-approval' });
               deps.redirect(target);
