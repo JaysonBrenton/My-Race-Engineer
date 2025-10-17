@@ -1,5 +1,6 @@
 export const LiveRcUrlInvalidReasons = {
   INVALID_ABSOLUTE_URL: 'LiveRC import requires an absolute URL.',
+  UNTRUSTED_HOST: 'LiveRC URL must use an approved LiveRC hostname.',
   INVALID_RESULTS_PATH: 'LiveRC URL must point to a JSON results endpoint under /results/.',
   INCOMPLETE_RESULTS_SEGMENTS:
     'LiveRC results URL must include event, class, round, and race segments.',
@@ -62,6 +63,16 @@ export const parseLiveRcUrl = (input: string): LiveRcUrlParseResult => {
     parsedUrl = new URL(input);
   } catch {
     return { type: 'invalid', reasonIfInvalid: LiveRcUrlInvalidReasons.INVALID_ABSOLUTE_URL };
+  }
+
+  const hostname = parsedUrl.hostname.toLowerCase();
+  const isTrustedHost =
+    hostname === 'liverc.com' ||
+    hostname === 'www.liverc.com' ||
+    hostname.endsWith('.liverc.com');
+
+  if (!isTrustedHost) {
+    return { type: 'invalid', reasonIfInvalid: LiveRcUrlInvalidReasons.UNTRUSTED_HOST };
   }
 
   const legacyPage = parsedUrl.searchParams.get('p');

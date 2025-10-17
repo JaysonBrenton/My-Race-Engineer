@@ -46,6 +46,10 @@ void test('parseLiveRcUrl reports invalid URLs with descriptive reasons', () => 
   }> = [
     { input: 'not-a-url', reason: LiveRcUrlInvalidReasons.INVALID_ABSOLUTE_URL },
     {
+      input: 'https://example.com/results/event/class/round/race',
+      reason: LiveRcUrlInvalidReasons.UNTRUSTED_HOST,
+    },
+    {
       input: 'https://liverc.com/results/event/class/round',
       reason: LiveRcUrlInvalidReasons.INCOMPLETE_RESULTS_SEGMENTS,
     },
