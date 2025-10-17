@@ -1,8 +1,4 @@
-import type {
-  DriverRepository,
-  DriverSourceUpsertInput,
-  DriverUpsertInput,
-} from '@core/app';
+import type { DriverRepository, DriverSourceUpsertInput, DriverUpsertInput } from '@core/app';
 import type { Driver } from '@core/domain';
 import type { Driver as PrismaDriver } from '@prisma/client';
 

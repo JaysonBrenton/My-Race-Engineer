@@ -1,5 +1,5 @@
 import type { UserRepository } from '@core/app';
-import { DuplicateUserEmailError } from '@core/app';
+import { DuplicateUserDriverNameError, DuplicateUserEmailError } from '@core/app';
 import type { CreateUserInput, User } from '@core/domain';
 /*
  * Prisma's generated client returns fully typed objects, but `@typescript-eslint`
@@ -15,6 +15,7 @@ import { getPrismaClient } from './prismaClient';
 const toDomain = (user: PrismaUser): User => ({
   id: user.id,
   name: user.name,
+  driverName: user.driverName,
   email: user.email,
   passwordHash: user.passwordHash,
   status: user.status.toLowerCase() as User['status'],
@@ -45,6 +46,12 @@ export class PrismaUserRepository implements UserRepository {
     return user ? toDomain(user) : null;
   }
 
+  async findByDriverName(driverName: string): Promise<User | null> {
+    const user = await this.prisma.user.findUnique({ where: { driverName } });
+
+    return user ? toDomain(user) : null;
+  }
+
   async findById(id: string): Promise<User | null> {
     const user = await this.prisma.user.findUnique({ where: { id } });
 
@@ -58,6 +65,7 @@ export class PrismaUserRepository implements UserRepository {
           data: {
             id: input.id,
             name: input.name,
+            driverName: input.driverName,
             email: input.email.toLowerCase(),
             passwordHash: input.passwordHash,
             status: this.toPrismaStatus(input.status),
@@ -67,7 +75,22 @@ export class PrismaUserRepository implements UserRepository {
       );
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        throw new DuplicateUserEmailError(input.email.toLowerCase());
+        const targetMeta = error.meta?.target as string | string[] | undefined;
+        const targets: string[] = Array.isArray(targetMeta)
+          ? targetMeta.map((value) => String(value))
+          : typeof targetMeta === 'string'
+            ? [targetMeta]
+            : [];
+
+        if (targets.some((value) => value.includes('email'))) {
+          throw new DuplicateUserEmailError(input.email.toLowerCase());
+        }
+
+        if (targets.some((value) => value.includes('driverName'))) {
+          throw new DuplicateUserDriverNameError(input.driverName);
+        }
+
+        throw error;
       }
 
       throw error;

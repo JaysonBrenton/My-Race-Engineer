@@ -24,7 +24,12 @@ test.afterAll(async () => {
 test('raw POST login exchanges credentials for a session redirect', async ({ request }, testInfo) => {
   test.skip(!process.env.DATABASE_URL, 'DATABASE_URL is required for login raw POST test');
   const email = uniqueEmail();
-  await createActiveUser({ name: 'Raw Login User', email, password: strongPassword });
+  await createActiveUser({
+    name: 'Raw Login User',
+    driverName: `RawDriver-${Date.now()}`,
+    email,
+    password: strongPassword,
+  });
 
   const loginPage = await request.get('/auth/login');
   expect(loginPage.ok()).toBeTruthy();

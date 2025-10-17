@@ -17,6 +17,7 @@ export * from './ports/auth/registrationUnitOfWork';
 export * from './ports/auth/passwordResetTokenRepository';
 export * from './ports/auth/mailer';
 export * from './errors/duplicateUserEmailError';
+export * from './errors/duplicateUserDriverNameError';
 export * from './services/getLapSummary';
 export * from './services/importLiveRc';
 export * from './services/liveRcUrlParser';

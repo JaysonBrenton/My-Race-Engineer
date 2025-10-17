@@ -27,6 +27,7 @@ test('registration requires verification before login succeeds when enabled', as
 
   const registerResult = await env.registerService.register({
     name: 'Flow User',
+    driverName: 'Flow Driver',
     email: 'flow-user@example.com',
     password: 'Str0ngPassword!23',
   });
@@ -83,6 +84,7 @@ test('admin approval blocks login until status becomes active', async () => {
 
   const registerResult = await env.registerService.register({
     name: 'Pending User',
+    driverName: 'Pending Driver',
     email: 'pending-user@example.com',
     password: 'An0therStrongPass!9',
   });

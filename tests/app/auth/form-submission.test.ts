@@ -162,6 +162,7 @@ const createRegisterDeps = (
         user: {
           id: 'user-1',
           name: 'Example User',
+          driverName: 'Example Driver',
           email: 'user@example.com',
           status: 'active',
           passwordHash: 'hash',
@@ -219,6 +220,7 @@ const createLoginDeps = (overrides: Partial<LoginActionDependencies> = {}): Logi
         user: {
           id: 'user-1',
           name: 'Example User',
+          driverName: 'Example Driver',
           email: 'user@example.com',
           status: 'active',
           passwordHash: 'hash',
@@ -342,12 +344,13 @@ test('registerAction redirects with invalid-origin when the guard rejects the su
             token: 'unused',
             expiresAt: new Date(),
           },
-          user: {
-            id: 'user-1',
-            name: 'Example User',
-            email: 'user@example.com',
-            status: 'active',
-            passwordHash: 'hash',
+        user: {
+          id: 'user-1',
+          name: 'Example User',
+          driverName: 'Example Driver',
+          email: 'user@example.com',
+          status: 'active',
+          passwordHash: 'hash',
             createdAt: new Date(),
             updatedAt: new Date(),
             emailVerifiedAt: new Date(),
@@ -359,6 +362,7 @@ test('registerAction redirects with invalid-origin when the guard rejects the su
   const registerAction = createRegisterAction(deps);
   const formData = new FormData();
   formData.set('name', ' Example User ');
+  formData.set('driverName', ' Example Driver ');
   formData.set('email', 'USER@example.com ');
   formData.set('password', 'Str0ngPassword!23');
   formData.set('confirmPassword', 'Str0ngPassword!23');
@@ -373,11 +377,13 @@ test('registerAction redirects with invalid-origin when the guard rejects the su
     assert.equal(url.pathname, '/auth/register');
     assert.equal(url.searchParams.get('error'), 'invalid-origin');
     assert.equal(url.searchParams.get('name'), 'Example User');
+    assert.equal(url.searchParams.get('driverName'), 'Example Driver');
     assert.equal(url.searchParams.get('email'), 'USER@example.com');
     const prefillParam = url.searchParams.get('prefill');
     assert.ok(prefillParam);
     assert.deepEqual(JSON.parse(prefillParam), {
       name: 'Example User',
+      driverName: 'Example Driver',
       email: 'USER@example.com',
     });
   }
@@ -398,12 +404,13 @@ test('registerAction redirects with validation error for mismatched passwords wi
             token: 'unused',
             expiresAt: new Date(),
           },
-          user: {
-            id: 'user-1',
-            name: 'Example User',
-            email: 'user@example.com',
-            status: 'active',
-            passwordHash: 'hash',
+        user: {
+          id: 'user-1',
+          name: 'Example User',
+          driverName: 'Example Driver',
+          email: 'user@example.com',
+          status: 'active',
+          passwordHash: 'hash',
             createdAt: new Date(),
             updatedAt: new Date(),
             emailVerifiedAt: new Date(),
@@ -415,6 +422,7 @@ test('registerAction redirects with validation error for mismatched passwords wi
   const registerAction = createRegisterAction(deps);
   const formData = new FormData();
   formData.set('name', 'Example User');
+  formData.set('driverName', 'Example Driver');
   formData.set('email', 'user@example.com');
   formData.set('password', 'Str0ngPassword!23');
   formData.set('confirmPassword', 'WrongPassword!23');
@@ -429,11 +437,13 @@ test('registerAction redirects with validation error for mismatched passwords wi
     assert.equal(url.pathname, '/auth/register');
     assert.equal(url.searchParams.get('error'), 'validation');
     assert.equal(url.searchParams.get('name'), 'Example User');
+    assert.equal(url.searchParams.get('driverName'), 'Example Driver');
     assert.equal(url.searchParams.get('email'), 'user@example.com');
     const prefillParam = url.searchParams.get('prefill');
     assert.ok(prefillParam);
     assert.deepEqual(JSON.parse(prefillParam), {
       name: 'Example User',
+      driverName: 'Example Driver',
       email: 'user@example.com',
     });
   }
@@ -458,6 +468,7 @@ test('registerAction issues a session cookie and redirects on successful registr
           user: {
             id: 'user-123',
             name: 'Example User',
+            driverName: 'Example Driver',
             email: 'user@example.com',
             status: 'active',
             passwordHash: 'hash',
@@ -473,6 +484,7 @@ test('registerAction issues a session cookie and redirects on successful registr
   const registerAction = createRegisterAction(deps);
   const formData = new FormData();
   formData.set('name', ' Example User ');
+  formData.set('driverName', ' Example Driver ');
   formData.set('email', 'User@example.com');
   formData.set('password', 'Str0ngPassword!23');
   formData.set('confirmPassword', 'Str0ngPassword!23');
@@ -488,6 +500,7 @@ test('registerAction issues a session cookie and redirects on successful registr
 
   assert.deepEqual(receivedPayload, {
     name: 'Example User',
+    driverName: 'Example Driver',
     email: 'user@example.com',
     password: 'Str0ngPassword!23',
     rememberSession: true,
@@ -514,6 +527,7 @@ test('registerAction redirects with verify-email-awaiting-approval when both che
         user: {
           id: 'user-approve',
           name: 'Example User',
+          driverName: 'Example Driver',
           email: 'user@example.com',
           status: 'pending',
           passwordHash: 'hash',
@@ -527,6 +541,7 @@ test('registerAction redirects with verify-email-awaiting-approval when both che
   const registerAction = createRegisterAction(deps);
   const formData = new FormData();
   formData.set('name', 'Example User');
+  formData.set('driverName', 'Example Driver');
   formData.set('email', 'user@example.com');
   formData.set('password', 'Str0ngPassword!23');
   formData.set('confirmPassword', 'Str0ngPassword!23');
@@ -555,6 +570,7 @@ test('registerAction redirects with verify-email when only verification is requi
         user: {
           id: 'user-verify',
           name: 'Example User',
+          driverName: 'Example Driver',
           email: 'user@example.com',
           status: 'pending',
           passwordHash: 'hash',
@@ -568,6 +584,7 @@ test('registerAction redirects with verify-email when only verification is requi
   const registerAction = createRegisterAction(deps);
   const formData = new FormData();
   formData.set('name', 'Example User');
+  formData.set('driverName', 'Example Driver');
   formData.set('email', 'user@example.com');
   formData.set('password', 'Str0ngPassword!23');
   formData.set('confirmPassword', 'Str0ngPassword!23');
@@ -609,6 +626,7 @@ test('loginAction redirects back to the form when the token is invalid', async (
           user: {
             id: 'user-1',
             name: 'Example User',
+            driverName: 'Example Driver',
             email: 'user@example.com',
             status: 'active',
             passwordHash: 'hash',
@@ -650,6 +668,7 @@ test('loginAction mints a session cookie and redirects to the dashboard on succe
           user: {
             id: 'user-777',
             name: 'Example User',
+            driverName: 'Example Driver',
             email: 'user@example.com',
             status: 'active',
             passwordHash: 'hash',
