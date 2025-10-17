@@ -19,7 +19,8 @@
     "test:auth": "tsx --test tests/core/auth/*.test.ts",
     "test:auth:e2e": "tsx --test tests/core/auth/auth-flow.e2e.test.ts",
     "test:cookie:unit": "tsx --test tests/server/runtime/cookies.strategy.test.ts",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:liverc": "LIVERC_E2E=1 tsx --test tests/connectors/liverc/live-smoke.test.ts"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.8.0",
