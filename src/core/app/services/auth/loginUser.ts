@@ -11,8 +11,12 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { Logger, PasswordHasher, UserRepository, UserSessionRepository } from '@core/app';
 import type { User } from '@core/domain';
 
+export type LoginIdentifier =
+  | { kind: 'email'; value: string }
+  | { kind: 'driver-name'; value: string };
+
 export type LoginUserInput = {
-  email: string;
+  identifier: LoginIdentifier;
   password: string;
   rememberSession?: boolean;
   sessionContext?: {
@@ -70,15 +74,20 @@ export class LoginUserService {
    */
   async login(input: LoginUserInput): Promise<LoginUserResult> {
     const start = this.clock();
-    const user = await this.userRepository.findByEmail(input.email);
+    const identifier = input.identifier;
+    const user =
+      identifier.kind === 'email'
+        ? await this.userRepository.findByEmail(identifier.value)
+        : await this.userRepository.findByDriverName(identifier.value);
 
     if (!user) {
       // Unknown email addresses are treated as invalid credentials so the
       // response timing and error messaging remain indistinguishable from other
       // failures, limiting enumeration attacks.
-      this.logger.warn('Login attempt with unknown email.', {
+      this.logger.warn('Login attempt with unknown credentials identifier.', {
         event: 'auth.login.invalid_credentials',
         outcome: 'rejected',
+        identifierType: identifier.kind,
         durationMs: this.clock().getTime() - start.getTime(),
       });
       return { ok: false, reason: 'invalid-credentials' };

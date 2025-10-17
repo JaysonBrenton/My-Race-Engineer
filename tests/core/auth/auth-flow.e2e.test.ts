@@ -43,7 +43,7 @@ test('registration requires verification before login succeeds when enabled', as
   assert.equal(env.verificationTokens.tokens.length, 1);
 
   const loginBeforeVerification = await env.loginService.login({
-    email: 'flow-user@example.com',
+    identifier: { kind: 'email', value: 'flow-user@example.com' },
     password: 'Str0ngPassword!23',
   });
 
@@ -54,7 +54,7 @@ test('registration requires verification before login succeeds when enabled', as
   await env.userRepository.updateStatus(registerResult.user.id, 'active');
 
   const loginAfterVerification = await env.loginService.login({
-    email: 'flow-user@example.com',
+    identifier: { kind: 'email', value: 'flow-user@example.com' },
     password: 'Str0ngPassword!23',
     rememberSession: true,
     sessionContext: { ipAddress: '203.0.113.42', userAgent: 'node:test' },
@@ -99,7 +99,7 @@ test('admin approval blocks login until status becomes active', async () => {
   assert.equal(env.sessionRepository.createdSessions.length, 0);
 
   const loginWhilePending = await env.loginService.login({
-    email: 'pending-user@example.com',
+    identifier: { kind: 'email', value: 'pending-user@example.com' },
     password: 'An0therStrongPass!9',
   });
 
@@ -108,7 +108,7 @@ test('admin approval blocks login until status becomes active', async () => {
   await env.userRepository.updateStatus(registerResult.user.id, 'active');
 
   const loginAfterApproval = await env.loginService.login({
-    email: 'pending-user@example.com',
+    identifier: { kind: 'email', value: 'pending-user@example.com' },
     password: 'An0therStrongPass!9',
     sessionContext: { ipAddress: '198.51.100.24' },
   });
@@ -119,5 +119,31 @@ test('admin approval blocks login until status becomes active', async () => {
     const [session] = env.sessionRepository.createdSessions;
     assert.equal(session.userId, registerResult.user.id);
     assert.equal(session.ipAddress, '198.51.100.24');
+  }
+});
+
+test('driver name identifiers authenticate successfully', async () => {
+  const env = createAuthTestEnvironment({ clock: buildClock() });
+
+  const registerResult = await env.registerService.register({
+    name: 'Driver Name User',
+    driverName: 'Unique Driver',
+    email: 'driver-name@example.com',
+    password: 'Sup3rStr0ngPass!',
+  });
+
+  assert.equal(registerResult.ok, true);
+  if (!registerResult.ok) {
+    return;
+  }
+
+  const loginResult = await env.loginService.login({
+    identifier: { kind: 'driver-name', value: 'Unique Driver' },
+    password: 'Sup3rStr0ngPass!',
+  });
+
+  assert.equal(loginResult.ok, true);
+  if (loginResult.ok) {
+    assert.equal(loginResult.user.id, registerResult.user.id);
   }
 });

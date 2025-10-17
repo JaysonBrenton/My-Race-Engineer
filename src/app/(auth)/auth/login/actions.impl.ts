@@ -30,14 +30,28 @@ import type { AuthActionDebugEvent } from '@/server/security/authDebug';
 // Zod schema ensures we sanitise and normalise the form payload before handing
 // it to the service layer.  Errors surface back to the UI through redirect
 // parameters so we can display contextual messages.
+const identifierSchema = z
+  .string()
+  .trim()
+  .min(1, 'Enter your email address or driver name.')
+  .max(320, 'Email addresses must be 320 characters or fewer.');
+
+const emailIdentifierSchema = z
+  .string()
+  .trim()
+  .min(1, 'Enter your email address.')
+  .max(320, 'Email addresses must be 320 characters or fewer.')
+  .email('Enter a valid email address.')
+  .transform((value) => value.toLowerCase());
+
+const driverNameIdentifierSchema = z
+  .string()
+  .trim()
+  .min(1, 'Enter your driver name.')
+  .max(60, 'Driver names must be 60 characters or fewer.');
+
 const loginSchema = z.object({
-  email: z
-    .string()
-    .trim()
-    .min(1, 'Enter your email address.')
-    .max(320, 'Email addresses must be 320 characters or fewer.')
-    .email('Enter a valid email address.')
-    .transform((value) => value.toLowerCase()),
+  identifier: identifierSchema,
   password: z.string().min(1, 'Enter your password.'),
   remember: z.literal('true').optional(),
 });
@@ -66,7 +80,11 @@ const getFormValue = (data: FormData, key: string) => {
 
 // Only whitelisted, non-sensitive fields are rehydrated on validation errors.  Password
 // inputs are intentionally excluded so we never echo secrets back to the browser.
-const buildPrefillParam = (prefill: { email?: string | null | undefined }): string | undefined => {
+type LoginPrefillInput = {
+  identifier?: string | null | undefined;
+};
+
+const buildPrefillParam = (prefill: LoginPrefillInput): string | undefined => {
   const safeEntries = Object.entries(prefill)
     .filter(([, value]) => typeof value === 'string' && value.trim().length > 0)
     .map(([key, value]) => [key, (value as string).trim()]);
@@ -299,14 +317,14 @@ export const createLoginAction = (
         }
 
         const parseResult = loginSchema.safeParse({
-          email: getFormValue(formData, 'email'),
+          identifier: getFormValue(formData, 'identifier'),
           password: getFormValue(formData, 'password'),
           remember: getFormValue(formData, 'remember'),
         });
 
         if (!parseResult.success) {
           span.setAttribute('mre.auth.outcome', 'validation_failed');
-          // Validation failures flow back with the email preserved so the user does
+          // Validation failures flow back with the identifier preserved so the user does
           // not have to re-type it, reducing friction for simple typos.
           const issues = parseResult.error.issues.map((issue) => ({
             path: issue.path.map((segment) => segment.toString()).join('.') || 'root',
@@ -327,7 +345,7 @@ export const createLoginAction = (
           });
           const target = buildRedirectUrl('/auth/login', {
             error: 'validation',
-            prefill: buildPrefillParam({ email: getFormValue(formData, 'email') }),
+            prefill: buildPrefillParam({ identifier: getFormValue(formData, 'identifier') }),
           });
           recordOutcome({ kind: 'redirect', target, statusKey: 'validation' });
           deps.redirect(target);
@@ -338,13 +356,51 @@ export const createLoginAction = (
           result: 'ok',
         });
 
-        const { email, password, remember } = parseResult.data;
+        const { identifier: rawIdentifier, password, remember } = parseResult.data;
+        const identifierLooksLikeEmail = rawIdentifier.includes('@');
+        const identifierCheck = identifierLooksLikeEmail
+          ? emailIdentifierSchema.safeParse(rawIdentifier)
+          : driverNameIdentifierSchema.safeParse(rawIdentifier);
+
+        if (!identifierCheck.success) {
+          span.setAttribute('mre.auth.outcome', 'validation_failed');
+          const issues = identifierCheck.error.issues.map((issue) => ({
+            path: 'identifier',
+            code: issue.code,
+            message: issue.message,
+          }));
+          logger.warn('Login rejected due to validation errors.', {
+            event: 'auth.login.validation_failed',
+            outcome: 'rejected',
+            clientFingerprint,
+            validationIssues: issues,
+            durationMs: Date.now() - requestStartedAt,
+          });
+          logger.info('Login validation summary.', {
+            event: 'auth.login.validation',
+            result: 'invalid',
+            issues: issues.map((issue) => issue.path),
+          });
+          const target = buildRedirectUrl('/auth/login', {
+            error: 'validation',
+            prefill: buildPrefillParam({ identifier: rawIdentifier }),
+          });
+          recordOutcome({ kind: 'redirect', target, statusKey: 'validation' });
+          deps.redirect(target);
+        }
+
+        const normalisedIdentifier = identifierCheck.data;
+        const identifierKind = identifierLooksLikeEmail ? 'email' : 'driver-name';
         const userAgent = headersList.get('user-agent');
-        const emailFingerprint = deps.createLogFingerprint(email);
+        const identifierFingerprint = deps.createLogFingerprint(normalisedIdentifier);
         const rememberSession = remember === 'true';
 
-        if (emailFingerprint) {
-          span.setAttribute('mre.auth.email_fingerprint', emailFingerprint);
+        span.setAttribute('mre.auth.identifier_type', identifierKind);
+        if (identifierKind === 'email' && identifierFingerprint) {
+          span.setAttribute('mre.auth.email_fingerprint', identifierFingerprint);
+        }
+        if (identifierKind === 'driver-name' && identifierFingerprint) {
+          span.setAttribute('mre.auth.driver_name_fingerprint', identifierFingerprint);
         }
         span.setAttribute('mre.auth.remember_session', rememberSession);
 
@@ -352,12 +408,14 @@ export const createLoginAction = (
           event: 'auth.login.payload_validated',
           outcome: 'processing',
           clientFingerprint,
-          emailFingerprint,
+          ...(identifierKind === 'email'
+            ? { emailFingerprint: identifierFingerprint }
+            : { driverNameFingerprint: identifierFingerprint }),
           rememberSession,
         });
 
         const result = await deps.loginUserService.login({
-          email,
+          identifier: { kind: identifierKind, value: normalisedIdentifier },
           password,
           rememberSession,
           sessionContext: {
@@ -375,12 +433,14 @@ export const createLoginAction = (
             event: `auth.login.${result.reason.replace(/-/g, '_')}`,
             outcome: 'rejected',
             clientFingerprint,
-            emailFingerprint,
+            ...(identifierKind === 'email'
+              ? { emailFingerprint: identifierFingerprint }
+              : { driverNameFingerprint: identifierFingerprint }),
             durationMs: Date.now() - requestStartedAt,
           });
           const target = buildRedirectUrl('/auth/login', {
             error: result.reason,
-            prefill: buildPrefillParam({ email }),
+            prefill: buildPrefillParam({ identifier: rawIdentifier }),
           });
           recordOutcome({ kind: 'redirect', target, statusKey: result.reason });
           deps.redirect(target);
@@ -417,7 +477,9 @@ export const createLoginAction = (
           event: 'auth.login.success',
           outcome: 'success',
           clientFingerprint,
-          emailFingerprint,
+          ...(identifierKind === 'email'
+            ? { emailFingerprint: identifierFingerprint }
+            : { driverNameFingerprint: identifierFingerprint }),
           rememberSession,
           sessionExpiresAt: result.expiresAt.toISOString(),
           durationMs: Date.now() - requestStartedAt,
