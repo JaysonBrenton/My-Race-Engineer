@@ -8,6 +8,7 @@
 
 import {
   ConfirmPasswordResetService,
+  LogoutUserSessionService,
   ValidateSessionTokenService,
   LoginUserService,
   RegisterUserService,
@@ -101,6 +102,7 @@ const verifyEmailLogger = createAuthFlowLogger('auth/verify-email');
 const passwordResetStartLogger = createAuthFlowLogger('auth/reset/start');
 const passwordResetConfirmLogger = createAuthFlowLogger('auth/reset/confirm');
 const sessionValidationLogger = createAuthFlowLogger('auth/session');
+const logoutLogger = createAuthFlowLogger('auth/logout');
 
 export const registerUserService = new RegisterUserService(
   userRepository,
@@ -159,4 +161,9 @@ export const validateSessionTokenService = new ValidateSessionTokenService(
   userSessionRepository,
   userRepository,
   sessionValidationLogger,
+);
+
+export const logoutUserSessionService = new LogoutUserSessionService(
+  userSessionRepository,
+  logoutLogger,
 );

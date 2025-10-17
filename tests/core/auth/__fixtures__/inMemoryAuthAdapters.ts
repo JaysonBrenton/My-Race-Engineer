@@ -10,6 +10,7 @@ import { createHash } from 'node:crypto';
 
 import type {
   Logger,
+  LoggerContext,
   MailMessage,
   MailerPort,
   PasswordHasher,
@@ -146,6 +147,7 @@ export class InMemoryUserRepository implements UserRepository {
 export class RecordingUserSessionRepository implements UserSessionRepository {
   public createdSessions: CreateUserSessionInput[] = [];
   private readonly sessionsByHash = new Map<string, UserSession>();
+  private readonly sessionsById = new Map<string, UserSession>();
 
   constructor(private readonly clock: TestClock = () => new Date()) {}
 
@@ -166,6 +168,7 @@ export class RecordingUserSessionRepository implements UserSessionRepository {
       updatedAt: createdAt,
     };
     this.sessionsByHash.set(session.sessionTokenHash, session);
+    this.sessionsById.set(session.id, session);
     return session;
   }
 
@@ -175,19 +178,43 @@ export class RecordingUserSessionRepository implements UserSessionRepository {
 
   async revokeAllForUser(userId: string): Promise<void> {
     const now = this.clock();
-    for (const [hash, session] of this.sessionsByHash.entries()) {
-      if (session.userId === userId && session.revokedAt === null) {
-        this.sessionsByHash.set(hash, {
-          ...session,
-          revokedAt: now,
-          updatedAt: now,
-        });
+    for (const session of this.sessionsById.values()) {
+      if (session.userId !== userId || session.revokedAt !== null) {
+        continue;
       }
+
+      const updated = {
+        ...session,
+        revokedAt: now,
+        updatedAt: now,
+      } satisfies UserSession;
+
+      this.sessionsByHash.set(updated.sessionTokenHash, updated);
+      this.sessionsById.set(updated.id, updated);
     }
+  }
+
+  async revokeById(sessionId: string): Promise<void> {
+    const session = this.sessionsById.get(sessionId);
+
+    if (!session || session.revokedAt !== null) {
+      return;
+    }
+
+    const now = this.clock();
+    const updated = {
+      ...session,
+      revokedAt: now,
+      updatedAt: now,
+    } satisfies UserSession;
+
+    this.sessionsByHash.set(updated.sessionTokenHash, updated);
+    this.sessionsById.set(updated.id, updated);
   }
 
   seed(session: UserSession) {
     this.sessionsByHash.set(session.sessionTokenHash, session);
+    this.sessionsById.set(session.id, session);
   }
 }
 
@@ -276,22 +303,22 @@ export class RecordingMailer implements MailerPort {
 }
 
 export class InMemoryLogger implements Logger {
-  public entries: Array<{ level: string; message: string }> = [];
+  public entries: Array<{ level: string; message: string; context?: LoggerContext }> = [];
 
-  debug(message: string): void {
-    this.entries.push({ level: 'debug', message });
+  debug(message: string, context?: LoggerContext): void {
+    this.entries.push({ level: 'debug', message, context });
   }
 
-  info(message: string): void {
-    this.entries.push({ level: 'info', message });
+  info(message: string, context?: LoggerContext): void {
+    this.entries.push({ level: 'info', message, context });
   }
 
-  warn(message: string): void {
-    this.entries.push({ level: 'warn', message });
+  warn(message: string, context?: LoggerContext): void {
+    this.entries.push({ level: 'warn', message, context });
   }
 
-  error(message: string): void {
-    this.entries.push({ level: 'error', message });
+  error(message: string, context?: LoggerContext): void {
+    this.entries.push({ level: 'error', message, context });
   }
 
   withContext(): Logger {

@@ -220,6 +220,7 @@ Expect a `303` redirect to `/auth/login?error=invalid-origin` and `x-auth-origin
 - Middleware guards only the `/auth/login` and `/auth/register` POST flows; `/api/**` endpoints remain unaffected.
 - Session cookies stay `httpOnly`, `sameSite='lax'`, and only use `secure` in production to prevent dev cookie drops.
 - New sign-ups self-serve with the lowest-privilege `driver` role and must verify their email when `FEATURE_REQUIRE_EMAIL_VERIFICATION=true` (default). Set `FEATURE_REQUIRE_ADMIN_APPROVAL=true` only when you need every registration reviewed manually.
+- Signed-in users can always log out via the persistent "Sign out" button in the top-right header, which revokes the server-side session and clears the cookie before redirecting back to `/auth/login`.
 - See also: [Auth runtime & origin guard runbook](docs/guides/auth-runtime-and-origin-guard.md).
 
 ---

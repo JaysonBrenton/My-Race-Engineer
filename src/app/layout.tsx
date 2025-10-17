@@ -1,6 +1,17 @@
+/**
+ * Filename: src/app/layout.tsx
+ * Purpose: Define the root layout shell, including the global header and logout affordance.
+ * Author: OpenAI ChatGPT (gpt-5-codex)
+ * Date: 2025-01-15
+ * License: MIT
+ */
+
+import Link from 'next/link';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 
+import { logout } from '@/app/actions/logout';
+import { getSessionFromCookies } from '@/lib/auth/serverSession';
 import { getAppUrl } from '@/lib/seo';
 import './globals.css';
 
@@ -26,11 +37,31 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const sessionStatus = await getSessionFromCookies();
+  const isAuthenticated = sessionStatus.status === 'authenticated';
+
   return (
     <html lang="en" data-theme="dark">
       <body className={inter.className}>
-        <main>{children}</main>
+        <div className="app-shell">
+          <header className="app-header" aria-label="Primary">
+            <div className="app-header__inner">
+              <Link href="/" className="app-header__brand">
+                My Race Engineer
+              </Link>
+              {isAuthenticated ? (
+                <form action={logout} className="app-header__logout" aria-label="Sign out form">
+                  {/* Provide a consistent logout affordance for authenticated users. */}
+                  <button type="submit" className="app-header__logoutButton">
+                    Sign out
+                  </button>
+                </form>
+              ) : null}
+            </div>
+          </header>
+          <main className="app-main">{children}</main>
+        </div>
       </body>
     </html>
   );

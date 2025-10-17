@@ -1,3 +1,11 @@
+/**
+ * Filename: src/core/infra/prisma/prismaUserSessionRepository.ts
+ * Purpose: Implement the user session repository contract using Prisma for persistence and revocation operations.
+ * Author: OpenAI ChatGPT (gpt-5-codex)
+ * Date: 2025-01-15
+ * License: MIT
+ */
+
 import type { UserSessionRepository } from '@core/app';
 import type { CreateUserSessionInput, UserSession } from '@core/domain';
 import type { Prisma, PrismaClient, UserSession as PrismaUserSession } from '@prisma/client';
@@ -50,6 +58,13 @@ export class PrismaUserSessionRepository implements UserSessionRepository {
   async revokeAllForUser(userId: string): Promise<void> {
     await this.prisma.userSession.updateMany({
       where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+  }
+
+  async revokeById(sessionId: string): Promise<void> {
+    await this.prisma.userSession.updateMany({
+      where: { id: sessionId, revokedAt: null },
       data: { revokedAt: new Date() },
     });
   }
