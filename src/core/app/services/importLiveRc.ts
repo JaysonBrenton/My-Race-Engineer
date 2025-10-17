@@ -15,6 +15,7 @@ import type {
   SessionRepository,
   SessionUpsertInput,
 } from '@core/app';
+import type { Entrant } from '@core/domain';
 import { parseRaceResultPayload, type LiveRcRaceContext } from '../liverc/responseMappers';
 import { buildLapId } from '../connectors/liverc/lapId';
 import { buildUploadNamespaceSeed, type UploadNamespaceMetadata } from '../liverc/uploadNamespace';
@@ -283,6 +284,58 @@ export class LiveRcImportService {
     );
 
     const entryMap = this.buildEntryMap(params.entryList.entries);
+    const entryIdsInList = new Set(params.entryList.entries.map((entry) => entry.entryId));
+    const processedEntrantSourceIds = new Set<string>();
+    const clearedEntrantSourceIds = new Set<string>();
+
+    const entrantBySourceCache = new Map<string, Entrant | null>();
+
+    const resolveEntrantBySource = async (sourceEntrantId: string) => {
+      if (!sourceEntrantId) {
+        return null;
+      }
+
+      if (entrantBySourceCache.has(sourceEntrantId)) {
+        return entrantBySourceCache.get(sourceEntrantId) ?? null;
+      }
+
+      const entrant = await this.entrantRepository.findBySourceEntrantId({
+        eventId: event.id,
+        raceClassId: raceClass.id,
+        sessionId: session.id,
+        sourceEntrantId,
+      });
+
+      entrantBySourceCache.set(sourceEntrantId, entrant);
+      return entrant ?? null;
+    };
+
+    const clearEntrantLaps = async (
+      sourceEntrantId: string,
+      reason: 'withdrawn' | 'missing_entry' | 'removed_from_entry_list',
+      context: Record<string, unknown>,
+    ) => {
+      if (!sourceEntrantId || clearedEntrantSourceIds.has(sourceEntrantId)) {
+        return;
+      }
+
+      const entrant = await resolveEntrantBySource(sourceEntrantId);
+      if (!entrant) {
+        return;
+      }
+
+      await this.lapRepository.replaceForEntrant(entrant.id, session.id, []);
+      clearedEntrantSourceIds.add(sourceEntrantId);
+
+      logger.info('Cleared laps for entrant removed from LiveRC dataset.', {
+        event: 'liverc.import.entrant_laps_cleared',
+        reason,
+        entryId: sourceEntrantId,
+        sessionId: session.id,
+        outcome: 'laps_cleared',
+        ...context,
+      });
+    };
 
     let entrantsProcessed = 0;
     let lapsImported = 0;
@@ -305,6 +358,7 @@ export class LiveRcImportService {
           lapsSkipped: laps.length,
           outcome: 'skipped',
         });
+        await clearEntrantLaps(entryId, 'missing_entry', { lapsSkipped: laps.length });
         continue;
       }
       if (entry.withdrawn) {
@@ -316,6 +370,7 @@ export class LiveRcImportService {
           lapsSkipped: laps.length,
           outcome: 'skipped',
         });
+        await clearEntrantLaps(entry.entryId, 'withdrawn', { lapsSkipped: laps.length });
         continue;
       }
 
@@ -348,6 +403,34 @@ export class LiveRcImportService {
         entrantsProcessed += 1;
         lapsImported += lapInputs.length;
       }
+
+      const sourceEntrantId = entrant.source.entrantId ?? entry.entryId;
+      if (sourceEntrantId) {
+        processedEntrantSourceIds.add(sourceEntrantId);
+        entrantBySourceCache.set(sourceEntrantId, entrant);
+      }
+    }
+
+    for (const entry of params.entryList.entries) {
+      if (entry.withdrawn) {
+        await clearEntrantLaps(entry.entryId, 'withdrawn', { lapsSkipped: 0 });
+      }
+    }
+
+    const existingEntrants = await this.entrantRepository.listBySession(session.id);
+    for (const existing of existingEntrants) {
+      const sourceEntrantId = existing.source.entrantId;
+      if (!sourceEntrantId || clearedEntrantSourceIds.has(sourceEntrantId)) {
+        continue;
+      }
+
+      if (entryIdsInList.has(sourceEntrantId) || processedEntrantSourceIds.has(sourceEntrantId)) {
+        entrantBySourceCache.set(sourceEntrantId, existing);
+        continue;
+      }
+
+      entrantBySourceCache.set(sourceEntrantId, existing);
+      await clearEntrantLaps(sourceEntrantId, 'removed_from_entry_list', {});
     }
 
     return {
@@ -405,6 +488,7 @@ export class LiveRcImportService {
   private mapInvalidReasonToErrorCode(reason: LiveRcUrlInvalidReason) {
     switch (reason) {
       case LiveRcUrlInvalidReasons.INVALID_ABSOLUTE_URL:
+      case LiveRcUrlInvalidReasons.UNTRUSTED_HOST:
       case LiveRcUrlInvalidReasons.EXTRA_SEGMENTS:
       case LiveRcUrlInvalidReasons.EMPTY_SEGMENT:
       case LiveRcUrlInvalidReasons.EMPTY_SLUG:
