@@ -6,11 +6,11 @@
  * License: MIT
  */
 
-import Link from 'next/link';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 
 import { logout } from '@/app/actions/logout';
+import { BrandLink } from '@/app/components/BrandLink';
 import { getSessionFromCookies } from '@/lib/auth/serverSession';
 import { getAppUrl } from '@/lib/seo';
 import './globals.css';
@@ -47,9 +47,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <div className="app-shell">
           <header className="app-header" aria-label="Primary">
             <div className="app-header__inner">
-              <Link href="/" className="app-header__brand">
-                My Race Engineer
-              </Link>
+              <BrandLink />
               {isAuthenticated ? (
                 <form action={logout} className="app-header__logout" aria-label="Sign out form">
                   {/* Provide a consistent logout affordance for authenticated users. */}
