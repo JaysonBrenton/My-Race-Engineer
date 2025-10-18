@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 
 type AppHeaderProps = {
   isAuthenticated: boolean;
-  onLogout: () => Promise<unknown> | void;
+  onLogout: (formData: FormData) => Promise<void> | void;
 };
 
 export function AppHeader({ isAuthenticated, onLogout }: AppHeaderProps) {

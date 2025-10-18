@@ -15,7 +15,9 @@ import { logoutUserSessionService } from '@/dependencies/auth';
 import { SESSION_COOKIE_NAME } from '@/lib/auth/constants';
 import { getSessionFromCookies } from '@/lib/auth/serverSession';
 
-export const logout = async (): Promise<never> => {
+export const logout = async (formData: FormData): Promise<void> => {
+  void formData;
+
   const status = await getSessionFromCookies();
 
   if (status.status === 'authenticated') {
