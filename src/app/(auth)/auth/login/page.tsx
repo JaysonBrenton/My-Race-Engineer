@@ -251,111 +251,113 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
   const isFormDisabled = !formToken;
 
   return (
-    <section className={styles.wrapper} aria-labelledby="auth-login-heading">
-      <article className={styles.card}>
-        <header className={styles.cardHeader}>
-          {/* Clear heading hierarchy improves screen reader navigation and gives
-              SEO crawlers structured context about the page purpose. */}
-          <h1 className={styles.title} id="auth-login-heading">
-            Sign in
-          </h1>
-          <p className={styles.description}>
-            Access telemetry dashboards and racing insights with your team credentials.
-          </p>
-        </header>
-        <form
-          className={styles.form}
-          method="post"
-          action={loginAction}
-          aria-describedby="auth-login-status"
-        >
-          {/* The hidden form token travels with the POST request so the server can
-              confirm the submission originated from this rendered page. */}
-          {formToken ? <input type="hidden" name="formToken" value={formToken} /> : null}
-          {inlineBannerMessage ? (
-            <div className={`${styles.inlineBanner} ${styles.inlineBannerError}`} role="alert">
-              {inlineBannerMessage}
-            </div>
-          ) : null}
-          <div className={styles.field}>
-            {/* Each input gets explicit labels and helper text to meet WCAG 2.2
-                accessibility requirements. */}
-            <label className={styles.label} htmlFor="auth-login-identifier">
-              Email address or Driver Name
-            </label>
-            <input
-              id="auth-login-identifier"
-              name="identifier"
-              type="text"
-              autoComplete="username"
-              inputMode="text"
-              required
-              aria-required="true"
-              className={styles.input}
-              aria-describedby="auth-login-identifier-help auth-login-status"
-              defaultValue={identifierPrefill}
-              disabled={isFormDisabled}
-            />
-            <p className={styles.helpText} id="auth-login-identifier-help">
-              Enter the email or driver name tied to your paddock or club account.
-            </p>
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="auth-login-password">
-              Password
-            </label>
-            <input
-              id="auth-login-password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              aria-required="true"
-              className={styles.input}
-              aria-describedby="auth-login-password-help auth-login-status"
-              disabled={isFormDisabled}
-            />
-            <p className={styles.helpText} id="auth-login-password-help">
-              Passwords are case sensitive and must meet the team security policy.
-            </p>
-          </div>
-          <div className={styles.checkboxField}>
-            <input
-              className={styles.checkbox}
-              id="auth-login-remember"
-              name="remember"
-              type="checkbox"
-              value="true"
-              disabled={isFormDisabled}
-            />
-            <label htmlFor="auth-login-remember">Remember me on this device</label>
-          </div>
-          <div className={styles.actions}>
-            <button type="submit" className={styles.primaryButton} disabled={isFormDisabled}>
+    <div className={styles.page}>
+      <section className={styles.wrapper} aria-labelledby="auth-login-heading">
+        <article className={styles.card}>
+          <header className={styles.cardHeader}>
+            {/* Clear heading hierarchy improves screen reader navigation and gives
+                SEO crawlers structured context about the page purpose. */}
+            <h1 className={styles.title} id="auth-login-heading">
               Sign in
-            </button>
-            <div className={styles.linkRow}>
-              <Link className={styles.secondaryLink} href="/auth/register">
-                Create an account
-              </Link>
-              <Link className={styles.secondaryLink} href="/auth/reset-password">
-                Forgot password?
-              </Link>
-            </div>
-          </div>
-          <p
-            className={statusClassName}
-            id="auth-login-status"
-            role="status"
-            aria-live="polite"
-            aria-atomic="true"
+            </h1>
+            <p className={styles.description}>
+              Access telemetry dashboards and racing insights with your team credentials.
+            </p>
+          </header>
+          <form
+            className={styles.form}
+            method="post"
+            action={loginAction}
+            aria-describedby="auth-login-status"
           >
-            {/* Status messages update politely so screen readers announce changes
-                without disrupting the user's current focus. */}
-            {status.message}
-          </p>
-        </form>
-      </article>
-    </section>
+            {/* The hidden form token travels with the POST request so the server can
+                confirm the submission originated from this rendered page. */}
+            {formToken ? <input type="hidden" name="formToken" value={formToken} /> : null}
+            {inlineBannerMessage ? (
+              <div className={`${styles.inlineBanner} ${styles.inlineBannerError}`} role="alert">
+                {inlineBannerMessage}
+              </div>
+            ) : null}
+            <div className={styles.field}>
+              {/* Each input gets explicit labels and helper text to meet WCAG 2.2
+                  accessibility requirements. */}
+              <label className={styles.label} htmlFor="auth-login-identifier">
+                Email address or Driver Name
+              </label>
+              <input
+                id="auth-login-identifier"
+                name="identifier"
+                type="text"
+                autoComplete="username"
+                inputMode="text"
+                required
+                aria-required="true"
+                className={styles.input}
+                aria-describedby="auth-login-identifier-help auth-login-status"
+                defaultValue={identifierPrefill}
+                disabled={isFormDisabled}
+              />
+              <p className={styles.helpText} id="auth-login-identifier-help">
+                Enter the email or driver name tied to your paddock or club account.
+              </p>
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="auth-login-password">
+                Password
+              </label>
+              <input
+                id="auth-login-password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                aria-required="true"
+                className={styles.input}
+                aria-describedby="auth-login-password-help auth-login-status"
+                disabled={isFormDisabled}
+              />
+              <p className={styles.helpText} id="auth-login-password-help">
+                Passwords are case sensitive and must meet the team security policy.
+              </p>
+            </div>
+            <div className={styles.checkboxField}>
+              <input
+                className={styles.checkbox}
+                id="auth-login-remember"
+                name="remember"
+                type="checkbox"
+                value="true"
+                disabled={isFormDisabled}
+              />
+              <label htmlFor="auth-login-remember">Remember me on this device</label>
+            </div>
+            <div className={styles.actions}>
+              <button type="submit" className={styles.primaryButton} disabled={isFormDisabled}>
+                Sign in
+              </button>
+              <div className={styles.linkRow}>
+                <Link className={styles.secondaryLink} href="/auth/register">
+                  Create an account
+                </Link>
+                <Link className={styles.secondaryLink} href="/auth/reset-password">
+                  Forgot password?
+                </Link>
+              </div>
+            </div>
+            <p
+              className={statusClassName}
+              id="auth-login-status"
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              {/* Status messages update politely so screen readers announce changes
+                  without disrupting the user's current focus. */}
+              {status.message}
+            </p>
+          </form>
+        </article>
+      </section>
+    </div>
   );
 }

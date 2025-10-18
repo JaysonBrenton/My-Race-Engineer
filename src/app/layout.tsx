@@ -10,7 +10,7 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 
 import { logout } from '@/app/actions/logout';
-import { AppHeader } from '@/app/components/AppHeader';
+import { BrandLink } from '@/app/components/BrandLink';
 import { getSessionFromCookies } from '@/lib/auth/serverSession';
 import { getAppUrl } from '@/lib/seo';
 import './globals.css';
@@ -45,7 +45,19 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en" data-theme="dark">
       <body className={inter.className}>
         <div className="app-shell">
-          <AppHeader isAuthenticated={isAuthenticated} onLogout={logout} />
+          <header className="app-header" aria-label="Primary">
+            <div className="app-header__inner">
+              <BrandLink />
+              {isAuthenticated ? (
+                <form action={logout} className="app-header__logout" aria-label="Sign out form">
+                  {/* Provide a consistent logout affordance for authenticated users. */}
+                  <button type="submit" className="app-header__logoutButton">
+                    Sign out
+                  </button>
+                </form>
+              ) : null}
+            </div>
+          </header>
           <main className="app-main">{children}</main>
         </div>
       </body>
