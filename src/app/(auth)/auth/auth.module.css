@@ -6,6 +6,16 @@
  * License: MIT License
  */
 
+.page {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.page :global(.app-header__brand) {
+  display: none;
+}
+
 .wrapper {
   width: min(100%, 26.25rem);
   display: flex;
