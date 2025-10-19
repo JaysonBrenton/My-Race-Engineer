@@ -29,7 +29,10 @@ class InProcessMailDeliveryQueue implements MailDeliveryQueue {
             const payload =
               error instanceof Error
                 ? { name: error.name, message: error.message }
-                : { name: 'UnknownMailDeliveryError', message: 'Non-error thrown during mail delivery.' };
+                : {
+                    name: 'UnknownMailDeliveryError',
+                    message: 'Non-error thrown during mail delivery.',
+                  };
 
             this.logger.error('Queued mail delivery failed.', {
               event: 'mailer.queue.delivery_failed',

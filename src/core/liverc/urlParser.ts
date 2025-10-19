@@ -67,9 +67,7 @@ export const parseLiveRcUrl = (input: string): LiveRcUrlParseResult => {
 
   const hostname = parsedUrl.hostname.toLowerCase();
   const isTrustedHost =
-    hostname === 'liverc.com' ||
-    hostname === 'www.liverc.com' ||
-    hostname.endsWith('.liverc.com');
+    hostname === 'liverc.com' || hostname === 'www.liverc.com' || hostname.endsWith('.liverc.com');
 
   if (!isTrustedHost) {
     return { type: 'invalid', reasonIfInvalid: LiveRcUrlInvalidReasons.UNTRUSTED_HOST };
