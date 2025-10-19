@@ -242,7 +242,7 @@ export default function RegisterPage({ searchParams }: RegisterPageProps) {
           </div>
           <div className={styles.field}>
             <label className={styles.label} htmlFor="auth-register-email">
-              Work email
+              Email
             </label>
             <input
               id="auth-register-email"

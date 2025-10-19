@@ -122,7 +122,7 @@ const FormFields = ({ formToken, state, inlineBannerMessage }: FormFieldsProps) 
       </div>
       <div className={styles.field}>
         <label className={styles.label} htmlFor="auth-register-email">
-          Work email
+          Email
         </label>
         <input
           id="auth-register-email"
