@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="My Race Engineer icon">
+  <defs>
+    <linearGradient id="mre-icon-bg" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#111827" />
+      <stop offset="1" stop-color="#1E3A8A" />
+    </linearGradient>
+    <linearGradient id="mre-icon-track" x1="18" y1="16" x2="46" y2="48" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#38BDF8" />
+      <stop offset="1" stop-color="#22D3EE" />
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="url(#mre-icon-bg)" />
+  <path
+    d="M14 44 L22 20 L32 36 L42 20 L50 44"
+    fill="none"
+    stroke="#F8FAFC"
+    stroke-width="5"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M20 46c6-4 12-8 18-8 4.5 0 8.5 2 12 5"
+    fill="none"
+    stroke="url(#mre-icon-track)"
+    stroke-width="4"
+    stroke-linecap="round"
+  />
+  <circle cx="48" cy="43" r="3" fill="#FDE68A" />
+</svg>
