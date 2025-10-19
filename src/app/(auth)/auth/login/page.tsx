@@ -64,7 +64,7 @@ export function generateMetadata(): Metadata {
 }
 
 type LoginPageProps = {
-  searchParams?: SearchParams;
+  searchParams?: SearchParams | Promise<SearchParams>;
 };
 
 type StatusTone = 'info' | 'success' | 'error';
@@ -223,10 +223,12 @@ const buildConfigurationStatusMessage = (): StatusMessage => ({
     'Sign in is temporarily unavailable due to a server configuration issue. Please contact your administrator.',
 });
 
-export default function LoginPage({ searchParams }: LoginPageProps) {
+export default async function LoginPage({ searchParams }: LoginPageProps) {
   noStore();
   let formToken: string | null = null;
   let configurationStatus: StatusMessage | null = null;
+
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
 
   try {
     // Every render attempts to mint a short-lived token used as a CSRF guard for
@@ -243,9 +245,9 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
       throw error;
     }
   }
-  const statusCode = firstParamValue(searchParams?.status);
-  const errorCode = firstParamValue(searchParams?.error);
-  const deletedParam = firstParamValue(searchParams?.deleted);
+  const statusCode = firstParamValue(resolvedSearchParams?.status);
+  const errorCode = firstParamValue(resolvedSearchParams?.error);
+  const deletedParam = firstParamValue(resolvedSearchParams?.deleted);
   const accountDeleted =
     typeof deletedParam === 'string' &&
     (deletedParam === '1' || deletedParam.toLowerCase() === 'true');
@@ -258,9 +260,11 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
             'Your account was deleted successfully. We hope to see you back on the grid soon.',
         }
       : buildStatusMessage(statusCode, errorCode);
-  const parsedPrefill = buildPrefill(firstParamValue(searchParams?.prefill));
-  const fallbackIdentifier = asOptionalTrimmedString(firstParamValue(searchParams?.identifier));
-  const fallbackEmail = asOptionalTrimmedString(firstParamValue(searchParams?.email));
+  const parsedPrefill = buildPrefill(firstParamValue(resolvedSearchParams?.prefill));
+  const fallbackIdentifier = asOptionalTrimmedString(
+    firstParamValue(resolvedSearchParams?.identifier),
+  );
+  const fallbackEmail = asOptionalTrimmedString(firstParamValue(resolvedSearchParams?.email));
   const identifierPrefill = parsedPrefill.identifier ?? fallbackIdentifier ?? fallbackEmail ?? '';
   const candidateEmail =
     looksLikeEmail(parsedPrefill.identifier) && parsedPrefill.identifier
