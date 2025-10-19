@@ -22,6 +22,7 @@ type EnvSyncResult = {
 
 const ALWAYS_REQUIRED_KEYS = new Set([
   'APP_URL',
+  'APP_NAME',
   'NEXT_PUBLIC_APP_ORIGIN',
   'ALLOWED_ORIGINS',
   'SESSION_SECRET',

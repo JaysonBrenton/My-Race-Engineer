@@ -15,6 +15,7 @@ export * from './prisma/prismaRegistrationUnitOfWork';
 export * from './prisma/prismaPasswordResetTokenRepository';
 export * from './mailer/consoleMailer';
 export * from './mailer/nodemailerMailer';
+export * from './mailer/queuedMailer';
 export * from './http/liveRcClient';
 export * from './logger/pinoLogger';
 export * from './logger/compositeLogger';

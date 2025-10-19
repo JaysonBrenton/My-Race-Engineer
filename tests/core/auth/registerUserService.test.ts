@@ -48,6 +48,8 @@ const buildService = (overrides?: {
     requireEmailVerification: false,
     requireAdminApproval: false,
     baseUrl: 'https://app.local',
+    appName: 'My Race Engineer',
+    defaultLocale: 'en',
     ...overrides?.options,
   };
 
@@ -163,6 +165,7 @@ test('issues verification email and token when verification is required', async 
   const tokenRecord = tokenRepository.tokens[0];
   const message = mailer.sent[0];
   assert.ok(message, 'mailer should send a verification email');
+  assert.equal(message.subject, 'Verify your My Race Engineer account');
   const urlMatch = message.text.match(/https?:\/\/[\S]+/);
   assert.ok(urlMatch, 'verification URL should be present in email body');
   const urlText = urlMatch[0].replace(/\.$/, '');
@@ -174,6 +177,8 @@ test('issues verification email and token when verification is required', async 
   assert.equal(tokenRecord.tokenHash, hashed);
   const expectedExpiry = new Date(fixedNow.getTime() + 24 * 60 * 60 * 1000);
   assert.equal(tokenRecord.expiresAt.getTime(), expectedExpiry.getTime());
+  assert.ok(message.html, 'html version should be included in verification email');
+  assert.ok(message.html?.includes(urlText), 'verification URL should be present in HTML payload');
 });
 
 test('returns await-approval when admin approval is required', async () => {

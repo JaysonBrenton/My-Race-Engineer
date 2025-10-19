@@ -143,6 +143,7 @@ Dev server listens on `http://localhost:3001/` (also `http://0.0.0.0:3001/`).
 | `PORT` | Default `3001` |
 | `TZ` | e.g., `Australia/Sydney` |
 | `APP_URL` | Absolute origin (e.g., `http://localhost:3001`) |
+| `APP_NAME` | Human-readable product name used in emails |
 | `NEXT_TELEMETRY_DISABLED` | `1` to disable Next.js telemetry |
 | `DATABASE_URL` | Prisma connection string |
 | `PRISMA_LOG_LEVEL` | `info` (or `query` locally) |
@@ -152,6 +153,8 @@ Dev server listens on `http://localhost:3001/` (also `http://0.0.0.0:3001/`).
 | `MAILER_DRIVER` | `console` (default) or `smtp` |
 | `SMTP_URL` | Connection string when `MAILER_DRIVER=smtp` |
 | `MAIL_FROM_EMAIL` / `MAIL_FROM_NAME` | Email identities for outgoing mail |
+| `MAIL_DEFAULT_LOCALE` | Default locale for transactional emails (defaults to `en`) |
+| `MAIL_DELIVERY_MODE` | `immediate` or `queue` (defaults to `queue` in production) |
 | `LOG_LEVEL` | `info` (or `debug`) |
 | `DISABLE_FILE_LOGS` | `false`; set `true` in ephemeral environments without writable disks |
 | `TRACING_ENABLED` | `true` enables OpenTelemetry tracing (defaults to `false`) |
@@ -178,7 +181,7 @@ Dev server listens on `http://localhost:3001/` (also `http://0.0.0.0:3001/`).
 | Always-on | `APP_URL`, `NEXT_PUBLIC_APP_ORIGIN` (defaults to `APP_URL` when blank), `ALLOWED_ORIGINS`, `SESSION_SECRET`, `COOKIE_SECURE_STRATEGY`, `TRUST_PROXY` | Always required for auth/session safety |
 | Tracing | `TRACING_ENABLED`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`, `OTEL_EXPORTER_OTLP_HEADERS` | Set `TRACING_ENABLED=true` to enable tracing; endpoint + service name become mandatory (headers optional) |
 | Rate limiting | `INGEST_RATE_LIMIT_WINDOW_MS`, `INGEST_RATE_LIMIT_MAX_REQUESTS` | Provide both as positive integers to enable ingestion throttling |
-| Mailer (SMTP) | `MAILER_DRIVER`, `SMTP_URL`, `MAIL_FROM_EMAIL`, `MAIL_FROM_NAME` | `MAILER_DRIVER` defaults to `console`; switch to `smtp` to require the SMTP URL and identities |
+| Mailer (SMTP) | `MAILER_DRIVER`, `SMTP_URL`, `MAIL_FROM_EMAIL`, `MAIL_FROM_NAME`, `MAIL_DEFAULT_LOCALE`, `MAIL_DELIVERY_MODE` | `MAILER_DRIVER` defaults to `console`; switch to `smtp` to require SMTP configuration. `MAIL_DELIVERY_MODE` defaults to background queuing in production deployments |
 | LiveRC | `ENABLE_IMPORT_WIZARD`, `ENABLE_LIVERC_RESOLVER`, `ENABLE_IMPORT_FILE`, `ENABLE_LIVERC_FIXTURE_PROXY`, `LIVERC_HTTP_BASE` | When any toggle is truthy (`1`/`true`), configure `LIVERC_HTTP_BASE` to a valid HTTP(S) endpoint |
 
 ---

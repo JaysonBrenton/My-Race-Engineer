@@ -18,6 +18,7 @@ import {
 export type EnvironmentConfig = {
   appUrl: URL;
   appOrigin: string;
+  appName: string;
   sessionSecret: string;
   allowedOrigins: string[];
   trustProxy: boolean;
@@ -26,6 +27,10 @@ export type EnvironmentConfig = {
     requireEmailVerification: boolean;
     requireAdminApproval: boolean;
     inviteOnly: boolean;
+  };
+  mail: {
+    defaultLocale: string;
+    deliveryMode: 'immediate' | 'queue';
   };
 };
 
@@ -176,6 +181,47 @@ const parseAppUrl = (
   }
 };
 
+const parseAppName = (raw: string | undefined, issues: EnvIssue[]): string | null => {
+  const value = raw?.trim();
+
+  if (!value) {
+    issues.push({ key: 'APP_NAME', message: 'APP_NAME is not configured.' });
+    return null;
+  }
+
+  return value;
+};
+
+const parseMailDefaultLocale = (raw: string | undefined): string => {
+  const value = raw?.trim();
+  return value && value.length > 0 ? value : 'en';
+};
+
+const parseMailDeliveryMode = (
+  raw: string | undefined,
+  issues: EnvIssue[],
+  nodeEnv: string,
+): 'immediate' | 'queue' => {
+  const defaultMode = nodeEnv === 'production' ? 'queue' : 'immediate';
+
+  if (!raw) {
+    return defaultMode;
+  }
+
+  const value = raw.trim().toLowerCase();
+
+  if (value === 'immediate' || value === 'queue') {
+    return value;
+  }
+
+  issues.push({
+    key: 'MAIL_DELIVERY_MODE',
+    message: 'MAIL_DELIVERY_MODE must be set to "immediate" or "queue".',
+  });
+
+  return defaultMode;
+};
+
 const parseNextPublicBaseUrl = (raw: string | undefined, issues: EnvIssue[]): URL | null => {
   const value = raw?.trim();
   if (!value) {
@@ -217,6 +263,7 @@ export const parseEnvironment = (env: Record<string, string | undefined>): Envir
   const issues: EnvIssue[] = [];
 
   const { appUrl, origin: appOrigin } = parseAppUrl(env.APP_URL, issues);
+  const appName = parseAppName(env.APP_NAME, issues);
   const sessionSecret = parseSessionSecret(env.SESSION_SECRET, issues);
   const allowedOriginsResult = parseAllowedOriginsList(env.ALLOWED_ORIGINS, issues);
   const nextPublicBaseUrl = parseNextPublicBaseUrl(env.NEXT_PUBLIC_BASE_URL, issues);
@@ -235,6 +282,9 @@ export const parseEnvironment = (env: Record<string, string | undefined>): Envir
     false,
   );
   const inviteOnly = readBooleanFlag('FEATURE_INVITE_ONLY', env.FEATURE_INVITE_ONLY, issues, false);
+  const nodeEnv = env.NODE_ENV?.trim().toLowerCase() ?? '';
+  const mailDefaultLocale = parseMailDefaultLocale(env.MAIL_DEFAULT_LOCALE);
+  const mailDeliveryMode = parseMailDeliveryMode(env.MAIL_DELIVERY_MODE, issues, nodeEnv);
 
   let allowedOrigins = allowedOriginsResult.origins;
   if (appOrigin) {
@@ -259,6 +309,7 @@ export const parseEnvironment = (env: Record<string, string | undefined>): Envir
   return {
     appUrl: appUrl!,
     appOrigin: appOrigin!,
+    appName: appName!,
     sessionSecret: sessionSecret!,
     allowedOrigins,
     trustProxy,
@@ -267,6 +318,10 @@ export const parseEnvironment = (env: Record<string, string | undefined>): Envir
       requireEmailVerification,
       requireAdminApproval,
       inviteOnly,
+    },
+    mail: {
+      defaultLocale: mailDefaultLocale,
+      deliveryMode: mailDeliveryMode,
     },
   };
 };

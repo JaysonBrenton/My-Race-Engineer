@@ -23,6 +23,8 @@ import { canonicalFor } from '@/lib/seo';
 
 import styles from '../auth.module.css';
 import { loginAction } from './actions';
+import { resendVerificationEmailAction } from './resend-verification/actions';
+import { VerificationStatusPanel } from './verification-status-panel';
 import {
   asOptionalTrimmedString,
   firstParamValue,
@@ -209,6 +211,9 @@ const getStatusClassName = (tone: StatusTone) => {
   }
 };
 
+const looksLikeEmail = (value: string | null | undefined): value is string =>
+  typeof value === 'string' && /.+@.+/.test(value);
+
 // Dedicated helper for configuration issues so we can surface a clearer
 // message when the CSRF secret is missing.
 const buildConfigurationStatusMessage = (): StatusMessage => ({
@@ -241,6 +246,36 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
   const fallbackIdentifier = asOptionalTrimmedString(firstParamValue(searchParams?.identifier));
   const fallbackEmail = asOptionalTrimmedString(firstParamValue(searchParams?.email));
   const identifierPrefill = parsedPrefill.identifier ?? fallbackIdentifier ?? fallbackEmail ?? '';
+  const candidateEmail =
+    looksLikeEmail(parsedPrefill.identifier) && parsedPrefill.identifier
+      ? parsedPrefill.identifier
+      : looksLikeEmail(fallbackEmail)
+        ? fallbackEmail
+        : looksLikeEmail(fallbackIdentifier)
+          ? fallbackIdentifier
+          : '';
+
+  const shouldShowVerificationPanel =
+    statusCode === 'verify-email' ||
+    statusCode === 'verify-email-awaiting-approval' ||
+    statusCode === 'verification-resent' ||
+    errorCode === 'email-not-verified' ||
+    errorCode === 'verification-rate-limited' ||
+    errorCode === 'verification-invalid-token' ||
+    errorCode === 'verification-server-error' ||
+    errorCode === 'verification-validation';
+
+  let resendFormToken: string | null = null;
+
+  if (shouldShowVerificationPanel) {
+    try {
+      resendFormToken = generateAuthFormToken('verification-resend');
+    } catch (error) {
+      if (!(error instanceof MissingAuthFormTokenSecretError)) {
+        throw error;
+      }
+    }
+  }
 
   const inlineBannerCandidate = errorCode ? buildStatusMessage(undefined, errorCode) : null;
   const inlineBannerMessage =
@@ -356,6 +391,15 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
               {status.message}
             </p>
           </form>
+          {shouldShowVerificationPanel ? (
+            <VerificationStatusPanel
+              statusCode={statusCode}
+              errorCode={errorCode}
+              defaultEmail={candidateEmail}
+              resendFormToken={resendFormToken}
+              resendAction={resendVerificationEmailAction}
+            />
+          ) : null}
         </article>
       </section>
     </div>

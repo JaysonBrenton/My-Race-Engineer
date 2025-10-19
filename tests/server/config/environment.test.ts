@@ -19,6 +19,7 @@ const buildSecret = () => 'a'.repeat(40);
 test('parseEnvironment returns canonicalised configuration', () => {
   const config = parseEnvironment({
     APP_URL: 'https://example.com/',
+    APP_NAME: 'My Race Engineer',
     SESSION_SECRET: buildSecret(),
     ALLOWED_ORIGINS: 'https://example.com, http://localhost:3001/',
     TRUST_PROXY: 'true',
@@ -26,22 +27,30 @@ test('parseEnvironment returns canonicalised configuration', () => {
     FEATURE_REQUIRE_EMAIL_VERIFICATION: '1',
     FEATURE_REQUIRE_ADMIN_APPROVAL: '0',
     FEATURE_INVITE_ONLY: 'false',
+    MAIL_DEFAULT_LOCALE: 'es-MX',
+    MAIL_DELIVERY_MODE: 'queue',
+    NODE_ENV: 'development',
   });
 
   assert.equal(config.appUrl.toString(), 'https://example.com/');
   assert.equal(config.appOrigin, 'https://example.com');
+  assert.equal(config.appName, 'My Race Engineer');
   assert.deepEqual(config.allowedOrigins, ['https://example.com', 'http://localhost:3001']);
   assert.equal(config.trustProxy, true);
   assert.equal(config.nextPublicBaseUrl?.toString(), 'https://public.example.com/');
   assert.equal(config.features.requireEmailVerification, true);
   assert.equal(config.features.requireAdminApproval, false);
   assert.equal(config.features.inviteOnly, false);
+  assert.equal(config.mail.defaultLocale, 'es-MX');
+  assert.equal(config.mail.deliveryMode, 'queue');
 });
 
 test('parseEnvironment falls back to APP_URL origin when ALLOWED_ORIGINS is missing', () => {
   const config = parseEnvironment({
     APP_URL: 'https://example.com',
+    APP_NAME: 'Telemetry Hub',
     SESSION_SECRET: buildSecret(),
+    NODE_ENV: 'production',
   });
 
   assert.deepEqual(config.allowedOrigins, ['https://example.com']);
@@ -50,6 +59,9 @@ test('parseEnvironment falls back to APP_URL origin when ALLOWED_ORIGINS is miss
   assert.equal(config.features.requireEmailVerification, true);
   assert.equal(config.features.requireAdminApproval, false);
   assert.equal(config.features.inviteOnly, false);
+  assert.equal(config.appName, 'Telemetry Hub');
+  assert.equal(config.mail.defaultLocale, 'en');
+  assert.equal(config.mail.deliveryMode, 'queue');
 });
 
 test('parseEnvironment surfaces validation issues for invalid entries', () => {
@@ -57,6 +69,7 @@ test('parseEnvironment surfaces validation issues for invalid entries', () => {
     () => {
       parseEnvironment({
         APP_URL: 'not-a-url',
+        APP_NAME: '',
         SESSION_SECRET: 'short',
         TRUST_PROXY: 'maybe',
       });
@@ -67,7 +80,7 @@ test('parseEnvironment surfaces validation issues for invalid entries', () => {
       }
 
       const keys = error.issues.map((issue) => issue.key).sort();
-      assert.deepEqual(keys, ['APP_URL', 'SESSION_SECRET', 'TRUST_PROXY']);
+      assert.deepEqual(keys, ['APP_NAME', 'APP_URL', 'SESSION_SECRET', 'TRUST_PROXY']);
       return true;
     },
   );
@@ -78,6 +91,7 @@ test('parseEnvironment requires ALLOWED_ORIGINS to include APP_URL when provided
     () => {
       parseEnvironment({
         APP_URL: 'https://example.com',
+        APP_NAME: 'My Race Engineer',
         SESSION_SECRET: buildSecret(),
         ALLOWED_ORIGINS: 'https://other.example.com',
       });
