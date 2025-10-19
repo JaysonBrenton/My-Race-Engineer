@@ -224,6 +224,8 @@ export default async function Page({ searchParams }: PageProps) {
   let formToken: string | null = null;
   let configurationStatus: StatusMessage | null = null;
 
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+
   try {
     // Every render attempts to mint a short-lived token used as a CSRF guard for
     // the server action.  If the secret is missing we fall back to a disabled
