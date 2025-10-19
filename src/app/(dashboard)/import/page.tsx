@@ -1,4 +1,5 @@
-import type { Metadata, PageProps } from 'next';
+import type { Metadata } from 'next';
+import type { AppPageProps, ResolvedSearchParams } from '@/types/app-page-props';
 
 import ImportForm from './ImportForm';
 import styles from './page.module.css';
@@ -21,8 +22,10 @@ const bookmarkletHref = `javascript:(()=>{var u=encodeURIComponent(location.href
 const enableFileImport =
   process.env.NODE_ENV !== 'production' || process.env.ENABLE_IMPORT_FILE === '1';
 
+type PageProps = AppPageProps;
+
 export default async function Page({ searchParams }: PageProps) {
-  const sp = ((await searchParams) ?? {}) as Awaited<PageProps['searchParams']>;
+  const sp = ((await searchParams) ?? {}) as ResolvedSearchParams<PageProps>;
   const srcParam = sp.src;
   let initialUrl: string | undefined;
 
