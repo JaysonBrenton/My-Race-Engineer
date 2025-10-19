@@ -105,7 +105,7 @@ type LoginService = Pick<typeof loginUserService, 'login'>;
 export type LoginActionDependencies = {
   headers: typeof headers;
   cookies: typeof cookies;
-  redirect: typeof redirect;
+  redirect: (url: string) => never;
   guardAuthPostOrigin: typeof guardAuthPostOrigin;
   checkLoginRateLimit: typeof checkLoginRateLimit;
   validateAuthFormToken: typeof validateAuthFormToken;
@@ -124,7 +124,7 @@ export type LoginActionOptions = {
 const defaultLoginActionDependencies: LoginActionDependencies = {
   headers,
   cookies,
-  redirect,
+  redirect: redirect as (url: string) => never,
   guardAuthPostOrigin,
   checkLoginRateLimit,
   validateAuthFormToken,
