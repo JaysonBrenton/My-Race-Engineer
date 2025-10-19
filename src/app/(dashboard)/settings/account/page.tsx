@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { deleteAccount } from '@/app/actions/deleteAccount';
 import { requireAuthenticatedUser } from '@/lib/auth/serverSession';
 
+import { DeleteAccountForm } from './DeleteAccountForm';
 import styles from './page.module.css';
 
 const PAGE_TITLE = 'Account settings';
@@ -56,15 +57,7 @@ export default async function AccountSettingsPage() {
             Deleting your account immediately signs you out on every device and removes your
             telemetry history from My Race Engineer. This action cannot be undone.
           </p>
-          <form className={styles.deleteForm} action={deleteAccount}>
-            <p className={styles.confirmationPrompt}>
-              To continue, select <strong>Delete account</strong>. You will be redirected to the
-              sign-in page once complete.
-            </p>
-            <button type="submit" className={styles.deleteButton}>
-              Delete account
-            </button>
-          </form>
+          <DeleteAccountForm deleteAccountAction={deleteAccount} />
         </article>
       </div>
     </section>
