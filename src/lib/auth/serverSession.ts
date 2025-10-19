@@ -26,7 +26,7 @@ const mapFailureReasonToErrorCode = (reason: ValidateSessionTokenFailureReason):
 };
 
 export const getSessionFromCookies = async (): Promise<SessionValidationStatus> => {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const sessionCookie = cookieStore.get(SESSION_COOKIE_NAME);
 
   if (!sessionCookie || !sessionCookie.value) {

@@ -8,9 +8,9 @@ const devServerActions =
 
 const nextConfig = {
   reactStrictMode: true,
+  typedRoutes: true,
+  serverExternalPackages: ['pino', 'pino-pretty', 'thread-stream', 'pino-abstract-transport'],
   experimental: {
-    typedRoutes: true,
-    serverComponentsExternalPackages: ['pino', 'pino-pretty', 'thread-stream', 'pino-abstract-transport'],
     ...(devServerActions ? { serverActions: devServerActions } : {}),
   },
   eslint: {

@@ -98,7 +98,7 @@ function isValidSmtpUrl(value: string): boolean {
     }
 
     return parsed.port !== '';
-  } catch (error) {
+  } catch {
     return false;
   }
 }
@@ -228,7 +228,7 @@ export function isAbsoluteUrl(value: string): boolean {
     // eslint-disable-next-line no-new
     new URL(value);
     return /^(http|https):/i.test(value);
-  } catch (error) {
+  } catch {
     return false;
   }
 }
@@ -250,7 +250,7 @@ export function canonicaliseOrigin(value: string): string | null {
     }
 
     return `${protocol}//${url.host}`;
-  } catch (error) {
+  } catch {
     return null;
   }
 }

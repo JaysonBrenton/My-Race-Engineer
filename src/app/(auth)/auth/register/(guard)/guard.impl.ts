@@ -10,8 +10,8 @@ import type { ResponseCookies } from 'next/dist/server/web/spec-extension/cookie
 import {
   getRedirectStatusCodeFromError,
   getURLFromRedirectError,
-  isRedirectError,
 } from 'next/dist/client/components/redirect';
+import { isRedirectError } from 'next/dist/client/components/redirect-error';
 import { appendMutableCookies } from 'next/dist/server/web/spec-extension/adapters/request-cookies';
 
 import { applicationLogger } from '@/dependencies/logger';
@@ -22,6 +22,7 @@ import {
 } from '@/core/security/origin';
 
 import { createRegisterAction } from '../actions.impl';
+import { ensureError } from '@/lib/errors/ensureError';
 import { applyAuthDebugHeaders, createAuthActionDebugRecorder } from '@/server/security/authDebug';
 
 const shouldLogDiagnostics = (): boolean => process.env.NODE_ENV !== 'production';
@@ -73,12 +74,15 @@ export const handleRegisterGuardPost = async (req: Request): Promise<Response> =
   try {
     await action(formData);
   } catch (error) {
-    if (isRedirectError(error)) {
-      const location = getURLFromRedirectError(error);
-      const statusCode = getRedirectStatusCodeFromError(error);
+    const caught: unknown = error;
+
+    if (isRedirectError(caught)) {
+      const redirectError = caught;
+      const location = getURLFromRedirectError(redirectError);
+      const statusCode = getRedirectStatusCodeFromError(redirectError);
 
       if (!location) {
-        throw error;
+        throw ensureError(redirectError);
       }
 
       const response = NextResponse.redirect(location, statusCode);
@@ -87,7 +91,7 @@ export const handleRegisterGuardPost = async (req: Request): Promise<Response> =
 
       applyAuthDebugHeaders(response, debugRecorder.snapshot());
 
-      const mutableCookies = (error as { mutableCookies?: ResponseCookies }).mutableCookies;
+      const mutableCookies = (redirectError as { mutableCookies?: ResponseCookies }).mutableCookies;
       if (mutableCookies) {
         appendMutableCookies(response.headers, mutableCookies);
       }
@@ -95,7 +99,7 @@ export const handleRegisterGuardPost = async (req: Request): Promise<Response> =
       return response;
     }
 
-    throw error;
+    throw ensureError(caught);
   }
 
   const fallback = NextResponse.redirect(new URL('/auth/register', req.url), 303);

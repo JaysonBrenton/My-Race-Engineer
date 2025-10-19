@@ -2,12 +2,12 @@ import { headers } from 'next/headers';
 
 export type CookieSecureStrategy = 'auto' | 'always' | 'never';
 
-export function computeCookieSecure(opts?: {
+export async function computeCookieSecure(opts?: {
   strategy?: CookieSecureStrategy;
   trustProxy?: boolean;
   appUrl?: string | null;
   forwardedProto?: string | null;
-}): boolean {
+}): Promise<boolean> {
   const strategy = opts?.strategy ?? 'auto';
   if (strategy === 'always') {
     return true;
@@ -18,8 +18,14 @@ export function computeCookieSecure(opts?: {
   }
 
   const trustProxy = opts?.trustProxy ?? false;
-  const xf =
-    (opts?.forwardedProto ?? (trustProxy ? headers().get('x-forwarded-proto') : null)) || '';
+  let forwardedProto = opts?.forwardedProto ?? null;
+
+  if (!forwardedProto && trustProxy) {
+    const headerSnapshot = await headers();
+    forwardedProto = headerSnapshot.get('x-forwarded-proto');
+  }
+
+  const xf = (forwardedProto ?? '') || '';
   const first = xf.split(',')[0]?.trim().toLowerCase();
   if (first === 'https') {
     return true;

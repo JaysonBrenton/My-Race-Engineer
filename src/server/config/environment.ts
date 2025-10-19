@@ -175,7 +175,7 @@ const parseAppUrl = (
       return { appUrl: null, origin: null };
     }
     return { appUrl: url, origin };
-  } catch (error) {
+  } catch {
     issues.push({ key: 'APP_URL', message: 'APP_URL must be an absolute HTTP(S) URL.' });
     return { appUrl: null, origin: null };
   }
@@ -238,7 +238,7 @@ const parseNextPublicBaseUrl = (raw: string | undefined, issues: EnvIssue[]): UR
 
   try {
     return new URL(value);
-  } catch (error) {
+  } catch {
     issues.push({
       key: 'NEXT_PUBLIC_BASE_URL',
       message: 'NEXT_PUBLIC_BASE_URL must be an absolute HTTP(S) URL.',
