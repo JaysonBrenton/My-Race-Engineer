@@ -11,6 +11,8 @@
   --color-fg: rgb(230 230 230);
   --color-fg-muted: rgb(185 185 185);
   --color-accent: rgb(110 231 183);
+  --color-danger: rgb(248 113 113);
+  --color-danger-contrast: rgb(17 24 39);
   --color-border: rgb(42 47 58);
   --color-surface: color-mix(in srgb, var(--color-bg) 88%, var(--color-fg) 12%);
   --color-surface-overlay: color-mix(in srgb, var(--color-bg) 94%, var(--color-fg) 6%);
