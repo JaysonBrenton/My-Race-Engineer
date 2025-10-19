@@ -80,7 +80,8 @@ const buildPanelCopy = (statusCode?: string, errorCode?: string): PanelCopy => {
     default:
       return {
         heading: 'Email verification pending',
-        message: 'Confirm your email address to unlock telemetry dashboards. Request another link if needed.',
+        message:
+          'Confirm your email address to unlock telemetry dashboards. Request another link if needed.',
         tone: 'info',
       };
   }
