@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 
 import { applicationLogger } from '@/dependencies/logger';
 
@@ -56,15 +56,12 @@ const jsonResponse = (status: number, payload: unknown, requestId: string) =>
     },
   });
 
-type RouteContext = {
-  params: {
-    slug?: string[];
-  };
-};
-
-export async function GET(request: Request, context: RouteContext) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ slug?: string[] }> },
+) {
+  const { slug = [] } = await params;
   const requestId = request.headers.get('x-request-id') ?? randomUUID();
-  const slug = context.params.slug ?? [];
   const logger = applicationLogger.withContext({
     requestId,
     route: '/api/dev/liverc/results',
