@@ -6,7 +6,7 @@
  * License: MIT License
  */
 
-import type { Metadata } from 'next';
+import type { Metadata, PageProps } from 'next';
 import { unstable_noStore as noStore } from 'next/cache';
 import Link from 'next/link';
 
@@ -17,12 +17,7 @@ import { MissingAuthFormTokenSecretError, generateAuthFormToken } from '@/lib/au
 import { canonicalFor } from '@/lib/seo';
 
 import styles from '../auth.module.css';
-import {
-  asOptionalTrimmedString,
-  firstParamValue,
-  safeParseJsonRecord,
-  type SearchParams,
-} from '../shared/search-params';
+import { asOptionalTrimmedString, firstParamValue, safeParseJsonRecord } from '../shared/search-params';
 import {
   buildStatusMessage,
   parseDriverNameSuggestionsParam,
@@ -60,10 +55,6 @@ export function generateMetadata(): Metadata {
     },
   };
 }
-
-type RegisterPageProps = {
-  searchParams?: SearchParams;
-};
 
 type RegisterPrefill = {
   name?: string;
@@ -118,7 +109,8 @@ const buildConfigurationErrorStatus = (): StatusMessage => ({
     'Account registration is temporarily unavailable due to a server configuration issue. Please contact your administrator.',
 });
 
-export default function RegisterPage({ searchParams }: RegisterPageProps) {
+export default async function Page({ searchParams }: PageProps) {
+  const sp = ((await searchParams) ?? {}) as Awaited<PageProps['searchParams']>;
   noStore();
   let formToken: string | null = null;
   let configurationStatus: StatusMessage | null = null;
@@ -136,14 +128,14 @@ export default function RegisterPage({ searchParams }: RegisterPageProps) {
     }
   }
 
-  const errorParam = firstParamValue(searchParams?.error);
+  const errorParam = firstParamValue(sp.error);
   const errorCode = parseErrorCode(errorParam);
-  const parsedPrefill = buildPrefill(firstParamValue(searchParams?.prefill));
-  const fallbackName = asOptionalTrimmedString(firstParamValue(searchParams?.name));
-  const fallbackDriverName = asOptionalTrimmedString(firstParamValue(searchParams?.driverName));
-  const fallbackEmail = asOptionalTrimmedString(firstParamValue(searchParams?.email));
+  const parsedPrefill = buildPrefill(firstParamValue(sp.prefill));
+  const fallbackName = asOptionalTrimmedString(firstParamValue(sp.name));
+  const fallbackDriverName = asOptionalTrimmedString(firstParamValue(sp.driverName));
+  const fallbackEmail = asOptionalTrimmedString(firstParamValue(sp.email));
   const driverNameSuggestions = parseDriverNameSuggestionsParam(
-    firstParamValue(searchParams?.driverNameSuggestions),
+    firstParamValue(sp.driverNameSuggestions),
   );
 
   const namePrefill = parsedPrefill.name ?? fallbackName ?? '';

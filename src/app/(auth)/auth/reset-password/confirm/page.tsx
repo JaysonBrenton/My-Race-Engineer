@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, PageProps } from 'next';
 import { unstable_noStore as noStore } from 'next/cache';
 import Link from 'next/link';
 
@@ -38,10 +38,6 @@ export function generateMetadata(): Metadata {
     },
   };
 }
-
-type ResetConfirmPageProps = {
-  searchParams?: Record<string, string | string[] | undefined>;
-};
 
 type StatusTone = 'info' | 'error';
 
@@ -119,10 +115,11 @@ const buildConfigurationStatus = (): StatusMessage => ({
     'Password reset confirmations are temporarily unavailable due to a server configuration issue. Please contact your administrator.',
 });
 
-export default function ResetPasswordConfirmPage({ searchParams }: ResetConfirmPageProps) {
+export default async function Page({ searchParams }: PageProps) {
+  const sp = ((await searchParams) ?? {}) as Awaited<PageProps['searchParams']>;
   noStore();
-  const resetToken = getParam(searchParams?.token);
-  const errorCode = getParam(searchParams?.error);
+  const resetToken = getParam(sp.token);
+  const errorCode = getParam(sp.error);
   let formToken: string | null = null;
   let configurationStatus: StatusMessage | null = null;
 
