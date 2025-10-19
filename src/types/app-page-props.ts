@@ -1,24 +1,25 @@
 /**
- * Helpers for typing Next.js App Router page components.
- *
- * Next.js 15 removed the `PageProps` export from the public `next` entry point.
- * These utilities provide a small, typed surface that mirrors the runtime
- * contract while allowing individual pages to tighten their search parameter
- * definitions as needed.
+ * Filename: src/types/app-page-props.ts
+ * Purpose: Provide shared App Router page prop typings aligned with Next.js 15 expectations.
+ * Author: Jayson Brenton
+ * Date: 2025-10-19
+ * License: MIT License
  */
+
+export type AppPageRouteParams = Record<string, string | string[] | undefined>;
 
 export type AppPageSearchParams = Record<string, string | string[] | undefined>;
 
-export type AsyncSearchParams<TSearchParams extends AppPageSearchParams = AppPageSearchParams> =
-  | TSearchParams
-  | Promise<TSearchParams>;
+export type AppPageParams<
+  TParams extends AppPageRouteParams = AppPageRouteParams,
+> = Promise<TParams>;
 
 export interface AppPageProps<
+  TParams extends AppPageRouteParams = AppPageRouteParams,
   TSearchParams extends AppPageSearchParams = AppPageSearchParams,
-  TParams = Record<string, string | string[] | undefined>,
 > {
-  params?: TParams;
-  searchParams?: AsyncSearchParams<TSearchParams>;
+  params?: AppPageParams<TParams>;
+  searchParams?: TSearchParams;
 }
 
 export type ResolvedSearchParams<TProps extends { searchParams?: unknown }> = NonNullable<
