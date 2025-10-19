@@ -14,12 +14,16 @@ export type AppPageParams<
   TParams extends AppPageRouteParams = AppPageRouteParams,
 > = Promise<TParams>;
 
+export type AppPageSearchParamsPromise<
+  TSearchParams extends AppPageSearchParams = AppPageSearchParams,
+> = Promise<TSearchParams>;
+
 export interface AppPageProps<
   TParams extends AppPageRouteParams = AppPageRouteParams,
   TSearchParams extends AppPageSearchParams = AppPageSearchParams,
 > {
   params?: AppPageParams<TParams>;
-  searchParams?: TSearchParams;
+  searchParams?: AppPageSearchParamsPromise<TSearchParams>;
 }
 
 export type ResolvedSearchParams<TProps extends { searchParams?: unknown }> = NonNullable<
