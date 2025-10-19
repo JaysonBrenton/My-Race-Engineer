@@ -5,6 +5,7 @@ const RATE_LIMIT_CONFIG = {
   login: { limit: 10, windowMs: 1000 * 60 * 5 },
   passwordReset: { limit: 5, windowMs: 1000 * 60 * 10 },
   passwordResetConfirm: { limit: 5, windowMs: 1000 * 60 * 10 },
+  verificationResend: { limit: 5, windowMs: 1000 * 60 * 10 },
 };
 
 export const checkRegisterRateLimit = (
@@ -52,5 +53,17 @@ export const checkPasswordResetConfirmRateLimit = (
     identifier,
     RATE_LIMIT_CONFIG.passwordResetConfirm.limit,
     RATE_LIMIT_CONFIG.passwordResetConfirm.windowMs,
+    now,
+  );
+
+export const checkVerificationResendRateLimit = (
+  identifier: string,
+  now: number = Date.now(),
+): RateLimitResult =>
+  checkRateLimit(
+    'auth:verification-resend',
+    identifier,
+    RATE_LIMIT_CONFIG.verificationResend.limit,
+    RATE_LIMIT_CONFIG.verificationResend.windowMs,
     now,
   );

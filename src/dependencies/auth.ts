@@ -14,6 +14,7 @@ import {
   RegisterUserService,
   StartPasswordResetService,
   VerifyEmailService,
+  ResendVerificationEmailService,
   type Logger,
   type LoggerContext,
 } from '@core/app';
@@ -26,6 +27,7 @@ import {
   PrismaRegistrationUnitOfWork,
   createCompositeLogger,
   createNodemailerMailer,
+  createQueuedMailer,
   createPinoLogger,
 } from '@core/infra';
 import { applicationLogger, loggerEnvironmentConfig } from '@/dependencies/logger';
@@ -57,7 +59,7 @@ const mailerLogger = applicationLogger.withContext({ route: 'mailer' });
 // The mailer is resolved lazily so we can validate configuration and select the
 // transport at runtime.  Production deployments can opt into SMTP while local
 // development falls back to the ConsoleMailer for a zero-config experience.
-const mailer = (() => {
+const baseMailer = (() => {
   if (mailerDriver === 'smtp' || mailerDriver === 'nodemailer') {
     const connectionUrl = process.env.SMTP_URL?.trim();
     const fromEmail = process.env.MAIL_FROM_EMAIL?.trim();
@@ -79,6 +81,11 @@ const mailer = (() => {
   return new ConsoleMailer(mailerLogger);
 })();
 
+const mailer =
+  environment.mail.deliveryMode === 'queue'
+    ? createQueuedMailer(baseMailer, mailerLogger.withContext({ deliveryMode: 'queue' }))
+    : baseMailer;
+
 const authFileLogger = loggerEnvironmentConfig.disableFileLogs
   ? undefined
   : createPinoLogger({
@@ -99,6 +106,7 @@ export const getAuthRequestLogger = (context: LoggerContext): Logger =>
 const registerLogger = createAuthFlowLogger('auth/register');
 const loginLogger = createAuthFlowLogger('auth/login');
 const verifyEmailLogger = createAuthFlowLogger('auth/verify-email');
+const resendVerificationLogger = createAuthFlowLogger('auth/resend-verification');
 const passwordResetStartLogger = createAuthFlowLogger('auth/reset/start');
 const passwordResetConfirmLogger = createAuthFlowLogger('auth/reset/confirm');
 const sessionValidationLogger = createAuthFlowLogger('auth/session');
@@ -117,6 +125,8 @@ export const registerUserService = new RegisterUserService(
     requireEmailVerification,
     requireAdminApproval,
     baseUrl,
+    appName: environment.appName,
+    defaultLocale: environment.mail.defaultLocale,
   },
 );
 
@@ -139,6 +149,19 @@ export const verifyEmailService = new VerifyEmailService(
   emailVerificationTokens,
   verifyEmailLogger,
   { requireAdminApproval },
+);
+
+export const resendVerificationEmailService = new ResendVerificationEmailService(
+  userRepository,
+  emailVerificationTokens,
+  mailer,
+  resendVerificationLogger,
+  {
+    baseUrl,
+    appName: environment.appName,
+    defaultLocale: environment.mail.defaultLocale,
+    requireEmailVerification,
+  },
 );
 
 export const startPasswordResetService = new StartPasswordResetService(

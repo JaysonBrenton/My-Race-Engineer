@@ -367,6 +367,8 @@ export const createAuthTestEnvironment = (
     requireEmailVerification: false,
     requireAdminApproval: false,
     baseUrl: 'https://app.local',
+    appName: 'My Race Engineer',
+    defaultLocale: 'en',
     ...(options?.register ?? {}),
   };
 

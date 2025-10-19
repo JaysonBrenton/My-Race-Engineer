@@ -35,6 +35,7 @@ export * from './connectors/liverc/summary';
 export * from './services/auth/registerUser';
 export * from './services/auth/loginUser';
 export * from './services/auth/verifyEmail';
+export * from './services/auth/resendVerificationEmail';
 export * from './services/auth/startPasswordReset';
 export * from './services/auth/confirmPasswordReset';
 export * from './services/auth/validateSessionToken';

@@ -17,6 +17,7 @@ import type {
 } from '@core/app';
 import { DuplicateUserDriverNameError, DuplicateUserEmailError } from '@core/app';
 import type { User } from '@core/domain';
+import { renderVerificationEmail } from './templates/verificationEmail';
 
 export type RegisterUserInput = {
   name: string;
@@ -29,6 +30,7 @@ export type RegisterUserInput = {
     userAgent?: string | null;
     deviceName?: string | null;
   };
+  preferredLocale?: string | null;
 };
 
 export type RegisterUserResult =
@@ -73,6 +75,8 @@ export class RegisterUserService {
       requireEmailVerification: boolean;
       requireAdminApproval: boolean;
       baseUrl: string;
+      appName: string;
+      defaultLocale: string;
       verificationTokenTtlMs?: number;
       defaultSessionTtlMs?: number;
       shortSessionTtlMs?: number;
@@ -241,10 +245,20 @@ export class RegisterUserService {
       verificationUrl.searchParams.set('token', verificationToken);
 
       try {
+        const mailLocale = input.preferredLocale ?? this.options.defaultLocale;
+        const { subject, text, html } = renderVerificationEmail({
+          recipientName: user.name,
+          verificationUrl: verificationUrl.toString(),
+          expiresAt: verificationExpiresAt,
+          appName: this.options.appName,
+          locale: mailLocale,
+        });
+
         await this.mailer.send({
           to: { email: user.email, name: user.name },
-          subject: 'Verify your My Race Engineer account',
-          text: `Hi ${user.name},\n\nConfirm your email by visiting ${verificationUrl.toString()} before ${verificationExpiresAt.toISOString()}.`,
+          subject,
+          text,
+          html,
         });
       } catch (error) {
         await this.cleanupFailedRegistration(user.id);
