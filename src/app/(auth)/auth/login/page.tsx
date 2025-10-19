@@ -6,7 +6,7 @@
  * License: MIT License
  */
 
-import type { Metadata } from 'next';
+import type { Metadata, PageProps } from 'next';
 import { unstable_noStore as noStore } from 'next/cache';
 import Link from 'next/link';
 
@@ -30,7 +30,6 @@ import {
   asOptionalTrimmedString,
   firstParamValue,
   safeParseJsonRecord,
-  type SearchParams,
 } from '../shared/search-params';
 
 const PAGE_TITLE = 'Sign in to My Race Engineer';
@@ -62,10 +61,6 @@ export function generateMetadata(): Metadata {
     },
   };
 }
-
-type LoginPageProps = {
-  searchParams?: SearchParams | Promise<SearchParams>;
-};
 
 type StatusTone = 'info' | 'success' | 'error';
 
@@ -223,12 +218,11 @@ const buildConfigurationStatusMessage = (): StatusMessage => ({
     'Sign in is temporarily unavailable due to a server configuration issue. Please contact your administrator.',
 });
 
-export default async function LoginPage({ searchParams }: LoginPageProps) {
+export default async function Page({ searchParams }: PageProps) {
+  const sp = await searchParams;
   noStore();
   let formToken: string | null = null;
   let configurationStatus: StatusMessage | null = null;
-
-  const resolvedSearchParams = searchParams ? await searchParams : undefined;
 
   try {
     // Every render attempts to mint a short-lived token used as a CSRF guard for
@@ -245,9 +239,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       throw error;
     }
   }
-  const statusCode = firstParamValue(resolvedSearchParams?.status);
-  const errorCode = firstParamValue(resolvedSearchParams?.error);
-  const deletedParam = firstParamValue(resolvedSearchParams?.deleted);
+  const statusCode = firstParamValue(sp.status);
+  const errorCode = firstParamValue(sp.error);
+  const deletedParam = firstParamValue(sp.deleted);
   const accountDeleted =
     typeof deletedParam === 'string' &&
     (deletedParam === '1' || deletedParam.toLowerCase() === 'true');
@@ -260,11 +254,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             'Your account was deleted successfully. We hope to see you back on the grid soon.',
         }
       : buildStatusMessage(statusCode, errorCode);
-  const parsedPrefill = buildPrefill(firstParamValue(resolvedSearchParams?.prefill));
-  const fallbackIdentifier = asOptionalTrimmedString(
-    firstParamValue(resolvedSearchParams?.identifier),
-  );
-  const fallbackEmail = asOptionalTrimmedString(firstParamValue(resolvedSearchParams?.email));
+  const parsedPrefill = buildPrefill(firstParamValue(sp.prefill));
+  const fallbackIdentifier = asOptionalTrimmedString(firstParamValue(sp.identifier));
+  const fallbackEmail = asOptionalTrimmedString(firstParamValue(sp.email));
   const identifierPrefill = parsedPrefill.identifier ?? fallbackIdentifier ?? fallbackEmail ?? '';
   const candidateEmail =
     looksLikeEmail(parsedPrefill.identifier) && parsedPrefill.identifier
