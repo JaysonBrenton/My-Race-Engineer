@@ -15,6 +15,7 @@ export const revalidate = 0;
 
 import { MissingAuthFormTokenSecretError, generateAuthFormToken } from '@/lib/auth/formTokens';
 import { canonicalFor } from '@/lib/seo';
+import { EnvironmentValidationError } from '@/server/config/environment';
 
 // The login page is a server component that renders the sign-in form and reacts
 // to status codes passed through query parameters.  Pairing it with the server
@@ -233,7 +234,10 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
     // form state with an explicit message.
     formToken = generateAuthFormToken('login');
   } catch (error) {
-    if (error instanceof MissingAuthFormTokenSecretError) {
+    if (
+      error instanceof MissingAuthFormTokenSecretError ||
+      error instanceof EnvironmentValidationError
+    ) {
       configurationStatus = buildConfigurationStatusMessage();
     } else {
       throw error;
@@ -243,13 +247,15 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
   const errorCode = firstParamValue(searchParams?.error);
   const deletedParam = firstParamValue(searchParams?.deleted);
   const accountDeleted =
-    typeof deletedParam === 'string' && (deletedParam === '1' || deletedParam.toLowerCase() === 'true');
+    typeof deletedParam === 'string' &&
+    (deletedParam === '1' || deletedParam.toLowerCase() === 'true');
   const status = configurationStatus
     ? configurationStatus
     : accountDeleted
       ? {
           tone: 'success' as const,
-          message: 'Your account was deleted successfully. We hope to see you back on the grid soon.',
+          message:
+            'Your account was deleted successfully. We hope to see you back on the grid soon.',
         }
       : buildStatusMessage(statusCode, errorCode);
   const parsedPrefill = buildPrefill(firstParamValue(searchParams?.prefill));
@@ -281,7 +287,10 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
     try {
       resendFormToken = generateAuthFormToken('verification-resend');
     } catch (error) {
-      if (!(error instanceof MissingAuthFormTokenSecretError)) {
+      if (
+        !(error instanceof MissingAuthFormTokenSecretError) &&
+        !(error instanceof EnvironmentValidationError)
+      ) {
         throw error;
       }
     }
