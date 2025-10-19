@@ -5,6 +5,7 @@
 
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import type { Route } from 'next';
 import { z } from 'zod';
 
 import { resendVerificationEmailService } from '@/dependencies/auth';
@@ -39,7 +40,10 @@ const buildPrefillParam = (identifier: string): string => {
   }
 };
 
-const buildRedirectUrl = (pathname: string, searchParams: Record<string, string | undefined>) => {
+const buildRedirectUrl = (
+  pathname: Route,
+  searchParams: Record<string, string | undefined>,
+): Route => {
   const params = new URLSearchParams();
 
   for (const [key, value] of Object.entries(searchParams)) {
@@ -49,7 +53,7 @@ const buildRedirectUrl = (pathname: string, searchParams: Record<string, string 
   }
 
   const query = params.toString();
-  return query ? `${pathname}?${query}` : pathname;
+  return query ? (`${pathname}?${query}` as Route) : pathname;
 };
 
 type ResendDependencies = {
@@ -76,7 +80,9 @@ const defaultDependencies: ResendDependencies = {
   logger: applicationLogger.withContext({ route: 'auth/login/resend-verification' }),
 };
 
-const redirectTo = (target: string, deps: ResendDependencies): never => deps.redirect(target);
+type RedirectHref = Parameters<typeof redirect>[0];
+
+const redirectTo = (target: RedirectHref, deps: ResendDependencies): never => deps.redirect(target);
 
 export const createResendVerificationEmailAction = (
   deps: ResendDependencies = defaultDependencies,
