@@ -73,7 +73,7 @@ const serializeError = (value: unknown): Record<string, unknown> | undefined => 
     return { ...(value as Record<string, unknown>) };
   }
 
-  return { value: String(value) };
+  return { value };
 };
 
 const serializeContext = (context?: LoggerContext): Record<string, unknown> | undefined => {

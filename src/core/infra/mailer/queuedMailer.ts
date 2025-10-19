@@ -45,8 +45,8 @@ class InProcessMailDeliveryQueue implements MailDeliveryQueue {
         });
 
         resolve();
-      } catch (error) {
-        reject(error);
+      } catch (error: unknown) {
+        reject(error instanceof Error ? error : new Error('Mailer queue scheduling failed'));
       }
     });
   }

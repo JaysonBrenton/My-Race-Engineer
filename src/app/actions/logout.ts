@@ -27,7 +27,7 @@ export const logout = async (formData: FormData): Promise<void> => {
     });
   }
 
-  const cookieJar = cookies();
+  const cookieJar = await cookies();
   cookieJar.delete({ name: SESSION_COOKIE_NAME, path: '/' });
 
   redirect('/auth/login');

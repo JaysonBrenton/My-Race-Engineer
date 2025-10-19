@@ -15,10 +15,11 @@ import {
 import {
   getRedirectStatusCodeFromError,
   getURLFromRedirectError,
-  isRedirectError,
 } from 'next/dist/client/components/redirect';
+import { isRedirectError } from 'next/dist/client/components/redirect-error';
 
 import { createLoginAction } from '../actions.impl';
+import { ensureError } from '@/lib/errors/ensureError';
 import { applyAuthDebugHeaders, createAuthActionDebugRecorder } from '@/server/security/authDebug';
 
 const shouldLogDiagnostics = (): boolean => process.env.NODE_ENV !== 'production';
@@ -70,12 +71,15 @@ export const handleLoginGuardPost = async (req: Request): Promise<Response> => {
   try {
     await action(formData);
   } catch (error) {
-    if (isRedirectError(error)) {
-      const location = getURLFromRedirectError(error);
-      const statusCode = getRedirectStatusCodeFromError(error);
+    const caught: unknown = error;
+
+    if (isRedirectError(caught)) {
+      const redirectError = caught;
+      const location = getURLFromRedirectError(redirectError);
+      const statusCode = getRedirectStatusCodeFromError(redirectError);
 
       if (!location) {
-        throw error;
+        throw ensureError(redirectError);
       }
 
       const response = NextResponse.redirect(location, statusCode);
@@ -85,7 +89,7 @@ export const handleLoginGuardPost = async (req: Request): Promise<Response> => {
       return response;
     }
 
-    throw error;
+    throw ensureError(caught);
   }
 
   const response = NextResponse.redirect(new URL('/auth/login', req.url), { status: 303 });

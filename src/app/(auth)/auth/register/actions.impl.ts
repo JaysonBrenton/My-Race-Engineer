@@ -179,7 +179,7 @@ export const createRegisterAction = (
 ): RegisterAction => {
   return async (formData: FormData): Promise<void> => {
     const requestStartedAt = Date.now();
-    const headersList = deps.headers();
+    const headersList = await deps.headers();
     const requestId = headersList.get('x-request-id') ?? randomUUID();
     const emitDebugEvent = options.onDebugEvent;
 
@@ -517,10 +517,10 @@ export const createRegisterAction = (
           case 'session-created':
             span.setAttribute('mre.auth.outcome', 'success');
             if (result.session) {
-              const cookieJar = deps.cookies();
+              const cookieJar = await deps.cookies();
               const expiresAt = result.session.expiresAt;
               const maxAge = Math.max(Math.floor((expiresAt.getTime() - Date.now()) / 1000), 1);
-              const secure = deps.computeCookieSecure({
+              const secure = await deps.computeCookieSecure({
                 strategy: resolveCookieSecureStrategy(),
                 trustProxy: process.env.TRUST_PROXY === 'true',
                 appUrl: process.env.APP_URL ?? null,

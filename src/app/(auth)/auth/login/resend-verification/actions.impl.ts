@@ -82,7 +82,7 @@ export const createResendVerificationEmailAction = (
   deps: ResendDependencies = defaultDependencies,
 ): ResendVerificationEmailAction => {
   return async (formData: FormData): Promise<void> => {
-    const headersList = deps.headers();
+    const headersList = await deps.headers();
 
     deps.guardAuthPostOrigin(
       headersList,

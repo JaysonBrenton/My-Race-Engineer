@@ -14,7 +14,7 @@ export const deleteAccount = async (formData: FormData): Promise<void> => {
 
   await deleteUserAccountService.execute(user.id);
 
-  const cookieJar = cookies();
+  const cookieJar = await cookies();
   cookieJar.delete({ name: SESSION_COOKIE_NAME, path: '/' });
 
   redirect('/auth/login?deleted=1');

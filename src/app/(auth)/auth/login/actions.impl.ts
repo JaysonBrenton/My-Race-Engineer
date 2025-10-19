@@ -160,7 +160,7 @@ export const createLoginAction = (
     // The client identifier combines IP and user-agent hints so the rate limiter
     // can throttle burst attempts without locking out legitimate users sharing an
     // address (e.g. team pit wall).
-    const headersList = deps.headers();
+    const headersList = await deps.headers();
     const requestId = headersList.get('x-request-id') ?? randomUUID();
     const emitDebugEvent = options.onDebugEvent;
 
@@ -446,13 +446,13 @@ export const createLoginAction = (
           deps.redirect(target);
         }
 
-        const cookieJar = deps.cookies();
+        const cookieJar = await deps.cookies();
         const expiresAt = result.expiresAt;
         const maxAge = Math.max(Math.floor((expiresAt.getTime() - Date.now()) / 1000), 1);
         // The session cookie is httpOnly and same-site lax so it is resilient against
         // XSS and CSRF while still allowing multi-tab usage.  We rely on the TTL
         // returned by the service to synchronise browser and database expirations.
-        const secure = deps.computeCookieSecure({
+        const secure = await deps.computeCookieSecure({
           strategy: resolveCookieSecureStrategy(),
           trustProxy: process.env.TRUST_PROXY === 'true',
           appUrl: process.env.APP_URL ?? null,

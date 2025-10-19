@@ -99,7 +99,10 @@ const createRegisterCookieStub = () => {
     },
   };
 
-  return { jar: jar as unknown as ReturnType<RegisterActionDependencies['cookies']>, records };
+  return {
+    jar: jar as unknown as Awaited<ReturnType<RegisterActionDependencies['cookies']>>,
+    records,
+  };
 };
 
 const createLoginCookieStub = () => {
@@ -116,7 +119,10 @@ const createLoginCookieStub = () => {
     },
   };
 
-  return { jar: jar as unknown as ReturnType<LoginActionDependencies['cookies']>, records };
+  return {
+    jar: jar as unknown as Awaited<ReturnType<LoginActionDependencies['cookies']>>,
+    records,
+  };
 };
 
 type RegisterDepsResult = {
@@ -132,13 +138,13 @@ const createRegisterDeps = (
   const redirectCalls: RedirectTarget[] = [];
   const logger = createLogger();
   const defaultDeps: RegisterActionDependencies = {
-    headers: () =>
+    headers: async () =>
       new Headers({
         'x-request-id': 'register-test',
         origin: 'https://app.local',
         'user-agent': 'node:test',
       }),
-    cookies: () => cookieJar,
+    cookies: async () => cookieJar,
     redirect: (destination: string | URL) => {
       const location = typeof destination === 'string' ? destination : destination.toString();
       redirectCalls.push(location);
@@ -172,7 +178,7 @@ const createRegisterDeps = (
         },
       }),
     },
-    computeCookieSecure: () => true,
+    computeCookieSecure: async () => true,
   };
 
   return {
@@ -193,13 +199,13 @@ const createLoginDeps = (overrides: Partial<LoginActionDependencies> = {}): Logi
   const redirectCalls: RedirectTarget[] = [];
   const logger = createLogger();
   const defaultDeps: LoginActionDependencies = {
-    headers: () =>
+    headers: async () =>
       new Headers({
         'x-request-id': 'login-test',
         origin: 'https://app.local',
         'user-agent': 'node:test',
       }),
-    cookies: () => cookieJar,
+    cookies: async () => cookieJar,
     redirect: (destination: string | URL) => {
       const location = typeof destination === 'string' ? destination : destination.toString();
       redirectCalls.push(location);
@@ -230,7 +236,7 @@ const createLoginDeps = (overrides: Partial<LoginActionDependencies> = {}): Logi
         },
       }),
     },
-    computeCookieSecure: () => true,
+    computeCookieSecure: async () => true,
   };
 
   return {
@@ -253,7 +259,7 @@ const createPasswordResetRequestDeps = (
   const startInvocations: Array<{ email: string }> = [];
   const logger = createLogger();
   const defaultDeps: RequestPasswordResetDependencies = {
-    headers: () =>
+    headers: async () =>
       new Headers({
         origin: 'https://app.local',
         'x-request-id': 'reset-request',
@@ -297,7 +303,7 @@ const createPasswordResetConfirmDeps = (
   const confirmInvocations: Array<{ token: string; newPassword: string }> = [];
   const logger = createLogger();
   const defaultDeps: ConfirmPasswordResetDependencies = {
-    headers: () =>
+    headers: async () =>
       new Headers({
         origin: 'https://app.local',
         'x-request-id': 'reset-confirm',
@@ -344,13 +350,13 @@ test('registerAction redirects with invalid-origin when the guard rejects the su
             token: 'unused',
             expiresAt: new Date(),
           },
-        user: {
-          id: 'user-1',
-          name: 'Example User',
-          driverName: 'Example Driver',
-          email: 'user@example.com',
-          status: 'active',
-          passwordHash: 'hash',
+          user: {
+            id: 'user-1',
+            name: 'Example User',
+            driverName: 'Example Driver',
+            email: 'user@example.com',
+            status: 'active',
+            passwordHash: 'hash',
             createdAt: new Date(),
             updatedAt: new Date(),
             emailVerifiedAt: new Date(),
@@ -404,13 +410,13 @@ test('registerAction redirects with validation error for mismatched passwords wi
             token: 'unused',
             expiresAt: new Date(),
           },
-        user: {
-          id: 'user-1',
-          name: 'Example User',
-          driverName: 'Example Driver',
-          email: 'user@example.com',
-          status: 'active',
-          passwordHash: 'hash',
+          user: {
+            id: 'user-1',
+            name: 'Example User',
+            driverName: 'Example Driver',
+            email: 'user@example.com',
+            status: 'active',
+            passwordHash: 'hash',
             createdAt: new Date(),
             updatedAt: new Date(),
             emailVerifiedAt: new Date(),
@@ -479,7 +485,7 @@ test('registerAction issues a session cookie and redirects on successful registr
         };
       },
     },
-    computeCookieSecure: () => false,
+    computeCookieSecure: async () => false,
   });
   const registerAction = createRegisterAction(deps);
   const formData = new FormData();
@@ -679,7 +685,7 @@ test('loginAction mints a session cookie and redirects to the dashboard on succe
         };
       },
     },
-    computeCookieSecure: () => false,
+    computeCookieSecure: async () => false,
   });
   const loginAction = createLoginAction(deps);
   const formData = new FormData();

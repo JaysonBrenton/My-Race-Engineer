@@ -88,7 +88,7 @@ export const createConfirmPasswordResetAction = (
 ): ConfirmPasswordResetAction => {
   return async (formData: FormData): Promise<void> => {
     const resetToken = getFormValue(formData, 'token');
-    const headersList = deps.headers();
+    const headersList = await deps.headers();
 
     deps.guardAuthPostOrigin(
       headersList,
