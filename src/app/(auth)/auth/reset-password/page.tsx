@@ -1,4 +1,5 @@
-import type { Metadata, PageProps } from 'next';
+import type { Metadata } from 'next';
+import type { AppPageProps, ResolvedSearchParams } from '@/types/app-page-props';
 import { unstable_noStore as noStore } from 'next/cache';
 import Link from 'next/link';
 
@@ -11,6 +12,8 @@ import { canonicalFor } from '@/lib/seo';
 import { requestPasswordResetAction } from './actions';
 
 import styles from '../auth.module.css';
+
+type PageProps = AppPageProps;
 
 const PAGE_TITLE = 'Reset your My Race Engineer password';
 const PAGE_DESCRIPTION =
@@ -118,7 +121,7 @@ const getStatusClassName = (tone: ResetStatusTone) => {
 };
 
 export default async function Page({ searchParams }: PageProps) {
-  const sp = ((await searchParams) ?? {}) as Awaited<PageProps['searchParams']>;
+  const sp = ((await searchParams) ?? {}) as ResolvedSearchParams<PageProps>;
   noStore();
   let formToken: string | null = null;
   let configurationStatus: ResetStatusMessage | null = null;

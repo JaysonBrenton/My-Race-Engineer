@@ -6,7 +6,8 @@
  * License: MIT License
  */
 
-import type { Metadata, PageProps } from 'next';
+import type { Metadata } from 'next';
+import type { AppPageProps, ResolvedSearchParams } from '@/types/app-page-props';
 import { unstable_noStore as noStore } from 'next/cache';
 import Link from 'next/link';
 
@@ -25,6 +26,8 @@ import {
   type StatusMessage,
 } from './state';
 import { registerAction } from './actions';
+
+type PageProps = AppPageProps;
 
 const PAGE_TITLE = 'Create your My Race Engineer account';
 const PAGE_DESCRIPTION =
@@ -110,7 +113,7 @@ const buildConfigurationErrorStatus = (): StatusMessage => ({
 });
 
 export default async function Page({ searchParams }: PageProps) {
-  const sp = ((await searchParams) ?? {}) as Awaited<PageProps['searchParams']>;
+  const sp = ((await searchParams) ?? {}) as ResolvedSearchParams<PageProps>;
   noStore();
   let formToken: string | null = null;
   let configurationStatus: StatusMessage | null = null;
