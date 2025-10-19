@@ -40,4 +40,5 @@ export * from './services/auth/startPasswordReset';
 export * from './services/auth/confirmPasswordReset';
 export * from './services/auth/validateSessionToken';
 export * from './services/auth/logoutUserSession';
+export * from './services/auth/deleteUserAccount.service';
 export * from './liverc/responseMappers';
