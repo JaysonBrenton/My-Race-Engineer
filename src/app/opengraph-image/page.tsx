@@ -4,6 +4,20 @@ import type { Metadata } from 'next';
 export const metadata: Metadata = {
   title: 'Open Graph Preview',
   description: 'Telemetry insights that keep your team fast.',
+  icons: {
+    icon: [
+      {
+        url: '/icon.svg',
+        type: 'image/svg+xml',
+      },
+    ],
+    shortcut: ['/icon.svg'],
+    apple: [
+      {
+        url: '/icon.svg',
+      },
+    ],
+  },
 };
 
 const backgroundStyle =
