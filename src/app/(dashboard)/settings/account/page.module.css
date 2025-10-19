@@ -122,9 +122,11 @@
   padding: 0.85rem 1.5rem;
   border-radius: 999px;
   border: none;
+  appearance: none;
   background: var(--color-danger);
-  color: var(--color-bg);
+  color: var(--color-danger-contrast);
   font-weight: 700;
+  font-size: 1rem;
   cursor: pointer;
   transition: transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
 }
@@ -132,6 +134,7 @@
 .deleteButton:hover {
   transform: translateY(-1px);
   box-shadow: var(--shadow-elevated-strong);
+  background: color-mix(in srgb, var(--color-danger) 88%, var(--color-fg) 12%);
 }
 
 .deleteButton:focus-visible {
