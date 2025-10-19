@@ -1,5 +1,3 @@
-'use server';
-
 /**
  * Filename: src/app/(auth)/auth/login/resend-verification/actions.impl.ts
  * Purpose: Handle verification email resend submissions with rate limiting and CSRF protection.
