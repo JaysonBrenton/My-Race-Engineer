@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 import { logout } from '@/app/actions/logout';
@@ -41,11 +42,16 @@ export function AppHeader({ isAuthenticated }: AppHeaderProps) {
       <div className="app-header__inner">
         <BrandLink />
         {isAuthenticated ? (
-          <form action={logout} className="app-header__logout" aria-label="Sign out form">
-            <button type="submit" className="app-header__logoutButton">
-              Sign out
-            </button>
-          </form>
+          <nav className="app-header__actions" aria-label="Account">
+            <Link className="app-header__link" href="/settings/account">
+              Settings
+            </Link>
+            <form action={logout} className="app-header__logout" aria-label="Sign out form">
+              <button type="submit" className="app-header__logoutButton">
+                Sign out
+              </button>
+            </form>
+          </nav>
         ) : null}
       </div>
     </header>

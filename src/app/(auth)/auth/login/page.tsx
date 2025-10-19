@@ -241,7 +241,17 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
   }
   const statusCode = firstParamValue(searchParams?.status);
   const errorCode = firstParamValue(searchParams?.error);
-  const status = configurationStatus ?? buildStatusMessage(statusCode, errorCode);
+  const deletedParam = firstParamValue(searchParams?.deleted);
+  const accountDeleted =
+    typeof deletedParam === 'string' && (deletedParam === '1' || deletedParam.toLowerCase() === 'true');
+  const status = configurationStatus
+    ? configurationStatus
+    : accountDeleted
+      ? {
+          tone: 'success' as const,
+          message: 'Your account was deleted successfully. We hope to see you back on the grid soon.',
+        }
+      : buildStatusMessage(statusCode, errorCode);
   const parsedPrefill = buildPrefill(firstParamValue(searchParams?.prefill));
   const fallbackIdentifier = asOptionalTrimmedString(firstParamValue(searchParams?.identifier));
   const fallbackEmail = asOptionalTrimmedString(firstParamValue(searchParams?.email));

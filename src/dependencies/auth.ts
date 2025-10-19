@@ -15,8 +15,10 @@ import {
   StartPasswordResetService,
   VerifyEmailService,
   ResendVerificationEmailService,
+  DeleteUserAccountService,
   type Logger,
   type LoggerContext,
+  type LoggerLike,
 } from '@core/app';
 import {
   ConsoleMailer,
@@ -111,6 +113,14 @@ const passwordResetStartLogger = createAuthFlowLogger('auth/reset/start');
 const passwordResetConfirmLogger = createAuthFlowLogger('auth/reset/confirm');
 const sessionValidationLogger = createAuthFlowLogger('auth/session');
 const logoutLogger = createAuthFlowLogger('auth/logout');
+const deleteAccountLogger = createAuthFlowLogger('settings/account/delete');
+
+const deleteAccountLogAdapter: LoggerLike = {
+  info: (obj: Record<string, unknown>, msg?: string) =>
+    deleteAccountLogger.info(msg ?? 'Account deletion completed.', obj),
+  error: (obj: Record<string, unknown>, msg?: string) =>
+    deleteAccountLogger.error(msg ?? 'Account deletion failed.', obj),
+};
 
 export const registerUserService = new RegisterUserService(
   userRepository,
@@ -189,4 +199,10 @@ export const validateSessionTokenService = new ValidateSessionTokenService(
 export const logoutUserSessionService = new LogoutUserSessionService(
   userSessionRepository,
   logoutLogger,
+);
+
+export const deleteUserAccountService = new DeleteUserAccountService(
+  userRepository,
+  userSessionRepository,
+  deleteAccountLogAdapter,
 );
