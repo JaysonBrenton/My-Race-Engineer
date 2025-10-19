@@ -58,8 +58,8 @@ export default async function AccountSettingsPage() {
           </p>
           <form className={styles.deleteForm} action={deleteAccount}>
             <p className={styles.confirmationPrompt}>
-              To continue, select <strong>Delete account</strong>. You will be redirected to the sign in
-              page once complete.
+              To continue, select <strong>Delete account</strong>. You will be redirected to the
+              sign-in page once complete.
             </p>
             <button type="submit" className={styles.deleteButton}>
               Delete account
