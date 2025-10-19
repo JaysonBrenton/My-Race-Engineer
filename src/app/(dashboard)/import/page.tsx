@@ -1,13 +1,7 @@
-import type { Metadata } from 'next';
+import type { Metadata, PageProps } from 'next';
 
 import ImportForm from './ImportForm';
 import styles from './page.module.css';
-
-type ImportPageProps = {
-  searchParams?: {
-    src?: string | string[];
-  };
-};
 
 export const metadata: Metadata = {
   title: 'Import from LiveRC',
@@ -27,8 +21,9 @@ const bookmarkletHref = `javascript:(()=>{var u=encodeURIComponent(location.href
 const enableFileImport =
   process.env.NODE_ENV !== 'production' || process.env.ENABLE_IMPORT_FILE === '1';
 
-export default function ImportPage({ searchParams }: ImportPageProps) {
-  const srcParam = searchParams?.src;
+export default async function Page({ searchParams }: PageProps) {
+  const sp = ((await searchParams) ?? {}) as Awaited<PageProps['searchParams']>;
+  const srcParam = sp.src;
   let initialUrl: string | undefined;
 
   if (typeof srcParam === 'string' && srcParam.length > 0) {

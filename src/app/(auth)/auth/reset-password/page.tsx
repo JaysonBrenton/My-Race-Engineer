@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, PageProps } from 'next';
 import { unstable_noStore as noStore } from 'next/cache';
 import Link from 'next/link';
 
@@ -38,10 +38,6 @@ export function generateMetadata(): Metadata {
     },
   };
 }
-
-type ResetPasswordPageProps = {
-  searchParams?: Record<string, string | string[] | undefined>;
-};
 
 type ResetStatusTone = 'info' | 'error' | 'success';
 
@@ -121,7 +117,8 @@ const getStatusClassName = (tone: ResetStatusTone) => {
   }
 };
 
-export default function ResetPasswordPage({ searchParams }: ResetPasswordPageProps) {
+export default async function Page({ searchParams }: PageProps) {
+  const sp = ((await searchParams) ?? {}) as Awaited<PageProps['searchParams']>;
   noStore();
   let formToken: string | null = null;
   let configurationStatus: ResetStatusMessage | null = null;
@@ -136,10 +133,10 @@ export default function ResetPasswordPage({ searchParams }: ResetPasswordPagePro
     }
   }
 
-  const statusCode = getParam(searchParams?.status);
-  const errorCode = getParam(searchParams?.error);
+  const statusCode = getParam(sp.status);
+  const errorCode = getParam(sp.error);
   const status = configurationStatus ?? buildStatusMessage(statusCode, errorCode);
-  const emailPrefill = getParam(searchParams?.email) ?? '';
+  const emailPrefill = getParam(sp.email) ?? '';
   const statusClassName = getStatusClassName(status.tone);
   const isFormDisabled = !formToken;
 

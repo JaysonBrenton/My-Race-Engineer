@@ -219,7 +219,7 @@ const buildConfigurationStatusMessage = (): StatusMessage => ({
 });
 
 export default async function Page({ searchParams }: PageProps) {
-  const sp = await searchParams;
+  const sp = ((await searchParams) ?? {}) as Awaited<PageProps['searchParams']>;
   noStore();
   let formToken: string | null = null;
   let configurationStatus: StatusMessage | null = null;
