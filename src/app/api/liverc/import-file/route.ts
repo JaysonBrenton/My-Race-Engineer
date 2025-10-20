@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server';
 
 import { isPrismaUnavailableError, liveRcImportService } from '@/dependencies/liverc';
 import { applicationLogger } from '@/dependencies/logger';
+import { authorizeImportRequest } from '../authGuard';
 
 const baseHeaders = {
   'Cache-Control': 'no-store',
@@ -34,6 +35,16 @@ export async function POST(request: Request) {
     requestId,
     route: '/api/liverc/import-file',
   });
+
+  const authorization = await authorizeImportRequest(request, {
+    logger,
+    requestId,
+    route: '/api/liverc/import-file',
+  });
+
+  if (!authorization.ok) {
+    return jsonResponse(authorization.status, { error: authorization.error, requestId }, requestId);
+  }
   let rawBody: unknown;
 
   try {

@@ -22,3 +22,8 @@
 - Enforce authentication (session check plus anti-CSRF token) or move the LiveRC ingestion behind a server action so anonymous callers cannot write telemetry data.
 - Surface resolver/proxy flags to the client via `NEXT_PUBLIC_…` variables or a server-provided config endpoint, and add a regression test that the Resolve button renders when the flag is enabled.
 - Wrap the wizard’s `localStorage.setItem` in a try/catch (and degrade gracefully to in-memory history) so storage quota errors do not break the UI.
+
+## Resolution status — 2025-10-20
+- ✅ Authentication and anti-CSRF validation now live in `src/app/api/liverc/authGuard.ts`, and both the JSON import and file import routes invoke it before reading the request body.
+- ✅ `src/app/(dashboard)/import/page.tsx` resolves resolver/proxy flags on the server and passes them into the client import form, which uses the shared `ParsedState` helpers to decide when to show the Resolve affordance.
+- ✅ `src/app/(dashboard)/import/Wizard.tsx` guards `localStorage.setItem` calls and degrades to an in-memory history if the browser blocks storage writes.

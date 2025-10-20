@@ -8,7 +8,8 @@ export type AuthFormContext =
   | 'registration'
   | 'password-reset'
   | 'password-reset-confirm'
-  | 'verification-resend';
+  | 'verification-resend'
+  | 'liverc-import';
 
 export class MissingAuthFormTokenSecretError extends Error {
   constructor(message: string) {
