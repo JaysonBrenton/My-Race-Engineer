@@ -29,6 +29,8 @@ import {
   type RegisterErrorCode,
 } from './state';
 
+type RedirectHref = Parameters<typeof redirect>[0];
+
 type RegistrationPrefillInput = {
   name?: string | null | undefined;
   driverName?: string | null | undefined;
@@ -215,19 +217,20 @@ export const createRegisterAction = (
 
         const recordOutcome = (outcome: {
           kind: 'redirect' | 'rerender';
-          target?: string;
+          target?: RedirectHref;
           statusKey?: string;
         }) => {
+          const target = outcome.target?.toString();
           logger.info('Registration outcome resolved.', {
             event: 'auth.register.outcome',
             kind: outcome.kind,
-            target: outcome.target,
+            target,
             statusKey: outcome.statusKey,
           });
           emitDebugEvent?.({
             type: 'outcome',
             kind: outcome.kind,
-            target: outcome.target,
+            target,
             statusKey: outcome.statusKey,
           });
         };
@@ -550,8 +553,9 @@ export const createRegisterAction = (
               sessionExpiresAt: result.session?.expiresAt.toISOString(),
               durationMs: Date.now() - requestStartedAt,
             });
-            recordOutcome({ kind: 'redirect', target: '/dashboard', statusKey: 'session-created' });
-            deps.redirect('/dashboard');
+            const target = buildRedirectUrl('/dashboard', {});
+            recordOutcome({ kind: 'redirect', target, statusKey: 'session-created' });
+            deps.redirect(target);
             break;
           default:
             span.setAttribute('mre.auth.outcome', 'server_error');

@@ -6,6 +6,10 @@
  * License: MIT License
  */
 
+import type { Route } from 'next';
+
+type RedirectHref = Parameters<(typeof import('next/navigation'))['redirect']>[0];
+
 export type StatusTone = 'info' | 'error' | 'success';
 
 export type StatusMessage = {
@@ -152,9 +156,9 @@ export const buildPrefillParam = (prefill: RegistrationPrefillInput): string | u
 };
 
 export const buildRedirectUrl = (
-  pathname: string,
+  pathname: Route,
   searchParams: Record<string, string | undefined>,
-) => {
+): RedirectHref => {
   const params = new URLSearchParams();
   Object.entries(searchParams).forEach(([key, value]) => {
     if (value) {
@@ -163,7 +167,8 @@ export const buildRedirectUrl = (
   });
 
   const query = params.toString();
-  return query ? `${pathname}?${query}` : pathname;
+  const final = query ? `${pathname}?${query}` : pathname;
+  return final as RedirectHref;
 };
 
 export const buildDriverNameSuggestionsParam = (suggestions: string[]): string | undefined => {
