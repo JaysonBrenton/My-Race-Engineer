@@ -61,8 +61,8 @@ export const handleLoginGuardPost = async (req: Request): Promise<Response> => {
   const debugRecorder = createAuthActionDebugRecorder('login');
   const action = createLoginAction(undefined, { onDebugEvent: debugRecorder.record });
 
-  const actionResult = await action(formData);
-  const response = buildGuardResponse(actionResult, req);
+  const result = await action(formData);
+  const response = buildGuardResponse(result, req);
   response.headers.set('Cache-Control', 'no-store');
   response.headers.set('x-auth-origin-guard', 'ok');
   applyAuthDebugHeaders(response, debugRecorder.snapshot());
