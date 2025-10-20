@@ -206,11 +206,6 @@ const createLoginDeps = (overrides: Partial<LoginActionDependencies> = {}): Logi
         'user-agent': 'node:test',
       }),
     cookies: async () => cookieJar,
-    redirect: (destination: string | URL) => {
-      const location = typeof destination === 'string' ? destination : destination.toString();
-      redirectCalls.push(location);
-      throw new RedirectCaptured(location);
-    },
     guardAuthPostOrigin: () => {},
     checkLoginRateLimit: () => ({ ok: true }),
     validateAuthFormToken: () => ({ ok: true, issuedAt: new Date() }),
@@ -649,13 +644,16 @@ test('loginAction redirects back to the form when the token is invalid', async (
   formData.set('identifier', 'user@example.com');
   formData.set('password', 'correct-horse-battery-staple');
 
-  try {
-    await loginAction(formData);
-    assert.fail('Expected login action to redirect when the form token is invalid.');
-  } catch (error) {
-    assert.ok(error instanceof RedirectCaptured);
-    assert.equal(error.location, '/auth/login?error=invalid-token');
-  }
+  const result = await loginAction(formData);
+
+  assert.deepEqual(result, {
+    status: 'error',
+    error: 'invalid-token',
+    statusMessage: {
+      tone: 'error',
+      message: 'Your form expired. Please try again.',
+    },
+  });
 
   assert.equal(loginInvocations, 0);
 });
@@ -694,13 +692,12 @@ test('loginAction mints a session cookie and redirects to the dashboard on succe
   formData.set('remember', 'true');
   formData.set('formToken', 'token');
 
-  try {
-    await loginAction(formData);
-    assert.fail('Expected login action to redirect after success.');
-  } catch (error) {
-    assert.ok(error instanceof RedirectCaptured);
-    assert.equal(error.location, '/dashboard');
-  }
+  const result = await loginAction(formData);
+
+  assert.deepEqual(result, {
+    status: 'success',
+    redirectTo: '/dashboard',
+  });
 
   assert.deepEqual(capturedLoginPayload, {
     identifier: { kind: 'email', value: 'user@example.com' },
@@ -751,13 +748,12 @@ test('loginAction accepts driver name identifiers', async () => {
   formData.set('password', 'correct-horse-battery-staple');
   formData.set('formToken', 'token');
 
-  try {
-    await loginAction(formData);
-    assert.fail('Expected login action to redirect after success.');
-  } catch (error) {
-    assert.ok(error instanceof RedirectCaptured);
-    assert.equal(error.location, '/dashboard');
-  }
+  const result = await loginAction(formData);
+
+  assert.deepEqual(result, {
+    status: 'success',
+    redirectTo: '/dashboard',
+  });
 
   assert.deepEqual(capturedLoginPayload, {
     identifier: { kind: 'driver-name', value: 'Example Driver' },
