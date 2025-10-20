@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Filename: src/app/(auth)/auth/login/verification-status-panel.tsx
  * Purpose: Display verification status messaging and expose a resend workflow.
