@@ -35,10 +35,10 @@ const setEnv = (overrides: Partial<typeof original>) => {
   });
 };
 
-test('auto strategy respects APP_URL scheme when proxy headers are absent', () => {
+test('auto strategy respects APP_URL scheme when proxy headers are absent', async () => {
   setEnv({ NODE_ENV: 'production', APP_URL: 'http://example.test' });
 
-  const secure = computeCookieSecure({
+  const secure = await computeCookieSecure({
     strategy: 'auto',
     trustProxy: false,
     appUrl: env.APP_URL ?? null,
@@ -48,10 +48,10 @@ test('auto strategy respects APP_URL scheme when proxy headers are absent', () =
   assert.equal(secure, false);
 });
 
-test('auto strategy enables Secure when APP_URL is https://', () => {
+test('auto strategy enables Secure when APP_URL is https://', async () => {
   setEnv({ NODE_ENV: 'production', APP_URL: 'https://example.test' });
 
-  const secure = computeCookieSecure({
+  const secure = await computeCookieSecure({
     strategy: 'auto',
     trustProxy: false,
     appUrl: env.APP_URL ?? null,
@@ -61,10 +61,10 @@ test('auto strategy enables Secure when APP_URL is https://', () => {
   assert.equal(secure, true);
 });
 
-test('auto strategy trusts proxy headers when enabled', () => {
+test('auto strategy trusts proxy headers when enabled', async () => {
   setEnv({ NODE_ENV: 'production', TRUST_PROXY: 'true', APP_URL: 'http://example.test' });
 
-  const secure = computeCookieSecure({
+  const secure = await computeCookieSecure({
     strategy: 'auto',
     trustProxy: env.TRUST_PROXY === 'true',
     appUrl: env.APP_URL ?? null,
@@ -74,9 +74,9 @@ test('auto strategy trusts proxy headers when enabled', () => {
   assert.equal(secure, true);
 });
 
-test('explicit strategy overrides environment heuristics', () => {
-  const alwaysSecure = computeCookieSecure({ strategy: 'always' });
-  const neverSecure = computeCookieSecure({ strategy: 'never' });
+test('explicit strategy overrides environment heuristics', async () => {
+  const alwaysSecure = await computeCookieSecure({ strategy: 'always' });
+  const neverSecure = await computeCookieSecure({ strategy: 'never' });
 
   assert.equal(alwaysSecure, true);
   assert.equal(neverSecure, false);
