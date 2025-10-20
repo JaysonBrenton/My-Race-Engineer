@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { NextRequest } from 'next/server';
+
 import { GET } from '../src/app/api/dev/liverc/results/[...slug]/route';
 
 type FetchCall = {
@@ -35,7 +37,7 @@ test('GET /api/dev/liverc/results proxies race result requests when proxy flag e
       headers: { 'content-type': 'application/json' },
     });
   }, async (calls) => {
-    const request = new Request(
+    const request = new NextRequest(
       'http://localhost/api/dev/liverc/results/sample-event/sample-class/round-1/a-main.json?proxy=1',
       {
         headers: { 'x-request-id': 'test-race-result' },
@@ -43,9 +45,9 @@ test('GET /api/dev/liverc/results proxies race result requests when proxy flag e
     );
 
     const response = await GET(request, {
-      params: {
+      params: Promise.resolve({
         slug: ['sample-event', 'sample-class', 'round-1', 'a-main.json'],
-      },
+      }),
     });
 
     assert.equal(response.status, 200);
@@ -67,7 +69,7 @@ test('GET /api/dev/liverc/results proxies entry list requests when proxy flag en
       headers: { 'content-type': 'application/json' },
     });
   }, async (calls) => {
-    const request = new Request(
+    const request = new NextRequest(
       'http://localhost/api/dev/liverc/results/sample-event/sample-class/entry-list.json?proxy=1',
       {
         headers: { 'x-request-id': 'test-entry-list' },
@@ -75,9 +77,9 @@ test('GET /api/dev/liverc/results proxies entry list requests when proxy flag en
     );
 
     const response = await GET(request, {
-      params: {
+      params: Promise.resolve({
         slug: ['sample-event', 'sample-class', 'entry-list.json'],
-      },
+      }),
     });
 
     assert.equal(response.status, 200);

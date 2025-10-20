@@ -1,5 +1,6 @@
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import type { Route } from 'next';
 import { z } from 'zod';
 
 import { startPasswordResetService } from '@/dependencies/auth';
@@ -10,6 +11,8 @@ import { extractClientIdentifier } from '@/lib/request/clientIdentifier';
 import { guardAuthPostOrigin } from '@/server/security/origin';
 import { createErrorLogContext } from './logging';
 import type { Logger } from '@core/app';
+
+type RedirectHref = Parameters<typeof redirect>[0];
 
 type RateLimitResult = ReturnType<typeof checkPasswordResetRateLimit>;
 
@@ -25,7 +28,10 @@ const requestSchema = z.object({
     .transform((value) => value.toLowerCase()),
 });
 
-const buildRedirectUrl = (pathname: string, searchParams: Record<string, string | undefined>) => {
+const buildRedirectUrl = (
+  pathname: Route,
+  searchParams: Record<string, string | undefined>,
+): RedirectHref => {
   const params = new URLSearchParams();
   Object.entries(searchParams).forEach(([key, value]) => {
     if (value) {
@@ -34,7 +40,8 @@ const buildRedirectUrl = (pathname: string, searchParams: Record<string, string 
   });
 
   const query = params.toString();
-  return query ? `${pathname}?${query}` : pathname;
+  const final = query ? `${pathname}?${query}` : pathname;
+  return final as RedirectHref;
 };
 
 const getFormValue = (data: FormData, key: string) => {
@@ -66,7 +73,7 @@ const defaultDependencies: RequestPasswordResetDependencies = {
   logger: applicationLogger.withContext({ route: 'auth/reset-password/start-action' }),
 };
 
-const redirectTo = (target: string, deps: RequestPasswordResetDependencies): never =>
+const redirectTo = (target: RedirectHref, deps: RequestPasswordResetDependencies): never =>
   deps.redirect(target);
 
 export const createRequestPasswordResetAction = (
