@@ -54,8 +54,8 @@ const buildRedirectUrl = (
   });
 
   const query = params.toString();
-  const target = query ? `${pathname}?${query}` : pathname;
-  return target as RedirectHref;
+  const target: RedirectHref = query ? `${pathname}?${query}` : pathname;
+  return target;
 };
 
 const getFormValue = (data: FormData, key: string) => {
