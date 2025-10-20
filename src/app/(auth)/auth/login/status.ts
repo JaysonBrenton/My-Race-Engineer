@@ -24,7 +24,8 @@ export const buildStatusMessage = (
   if (statusCode === 'verify-email') {
     return {
       tone: 'info',
-      message: 'Check your inbox for a verification link. Once confirmed, you can sign in immediately.',
+      message:
+        'Check your inbox for a verification link. Once confirmed, you can sign in immediately.',
     };
   }
 
@@ -92,7 +93,8 @@ export const buildStatusMessage = (
     case 'account-suspended':
       return {
         tone: 'error',
-        message: 'This account has been suspended. Contact support if you believe this is an error.',
+        message:
+          'This account has been suspended. Contact support if you believe this is an error.',
       };
     case 'session-expired':
       return {

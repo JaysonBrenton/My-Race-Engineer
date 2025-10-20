@@ -12,7 +12,11 @@ import {
   guardAuthPostOrigin,
   parseAllowedOrigins,
 } from '@/core/security/origin';
-import { createLoginAction, type LoginActionErrorResult, type LoginActionResult } from '../actions.impl';
+import {
+  createLoginAction,
+  type LoginActionErrorResult,
+  type LoginActionResult,
+} from '../actions.impl';
 import { applyAuthDebugHeaders, createAuthActionDebugRecorder } from '@/server/security/authDebug';
 
 const shouldLogDiagnostics = (): boolean => process.env.NODE_ENV !== 'production';
