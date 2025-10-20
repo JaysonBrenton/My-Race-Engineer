@@ -56,7 +56,7 @@ const getFormValue = (data: FormData, key: string) => {
   return typeof value === 'string' ? value : undefined;
 };
 
-const RESET_PASSWORD_ROUTE: Route = ('/auth/reset-password') as Route; // safe: canonical reset-request path
+const RESET_PASSWORD_ROUTE: Route = '/auth/reset-password' as Route; // safe: canonical reset-request path
 
 export type RequestPasswordResetDependencies = {
   headers: typeof headers;

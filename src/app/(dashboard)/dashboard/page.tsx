@@ -25,7 +25,7 @@ export const metadata: Metadata = {
 
 export default async function DashboardPage() {
   const { user } = await requireAuthenticatedUser();
-  const importRoute: Route = ('/import') as Route; // safe: import wizard root
+  const importRoute: Route = '/import' as Route; // safe: import wizard root
 
   return (
     <section className={styles.container} aria-labelledby="dashboard-heading">

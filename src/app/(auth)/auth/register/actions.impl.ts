@@ -38,7 +38,7 @@ type RegistrationPrefillInput = {
   email?: string | null | undefined;
 };
 
-const REGISTER_ROUTE: Route = ('/auth/register') as Route; // safe: canonical register path
+const REGISTER_ROUTE: Route = '/auth/register' as Route; // safe: canonical register path
 
 // The server action owns the full registration happy-path orchestration, so we keep
 // the validation rules alongside it. This schema mirrors the policy enforced at the

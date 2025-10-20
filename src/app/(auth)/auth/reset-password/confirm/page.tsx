@@ -21,7 +21,7 @@ import { confirmPasswordResetAction } from './actions';
 
 import styles from '../../auth.module.css';
 
-const RESET_REQUEST_ROUTE: Route = ('/auth/reset-password') as Route; // safe: static reset request path
+const RESET_REQUEST_ROUTE: Route = '/auth/reset-password' as Route; // safe: static reset request path
 
 type PageProps = AppPageProps;
 

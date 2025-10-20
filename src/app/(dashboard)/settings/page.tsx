@@ -9,6 +9,6 @@ import type { Route } from 'next';
 import { redirect } from 'next/navigation';
 
 export default function SettingsIndexPage(): never {
-  const target: Route = ('/settings/account') as Route; // safe: canonical settings account path
+  const target: Route = '/settings/account' as Route; // safe: canonical settings account path
   redirect(target);
 }

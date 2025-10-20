@@ -18,7 +18,7 @@ import { BrandLink } from './BrandLink';
 
 const HIDDEN_EXACT_PATHS = new Set(['', '/']);
 const HIDDEN_PREFIXES = ['/auth'];
-const SETTINGS_ACCOUNT_ROUTE: Route = ('/settings/account') as Route; // safe: canonical settings page
+const SETTINGS_ACCOUNT_ROUTE: Route = '/settings/account' as Route; // safe: canonical settings page
 
 export interface AppHeaderProps {
   isAuthenticated: boolean;

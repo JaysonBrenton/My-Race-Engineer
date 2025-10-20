@@ -37,7 +37,7 @@ export const logout = async (formData: FormData): Promise<void> => {
       });
     }
   } catch (error: unknown) {
-    redirectTarget = (`${ROUTE_LOGIN}?error=server-error`) as Route; // safe: fixed base + static error tag
+    redirectTarget = `${ROUTE_LOGIN}?error=server-error` as Route; // safe: fixed base + static error tag
     logger.error(
       'Failed to revoke session during logout.',
       createErrorLogContext(

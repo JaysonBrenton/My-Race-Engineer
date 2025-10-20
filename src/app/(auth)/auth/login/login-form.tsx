@@ -18,8 +18,8 @@ import { VerificationStatusPanel } from './verification-status-panel';
 import { resendVerificationEmailAction } from './resend-verification/actions';
 
 const INITIAL_STATE: LoginActionState = null;
-const REGISTER_ROUTE: Route = ('/auth/register') as Route; // safe: static register path
-const RESET_PASSWORD_ROUTE: Route = ('/auth/reset-password') as Route; // safe: static reset path
+const REGISTER_ROUTE: Route = '/auth/register' as Route; // safe: static register path
+const RESET_PASSWORD_ROUTE: Route = '/auth/reset-password' as Route; // safe: static reset path
 
 const getStatusClassName = (tone: StatusMessage['tone']) => {
   switch (tone) {
