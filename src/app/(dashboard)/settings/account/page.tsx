@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 
+import type { AppPageProps, ResolvedSearchParams } from '@/types/app-page-props';
 import { deleteAccount } from '@/app/actions/deleteAccount';
 import { requireAuthenticatedUser } from '@/lib/auth/serverSession';
 
@@ -15,8 +16,31 @@ export const metadata: Metadata = {
   description: PAGE_DESCRIPTION,
 };
 
-export default async function AccountSettingsPage() {
+type PageProps = AppPageProps;
+
+const EMPTY_SEARCH_PARAMS: ResolvedSearchParams<PageProps> = {};
+
+const resolveParamValue = (value: string | string[] | undefined): string | undefined => {
+  if (Array.isArray(value)) {
+    return value[0];
+  }
+
+  return value;
+};
+
+const buildStatusMessage = (errorCode: string | undefined): string | null => {
+  if (errorCode === 'delete-failed') {
+    return 'We were unable to delete your account. Please try again or contact support if the issue persists.';
+  }
+
+  return null;
+};
+
+export default async function AccountSettingsPage({ searchParams }: PageProps) {
+  const sp = (await searchParams) ?? EMPTY_SEARCH_PARAMS;
   const { user } = await requireAuthenticatedUser();
+  const errorCode = resolveParamValue(sp.error);
+  const statusMessage = buildStatusMessage(errorCode);
 
   return (
     <section className={styles.container} aria-labelledby="settings-account-heading">
@@ -28,6 +52,11 @@ export default async function AccountSettingsPage() {
           {PAGE_TITLE}
         </h1>
         <p className={styles.description}>{PAGE_DESCRIPTION}</p>
+        {statusMessage ? (
+          <div className={styles.statusMessage} role="alert" aria-live="assertive">
+            <p>{statusMessage}</p>
+          </div>
+        ) : null}
       </header>
       <div className={styles.grid}>
         <article className={styles.card} aria-labelledby="settings-account-profile">
