@@ -1,6 +1,6 @@
 import type { UserRepository } from '@core/app';
 import { DuplicateUserDriverNameError, DuplicateUserEmailError } from '@core/app';
-import type { CreateUserInput, User } from '@core/domain';
+import { normaliseDriverName, type CreateUserInput, type User } from '@core/domain';
 /*
  * Prisma's generated client returns fully typed objects, but `@typescript-eslint`
  * currently reports them as `any` when accessed through helper mappers. We
@@ -47,7 +47,10 @@ export class PrismaUserRepository implements UserRepository {
   }
 
   async findByDriverName(driverName: string): Promise<User | null> {
-    const user = await this.prisma.user.findUnique({ where: { driverName } });
+    const driverNameCanonical = normaliseDriverName(driverName);
+    const user = await this.prisma.user.findFirst({
+      where: { driverNameCanonical },
+    });
 
     return user ? toDomain(user) : null;
   }
@@ -66,6 +69,7 @@ export class PrismaUserRepository implements UserRepository {
             id: input.id,
             name: input.name,
             driverName: input.driverName,
+            driverNameCanonical: normaliseDriverName(input.driverName),
             email: input.email.toLowerCase(),
             passwordHash: input.passwordHash,
             status: this.toPrismaStatus(input.status),

@@ -141,6 +141,34 @@ test('returns driver-name-taken with suggestions when driver name already exists
   }
 });
 
+test('treats driver names differing only by case as duplicates', async () => {
+  const { service } = buildService();
+
+  const first = await service.register({
+    name: 'Casey Caps',
+    driverName: 'CaseSensitive',
+    email: 'casey@example.com',
+    password: 'P@ssword12345',
+  });
+
+  assert.equal(first.ok, true);
+  if (!first.ok) {
+    return;
+  }
+
+  const second = await service.register({
+    name: 'Casey Lower',
+    driverName: 'casesensitive',
+    email: 'casey-lower@example.com',
+    password: 'P@ssword12345',
+  });
+
+  assert.equal(second.ok, false);
+  if (!second.ok) {
+    assert.equal(second.reason, 'driver-name-taken');
+  }
+});
+
 test('issues verification email and token when verification is required', async () => {
   const { service, tokenRepository, mailer } = buildService({
     options: { requireEmailVerification: true },

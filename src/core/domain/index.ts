@@ -9,3 +9,4 @@ export * from './auth/user';
 export * from './auth/userSession';
 export * from './auth/userEmailVerificationToken';
 export * from './auth/passwordResetToken';
+export * from './auth/driverName';

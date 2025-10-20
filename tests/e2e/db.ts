@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 
+import { normaliseDriverName } from '@core/domain';
 import { Argon2PasswordHasher } from '@/lib/auth/passwordHasher';
 
 const prisma = new PrismaClient();
@@ -28,6 +29,7 @@ export const createActiveUser = async (params: {
     data: {
       name: params.name,
       driverName: params.driverName,
+      driverNameCanonical: normaliseDriverName(params.driverName),
       email: params.email,
       passwordHash,
       status: 'ACTIVE',
