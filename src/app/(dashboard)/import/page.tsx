@@ -1,5 +1,10 @@
 import type { Metadata } from 'next';
 import type { AppPageProps, ResolvedSearchParams } from '@/types/app-page-props';
+import {
+  MissingAuthFormTokenSecretError,
+  generateAuthFormToken,
+} from '@/lib/auth/formTokens';
+import { EnvironmentValidationError } from '@/server/config/environment';
 
 import ImportForm from './ImportForm';
 import styles from './page.module.css';
@@ -21,6 +26,9 @@ const sanitizedBookmarkletTarget = bookmarkletTarget.replace(/'/g, "\\'");
 const bookmarkletHref = `javascript:(()=>{var u=encodeURIComponent(location.href);location.href='${sanitizedBookmarkletTarget}'+u;})();`;
 const enableFileImport =
   process.env.NODE_ENV !== 'production' || process.env.ENABLE_IMPORT_FILE === '1';
+const resolverEnabled = process.env.ENABLE_LIVERC_RESOLVER === '1';
+const hasInternalProxy =
+  typeof process.env.LIVERC_HTTP_BASE === 'string' && process.env.LIVERC_HTTP_BASE.length > 0;
 
 type PageProps = AppPageProps;
 
@@ -36,6 +44,21 @@ export default async function Page({ searchParams }: PageProps) {
       initialUrl = decodeURIComponent(srcParam);
     } catch {
       initialUrl = srcParam;
+    }
+  }
+
+  let importFormToken: string | null = null;
+
+  try {
+    importFormToken = generateAuthFormToken('liverc-import');
+  } catch (error) {
+    if (
+      error instanceof MissingAuthFormTokenSecretError ||
+      error instanceof EnvironmentValidationError
+    ) {
+      importFormToken = null;
+    } else {
+      throw error;
     }
   }
 
@@ -61,6 +84,9 @@ export default async function Page({ searchParams }: PageProps) {
         enableWizard={enableWizard}
         initialUrl={initialUrl}
         enableFileImport={enableFileImport}
+        resolverEnabled={resolverEnabled}
+        hasInternalProxy={hasInternalProxy}
+        importFormToken={importFormToken}
       />
     </div>
   );

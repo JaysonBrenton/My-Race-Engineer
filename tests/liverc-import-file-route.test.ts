@@ -1,13 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import './helpers/test-env';
+
 import { LiveRcImportError, type LiveRcImportSummary } from '../src/core/app';
 import { PrismaClientInitializationError } from '../src/core/infra/prisma/prismaClient';
 import { liveRcImportService } from '../src/dependencies/liverc';
-
-if (!process.env.DATABASE_URL) {
-  process.env.DATABASE_URL = 'file:memorydb?schema=public';
-}
+import { validateSessionTokenService } from '../src/dependencies/auth';
+import { generateAuthFormToken } from '../src/lib/auth/formTokens';
+import { SESSION_COOKIE_NAME } from '../src/lib/auth/constants';
+import { IMPORT_FORM_TOKEN_HEADER } from '../src/lib/liverc/importAuth';
 
 type ImportFromPayload = typeof liveRcImportService.importFromPayload;
 
@@ -43,6 +45,41 @@ const withPatchedImport = async (
     });
   }
 };
+
+const ensureSessionSecret = () => {
+  if (!process.env.SESSION_SECRET) {
+    process.env.SESSION_SECRET = '12345678901234567890123456789012';
+  }
+};
+
+const AUTH_COOKIE = `${SESSION_COOKIE_NAME}=session-token`;
+
+const withAuthenticatedSession = async (run: () => Promise<void>) => {
+  ensureSessionSecret();
+  const originalValidate = validateSessionTokenService.validate;
+
+  Object.defineProperty(validateSessionTokenService, 'validate', {
+    configurable: true,
+    writable: true,
+    value: async () => ({ ok: true, user: {} as any, session: {} as any }),
+  });
+
+  try {
+    await run();
+  } finally {
+    Object.defineProperty(validateSessionTokenService, 'validate', {
+      configurable: true,
+      writable: true,
+      value: originalValidate,
+    });
+  }
+};
+
+const buildAuthHeaders = (overrides: Record<string, string> = {}) => ({
+  ...overrides,
+  cookie: AUTH_COOKIE,
+  [IMPORT_FORM_TOKEN_HEADER]: generateAuthFormToken('liverc-import'),
+});
 
 const withEnvironment = async (overrides: EnvOverrides, run: () => Promise<void>) => {
   const originalEntries = Object.entries(overrides).map(([key]) => [key, process.env[key]] as const);
@@ -109,51 +146,53 @@ test('POST /api/liverc/import-file forwards payload metadata with deterministic 
   await withEnvironment(
     { NODE_ENV: 'test', ENABLE_IMPORT_FILE: '1' },
     async () => {
-      let receivedPayload: unknown;
-      let receivedNamespaceSeed: string | undefined;
+      await withAuthenticatedSession(async () => {
+        let receivedPayload: unknown;
+        let receivedNamespaceSeed: string | undefined;
 
-      await withPatchedImport(
-        async (payloadArg, options) => {
-          receivedPayload = payloadArg;
-          receivedNamespaceSeed = options?.uploadMetadata?.namespaceSeed;
+        await withPatchedImport(
+          async (payloadArg, options) => {
+            receivedPayload = payloadArg;
+            receivedNamespaceSeed = options?.uploadMetadata?.namespaceSeed;
 
-          assert.deepEqual(options?.uploadMetadata, {
-            fileName: metadata.fileName,
-            fileSizeBytes: metadata.fileSizeBytes,
-            lastModifiedEpochMs: metadata.lastModifiedEpochMs,
-            uploadedAtEpochMs: metadata.uploadedAtEpochMs,
-            fileHash: metadata.fileHash,
-            requestId,
-            explicitNamespace: undefined,
-            namespaceSeed: expectedNamespaceSeed,
-          });
+            assert.deepEqual(options?.uploadMetadata, {
+              fileName: metadata.fileName,
+              fileSizeBytes: metadata.fileSizeBytes,
+              lastModifiedEpochMs: metadata.lastModifiedEpochMs,
+              uploadedAtEpochMs: metadata.uploadedAtEpochMs,
+              fileHash: metadata.fileHash,
+              requestId,
+              explicitNamespace: undefined,
+              namespaceSeed: expectedNamespaceSeed,
+            });
 
-          return summary;
-        },
-        async () => {
-          const { POST } = await importRouteModule();
+            return summary;
+          },
+          async () => {
+            const { POST } = await importRouteModule();
 
-          const request = new Request('http://localhost/api/liverc/import-file', {
-            method: 'POST',
-            headers: {
-              'content-type': 'application/json',
-              'x-request-id': requestId,
-            },
-            body: JSON.stringify({ payload, metadata }),
-          });
+            const request = new Request('http://localhost/api/liverc/import-file', {
+              method: 'POST',
+              headers: buildAuthHeaders({
+                'content-type': 'application/json',
+                'x-request-id': requestId,
+              }),
+              body: JSON.stringify({ payload, metadata }),
+            });
 
-          const response = await POST(request);
+            const response = await POST(request);
 
-          assert.equal(response.status, 202);
-          assert.equal(response.headers.get('x-request-id'), requestId);
+            assert.equal(response.status, 202);
+            assert.equal(response.headers.get('x-request-id'), requestId);
 
-          const body = (await response.json()) as Record<string, unknown>;
-          assert.equal(body.requestId, requestId);
-          assert.deepEqual(body.data, summary);
-          assert.deepEqual(receivedPayload, payload);
-          assert.equal(receivedNamespaceSeed, expectedNamespaceSeed);
-        },
-      );
+            const body = (await response.json()) as Record<string, unknown>;
+            assert.equal(body.requestId, requestId);
+            assert.deepEqual(body.data, summary);
+            assert.deepEqual(receivedPayload, payload);
+            assert.equal(receivedNamespaceSeed, expectedNamespaceSeed);
+          },
+        );
+      });
     },
   );
 });
@@ -213,31 +252,36 @@ test('POST /api/liverc/import-file surfaces LiveRcImportError responses', async 
   await withEnvironment(
     { NODE_ENV: 'test', ENABLE_IMPORT_FILE: '1' },
     async () => {
-      await withPatchedImport(
-        async () => {
-          throw error;
-        },
-        async () => {
-          const { POST } = await importRouteModule();
+      await withAuthenticatedSession(async () => {
+        await withPatchedImport(
+          async () => {
+            throw error;
+          },
+          async () => {
+            const { POST } = await importRouteModule();
 
-          const request = new Request('http://localhost/api/liverc/import-file', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json', 'x-request-id': 'req-error' },
-            body: JSON.stringify({ payload: {} }),
-          });
+            const request = new Request('http://localhost/api/liverc/import-file', {
+              method: 'POST',
+              headers: buildAuthHeaders({
+                'content-type': 'application/json',
+                'x-request-id': 'req-error',
+              }),
+              body: JSON.stringify({ payload: {} }),
+            });
 
-          const response = await POST(request);
-          const payload = (await response.json()) as Record<string, unknown>;
+            const response = await POST(request);
+            const payload = (await response.json()) as Record<string, unknown>;
 
-          assert.equal(response.status, 422);
-          assert.deepEqual(payload.error, {
-            code: 'INVALID_LIVERC_PAYLOAD',
-            message: 'Invalid LiveRC payload.',
-            details: { field: 'payload' },
-          });
-          assert.equal(payload.requestId, 'req-error');
-        },
-      );
+            assert.equal(response.status, 422);
+            assert.deepEqual(payload.error, {
+              code: 'INVALID_LIVERC_PAYLOAD',
+              message: 'Invalid LiveRC payload.',
+              details: { field: 'payload' },
+            });
+            assert.equal(payload.requestId, 'req-error');
+          },
+        );
+      });
     },
   );
 });
@@ -246,30 +290,82 @@ test('POST /api/liverc/import-file maps Prisma availability errors to 503', asyn
   await withEnvironment(
     { NODE_ENV: 'test', ENABLE_IMPORT_FILE: '1' },
     async () => {
-      await withPatchedImport(
-        async () => {
-          throw new PrismaClientInitializationError('Failed to connect to database.');
-        },
-        async () => {
-          const { POST } = await importRouteModule();
+      await withAuthenticatedSession(async () => {
+        await withPatchedImport(
+          async () => {
+            throw new PrismaClientInitializationError('Failed to connect to database.');
+          },
+          async () => {
+            const { POST } = await importRouteModule();
 
-          const request = new Request('http://localhost/api/liverc/import-file', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json', 'x-request-id': 'req-db' },
-            body: JSON.stringify({ payload: { sample: true } }),
-          });
+            const request = new Request('http://localhost/api/liverc/import-file', {
+              method: 'POST',
+              headers: buildAuthHeaders({
+                'content-type': 'application/json',
+                'x-request-id': 'req-db',
+              }),
+              body: JSON.stringify({ payload: { sample: true } }),
+            });
 
-          const response = await POST(request);
-          const payload = (await response.json()) as Record<string, unknown>;
+            const response = await POST(request);
+            const payload = (await response.json()) as Record<string, unknown>;
 
-          assert.equal(response.status, 503);
-          assert.deepEqual(payload.error, {
-            code: 'DATABASE_UNAVAILABLE',
-            message: 'Database is not available to store LiveRC data.',
-          });
-          assert.equal(payload.requestId, 'req-db');
-        },
-      );
+            assert.equal(response.status, 503);
+            assert.deepEqual(payload.error, {
+              code: 'DATABASE_UNAVAILABLE',
+              message: 'Database is not available to store LiveRC data.',
+            });
+            assert.equal(payload.requestId, 'req-db');
+          },
+        );
+      });
+    },
+  );
+});
+
+test('POST /api/liverc/import-file rejects requests without a session cookie', async () => {
+  await withEnvironment(
+    { NODE_ENV: 'test', ENABLE_IMPORT_FILE: '1' },
+    async () => {
+      const { POST } = await importRouteModule();
+
+      const request = new Request('http://localhost/api/liverc/import-file', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ payload: { sample: true } }),
+      });
+
+      const response = await POST(request);
+      const payload = (await response.json()) as Record<string, unknown>;
+
+      assert.equal(response.status, 401);
+      assert.equal((payload.error as { code: string }).code, 'UNAUTHENTICATED');
+    },
+  );
+});
+
+test('POST /api/liverc/import-file rejects requests missing the import token', async () => {
+  await withEnvironment(
+    { NODE_ENV: 'test', ENABLE_IMPORT_FILE: '1' },
+    async () => {
+      await withAuthenticatedSession(async () => {
+        const { POST } = await importRouteModule();
+
+        const request = new Request('http://localhost/api/liverc/import-file', {
+          method: 'POST',
+          headers: {
+            cookie: AUTH_COOKIE,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({ payload: { sample: true } }),
+        });
+
+        const response = await POST(request);
+        const payload = (await response.json()) as Record<string, unknown>;
+
+        assert.equal(response.status, 403);
+        assert.equal((payload.error as { code: string }).code, 'INVALID_FORM_TOKEN');
+      });
     },
   );
 });

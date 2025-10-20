@@ -42,6 +42,7 @@ export default function Wizard({ onComplete }: WizardProps) {
   const [completedUrl, setCompletedUrl] = useState<string | null>(null);
 
   const hasHydrated = useRef(false);
+  const storageWriteFailed = useRef(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -69,11 +70,15 @@ export default function Wizard({ onComplete }: WizardProps) {
   }, []);
 
   useEffect(() => {
-    if (!hasHydrated.current || typeof window === 'undefined') {
+    if (!hasHydrated.current || typeof window === 'undefined' || storageWriteFailed.current) {
       return;
     }
 
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+    } catch {
+      storageWriteFailed.current = true;
+    }
   }, [history]);
 
   const steps = useMemo(

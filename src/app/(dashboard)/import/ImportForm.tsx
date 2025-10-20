@@ -27,23 +27,17 @@ type LiveRcRaceResultResponse = ReturnType<typeof mapRaceResultResponse>;
 
 import styles from './ImportForm.module.css';
 import Wizard from './Wizard';
+import { IMPORT_FORM_TOKEN_HEADER } from '@/lib/liverc/importAuth';
+import { canShowResolveButton, type ParsedState } from './parsedState';
 
 type ImportFormProps = {
   enableWizard?: boolean;
   initialUrl?: string;
   enableFileImport?: boolean;
+  resolverEnabled?: boolean;
+  hasInternalProxy?: boolean;
+  importFormToken?: string | null;
 };
-
-type ParsedState =
-  | { kind: 'empty' }
-  | { kind: 'invalid'; message: string }
-  | { kind: 'html' }
-  | {
-      kind: 'json';
-      result: LiveRcJsonUrlParseResult;
-      canonicalAbsoluteJsonUrl: string;
-      wasMissingJsonSuffix: boolean;
-    };
 
 type ImportSuccess = {
   status: 'success';
@@ -56,7 +50,7 @@ type ImportFailure = {
   statusCode: number;
   requestId?: string;
   error: unknown;
-};
+    };
 
 type SubmissionState = ImportSuccess | ImportFailure | null;
 
@@ -107,10 +101,6 @@ const slugToTitle = (slug: string) =>
     .filter(Boolean)
     .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
     .join(' ');
-
-const resolverEnabled = process.env.ENABLE_LIVERC_RESOLVER === '1';
-const hasInternalProxy =
-  typeof process.env.LIVERC_HTTP_BASE === 'string' && process.env.LIVERC_HTTP_BASE.length > 0;
 
 const parseInput = (value: string): ParsedState => {
   const trimmed = value.trim();
@@ -348,9 +338,13 @@ const getStatusDescriptor = (
 const BulkImportTab = ({
   tabPanelId,
   labelledById,
+  securityDisabled,
+  importAuthHeaders,
 }: {
   tabPanelId: string;
   labelledById: string;
+  securityDisabled: boolean;
+  importAuthHeaders: Record<string, string>;
 }) => {
   const [bulkInput, setBulkInput] = useState('');
   const [rows, setRows] = useState<BulkImportRow[]>([]);
@@ -416,7 +410,7 @@ const BulkImportTab = ({
   }, [bulkInput]);
 
   const handleImportAll = useCallback(async () => {
-    if (isImporting || readyRows.length === 0) {
+    if (isImporting || readyRows.length === 0 || securityDisabled) {
       return;
     }
 
@@ -457,6 +451,7 @@ const BulkImportTab = ({
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
+                ...importAuthHeaders,
               },
               body: JSON.stringify({
                 url: row.canonicalAbsoluteJsonUrl,
@@ -519,7 +514,7 @@ const BulkImportTab = ({
     } finally {
       setIsImporting(false);
     }
-  }, [applyRowUpdates, isImporting, readyRows]);
+  }, [applyRowUpdates, importAuthHeaders, isImporting, readyRows, securityDisabled]);
 
   const toneClassMap: Record<StatusTone, string> = {
     default: styles.statusToneDefault,
@@ -604,7 +599,7 @@ const BulkImportTab = ({
           type="button"
           className={styles.importButton}
           onClick={handleImportAll}
-          disabled={isImporting || readyRows.length === 0}
+          disabled={isImporting || readyRows.length === 0 || securityDisabled}
         >
           {isImporting ? 'Importing…' : 'Import all'}
         </button>
@@ -622,6 +617,9 @@ export default function ImportForm({
   enableWizard = false,
   initialUrl,
   enableFileImport = false,
+  resolverEnabled = false,
+  hasInternalProxy = false,
+  importFormToken = null,
 }: ImportFormProps) {
   const [activeTab, setActiveTab] = useState<'single' | 'bulk'>('single');
   const [url, setUrl] = useState(() => initialUrl ?? '');
@@ -644,6 +642,11 @@ export default function ImportForm({
   const bulkTabId = `${tabSetId}-bulk-tab`;
   const singlePanelId = `${tabSetId}-single-panel`;
   const bulkPanelId = `${tabSetId}-bulk-panel`;
+  const securityDisabled = !importFormToken;
+  const importAuthHeaders = useMemo<Record<string, string>>(
+    () => (importFormToken ? { [IMPORT_FORM_TOKEN_HEADER]: importFormToken } : {}),
+    [importFormToken],
+  );
 
   const handleSelectSingle = useCallback(() => {
     setActiveTab('single');
@@ -798,7 +801,7 @@ export default function ImportForm({
   );
 
   const handleImportFile = useCallback(async () => {
-    if (!enableFileImport || !filePreview || isFileImporting) {
+    if (!enableFileImport || !filePreview || isFileImporting || securityDisabled) {
       return;
     }
 
@@ -810,6 +813,7 @@ export default function ImportForm({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...importAuthHeaders,
         },
         body: JSON.stringify({
           payload: filePreview.rawPayload,
@@ -867,7 +871,7 @@ export default function ImportForm({
     } finally {
       setIsFileImporting(false);
     }
-  }, [enableFileImport, filePreview, isFileImporting]);
+  }, [enableFileImport, filePreview, importAuthHeaders, isFileImporting, securityDisabled]);
 
   useEffect(() => {
     if (typeof initialUrl === 'string' && initialUrl.length > 0) {
@@ -922,14 +926,12 @@ export default function ImportForm({
     setResolveModalOpen(false);
   };
 
-  const shouldShowResolveButton =
-    resolverEnabled &&
-    (parsed.kind === 'html' || (parsed.kind === 'json' && parsed.wasMissingJsonSuffix));
+  const shouldShowResolveButton = canShowResolveButton(resolverEnabled, parsed);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (parsed.kind !== 'json') {
+    if (parsed.kind !== 'json' || securityDisabled) {
       return;
     }
 
@@ -941,6 +943,7 @@ export default function ImportForm({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...importAuthHeaders,
         },
         body: JSON.stringify({
           url: parsed.canonicalAbsoluteJsonUrl,
@@ -1081,7 +1084,11 @@ export default function ImportForm({
               Resolve
             </button>
           ) : null}
-          <button type="submit" className={styles.importButton} disabled={isSubmitting}>
+          <button
+            type="submit"
+            className={styles.importButton}
+            disabled={isSubmitting || parsed.kind !== 'json' || securityDisabled}
+          >
             {isSubmitting ? 'Importing…' : 'Import'}
           </button>
           <p className={styles.helper}>{parsed.canonicalAbsoluteJsonUrl}</p>
@@ -1099,6 +1106,11 @@ export default function ImportForm({
 
   return (
     <div className={styles.formWrapper}>
+      {securityDisabled ? (
+        <p className={styles.error} role="alert">
+          LiveRC imports are temporarily unavailable while we refresh your session. Reload the page and try again.
+        </p>
+      ) : null}
       <div className={styles.tabList} role="tablist" aria-label="Import mode">
         <button
           type="button"
@@ -1246,7 +1258,7 @@ export default function ImportForm({
                       type="button"
                       className={styles.importButton}
                       onClick={handleImportFile}
-                      disabled={isFileImporting}
+                      disabled={isFileImporting || securityDisabled}
                     >
                       {isFileImporting ? 'Importing…' : 'Import file'}
                     </button>
@@ -1291,7 +1303,12 @@ export default function ImportForm({
           ) : null}
         </form>
       ) : (
-        <BulkImportTab tabPanelId={bulkPanelId} labelledById={bulkTabId} />
+        <BulkImportTab
+          tabPanelId={bulkPanelId}
+          labelledById={bulkTabId}
+          securityDisabled={securityDisabled}
+          importAuthHeaders={importAuthHeaders}
+        />
       )}
       {resolverEnabled && resolveModalOpen ? (
         <div className={styles.modalBackdrop} role="presentation">

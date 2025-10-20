@@ -10,6 +10,12 @@ import { z } from 'zod';
 
 import { isPrismaUnavailableError, liveRcImportService } from '@/dependencies/liverc';
 import { applicationLogger } from '@/dependencies/logger';
+import {
+  authorizeImportRequest,
+  type ImportAuthorizationContext,
+  type ImportAuthorizationOptions,
+  type ImportAuthorizationResult,
+} from '../authGuard';
 
 const baseHeaders = {
   'Cache-Control': 'no-store',
@@ -49,16 +55,26 @@ const importRequestSchema = z.object({
 
 type ImportService = Pick<LiveRcImportService, 'importFromUrl'>;
 
+type AuthorizeRequest = (
+  request: Request,
+  context: ImportAuthorizationContext,
+  options?: ImportAuthorizationOptions,
+) => Promise<ImportAuthorizationResult>;
+
 type ResolvedDependencies = {
   service: ImportService;
   logger: Logger;
   isDatabaseUnavailable: (error: unknown) => boolean;
+  authorizeRequest: AuthorizeRequest;
+  authorizationOptions?: ImportAuthorizationOptions;
 };
 
 const defaultDependencies: ResolvedDependencies = {
   service: liveRcImportService,
   logger: applicationLogger,
   isDatabaseUnavailable: isPrismaUnavailableError,
+  authorizeRequest: authorizeImportRequest,
+  authorizationOptions: undefined,
 };
 
 const withRequestContext = (logger: Logger, context: LoggerContext): Logger =>
@@ -89,6 +105,8 @@ export type ImportRouteDependencies = {
   service?: ImportService;
   logger?: Logger;
   isDatabaseUnavailable?: (error: unknown) => boolean;
+  authorizeRequest?: AuthorizeRequest;
+  authorizationOptions?: ImportAuthorizationOptions;
 };
 
 export const createImportRouteHandlers = (
@@ -98,12 +116,16 @@ export const createImportRouteHandlers = (
     service = defaultDependencies.service,
     logger = defaultDependencies.logger,
     isDatabaseUnavailable = defaultDependencies.isDatabaseUnavailable,
+    authorizeRequest = defaultDependencies.authorizeRequest,
+    authorizationOptions = defaultDependencies.authorizationOptions,
   } = overrides;
 
   const dependencies: ResolvedDependencies = {
     service,
     logger,
     isDatabaseUnavailable,
+    authorizeRequest,
+    authorizationOptions,
   };
 
   const buildRequestLogger = (requestId: string) =>
@@ -124,6 +146,23 @@ export const createImportRouteHandlers = (
   const POST: RouteHandler = async (request) => {
     const requestId = request.headers.get('x-request-id') ?? randomUUID();
     const requestLogger = buildRequestLogger(requestId);
+
+    const authorization = await dependencies.authorizeRequest(
+      request,
+      { logger: requestLogger, requestId, route: '/api/liverc/import' },
+      dependencies.authorizationOptions,
+    );
+
+    if (!authorization.ok) {
+      return buildJsonResponse(
+        authorization.status,
+        {
+          error: authorization.error,
+          requestId,
+        },
+        requestId,
+      );
+    }
 
     let rawBody: unknown;
     try {
