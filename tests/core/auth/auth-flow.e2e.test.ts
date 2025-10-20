@@ -147,3 +147,29 @@ test('driver name identifiers authenticate successfully', async () => {
     assert.equal(loginResult.user.id, registerResult.user.id);
   }
 });
+
+test('driver name login treats casing as equivalent', async () => {
+  const env = createAuthTestEnvironment({ clock: buildClock() });
+
+  const registerResult = await env.registerService.register({
+    name: 'Case Shift',
+    driverName: 'MixedCaseDriver',
+    email: 'case-shift@example.com',
+    password: 'Sup3rStr0ngPass!',
+  });
+
+  assert.equal(registerResult.ok, true);
+  if (!registerResult.ok) {
+    return;
+  }
+
+  const loginResult = await env.loginService.login({
+    identifier: { kind: 'driver-name', value: 'mixedcasedriver' },
+    password: 'Sup3rStr0ngPass!',
+  });
+
+  assert.equal(loginResult.ok, true);
+  if (loginResult.ok) {
+    assert.equal(loginResult.user.id, registerResult.user.id);
+  }
+});

@@ -23,13 +23,14 @@ import type {
 import { DuplicateUserDriverNameError, DuplicateUserEmailError } from '../../../../src/core/app';
 import { LoginUserService } from '../../../../src/core/app/services/auth/loginUser';
 import { RegisterUserService } from '../../../../src/core/app/services/auth/registerUser';
-import type {
-  CreateUserEmailVerificationTokenInput,
-  CreateUserInput,
-  CreateUserSessionInput,
-  User,
-  UserEmailVerificationToken,
-  UserSession,
+import {
+  normaliseDriverName,
+  type CreateUserEmailVerificationTokenInput,
+  type CreateUserInput,
+  type CreateUserSessionInput,
+  type User,
+  type UserEmailVerificationToken,
+  type UserSession,
 } from '../../../../src/core/domain';
 
 export type TestClock = () => Date;
@@ -40,7 +41,7 @@ export class InMemoryUserRepository implements UserRepository {
   public created: CreateUserInput | null = null;
   public usersByEmail = new Map<string, User>();
   public usersById = new Map<string, User>();
-  public usersByDriverName = new Map<string, User>();
+  public usersByDriverNameCanonical = new Map<string, User>();
 
   constructor(private readonly clock: TestClock = () => new Date()) {}
 
@@ -49,7 +50,7 @@ export class InMemoryUserRepository implements UserRepository {
   }
 
   async findByDriverName(driverName: string): Promise<User | null> {
-    return this.usersByDriverName.get(driverName) ?? null;
+    return this.usersByDriverNameCanonical.get(normaliseDriverName(driverName)) ?? null;
   }
 
   async findById(id: string): Promise<User | null> {
@@ -61,7 +62,9 @@ export class InMemoryUserRepository implements UserRepository {
       throw new DuplicateUserEmailError(input.email.toLowerCase());
     }
 
-    if (this.usersByDriverName.has(input.driverName)) {
+    const driverNameKey = normaliseDriverName(input.driverName);
+
+    if (this.usersByDriverNameCanonical.has(driverNameKey)) {
       throw new DuplicateUserDriverNameError(input.driverName);
     }
 
@@ -80,7 +83,7 @@ export class InMemoryUserRepository implements UserRepository {
     this.created = input;
     this.usersByEmail.set(user.email, user);
     this.usersById.set(user.id, user);
-    this.usersByDriverName.set(user.driverName, user);
+    this.usersByDriverNameCanonical.set(driverNameKey, user);
     return user;
   }
 
@@ -94,7 +97,7 @@ export class InMemoryUserRepository implements UserRepository {
     };
     this.usersById.set(userId, updated);
     this.usersByEmail.set(updated.email, updated);
-    this.usersByDriverName.set(updated.driverName, updated);
+    this.usersByDriverNameCanonical.set(normaliseDriverName(updated.driverName), updated);
     return updated;
   }
 
@@ -108,7 +111,7 @@ export class InMemoryUserRepository implements UserRepository {
     };
     this.usersById.set(userId, updated);
     this.usersByEmail.set(updated.email, updated);
-    this.usersByDriverName.set(updated.driverName, updated);
+    this.usersByDriverNameCanonical.set(normaliseDriverName(updated.driverName), updated);
     return updated;
   }
 
@@ -122,7 +125,7 @@ export class InMemoryUserRepository implements UserRepository {
     };
     this.usersById.set(userId, updated);
     this.usersByEmail.set(updated.email, updated);
-    this.usersByDriverName.set(updated.driverName, updated);
+    this.usersByDriverNameCanonical.set(normaliseDriverName(updated.driverName), updated);
     return updated;
   }
 
@@ -134,13 +137,13 @@ export class InMemoryUserRepository implements UserRepository {
 
     this.usersById.delete(userId);
     this.usersByEmail.delete(user.email);
-    this.usersByDriverName.delete(user.driverName);
+    this.usersByDriverNameCanonical.delete(normaliseDriverName(user.driverName));
   }
 
   seed(user: User) {
     this.usersByEmail.set(user.email.toLowerCase(), user);
     this.usersById.set(user.id, user);
-    this.usersByDriverName.set(user.driverName, user);
+    this.usersByDriverNameCanonical.set(normaliseDriverName(user.driverName), user);
   }
 }
 
