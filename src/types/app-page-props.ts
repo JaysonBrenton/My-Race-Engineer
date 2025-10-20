@@ -11,16 +11,16 @@ export type AppPageRouteParams = Record<string, string | string[] | undefined>;
 export type AppPageSearchParams = Record<string, string | string[] | undefined>;
 
 export type AppPageParams<
-  TParams extends AppPageRouteParams = AppPageRouteParams,
+  TParams extends AppPageRouteParams = AppPageRouteParams
 > = Promise<TParams>;
 
 export type AppPageSearchParamsPromise<
-  TSearchParams extends AppPageSearchParams = AppPageSearchParams,
+  TSearchParams extends AppPageSearchParams = AppPageSearchParams
 > = Promise<TSearchParams>;
 
 export interface AppPageProps<
   TParams extends AppPageRouteParams = AppPageRouteParams,
-  TSearchParams extends AppPageSearchParams = AppPageSearchParams,
+  TSearchParams extends AppPageSearchParams = AppPageSearchParams
 > {
   params?: AppPageParams<TParams>;
   searchParams?: AppPageSearchParamsPromise<TSearchParams>;

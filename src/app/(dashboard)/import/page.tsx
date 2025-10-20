@@ -24,8 +24,10 @@ const enableFileImport =
 
 type PageProps = AppPageProps;
 
+const EMPTY_SEARCH_PARAMS: ResolvedSearchParams<PageProps> = {};
+
 export default async function Page({ searchParams }: PageProps) {
-  const sp = ((await searchParams) ?? {}) as ResolvedSearchParams<PageProps>;
+  const sp = (await searchParams) ?? EMPTY_SEARCH_PARAMS;
   const srcParam = sp.src;
   let initialUrl: string | undefined;
 

@@ -35,6 +35,8 @@ import {
 
 type PageProps = AppPageProps;
 
+const EMPTY_SEARCH_PARAMS: ResolvedSearchParams<PageProps> = {};
+
 const PAGE_TITLE = 'Sign in to My Race Engineer';
 const PAGE_DESCRIPTION =
   'Access telemetry dashboards and racing insights with your team credentials.';
@@ -222,7 +224,7 @@ const buildConfigurationStatusMessage = (): StatusMessage => ({
 });
 
 export default async function Page({ searchParams }: PageProps) {
-  const sp = ((await searchParams) ?? {}) as ResolvedSearchParams<PageProps>;
+  const sp = (await searchParams) ?? EMPTY_SEARCH_PARAMS;
   noStore();
   let formToken: string | null = null;
   let configurationStatus: StatusMessage | null = null;
