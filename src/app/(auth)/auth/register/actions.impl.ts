@@ -129,7 +129,7 @@ type RegisterService = Pick<typeof registerUserService, 'register'>;
 export type RegisterActionDependencies = {
   headers: typeof headers;
   cookies: typeof cookies;
-  redirect: typeof redirect;
+  redirect: (href: RedirectHref) => never;
   guardAuthPostOrigin: typeof guardAuthPostOrigin;
   checkRegisterRateLimit: typeof checkRegisterRateLimit;
   validateAuthFormToken: typeof validateAuthFormToken;
