@@ -21,22 +21,22 @@ export const handleLoginGuardPost = async (req: Request): Promise<Response> => {
   const route = '/auth/login';
   const logger = applicationLogger.withContext({ route });
   const allowedOrigins = parseAllowedOrigins(process.env, { logger });
-  const result = guardAuthPostOrigin(req, allowedOrigins, { logger, route });
+  const originCheck = guardAuthPostOrigin(req, allowedOrigins, { logger, route });
 
   logger.info('Login guard received request.', {
     event: 'auth.login.request',
     component: 'guard',
     method: req.method,
     hasOriginHeader: req.headers.has('origin'),
-    originAllowed: result.ok,
+    originAllowed: originCheck.ok,
     middlewareOriginHeader: req.headers.get('x-auth-origin-guard'),
   });
 
-  if (!result.ok) {
+  if (!originCheck.ok) {
     if (shouldLogDiagnostics()) {
       logger.warn('auth.origin_guard.login_blocked', {
         route,
-        reason: result.reason,
+        reason: originCheck.reason,
         allowedOrigins,
         effectiveOrigin: effectiveRequestOrigin(req),
         forwardedProto: req.headers.get('x-forwarded-proto'),
@@ -45,7 +45,7 @@ export const handleLoginGuardPost = async (req: Request): Promise<Response> => {
       });
     }
 
-    const response = NextResponse.redirect(result.redirectTo, 303);
+    const response = NextResponse.redirect(originCheck.redirectTo, 303);
     response.headers.set('Cache-Control', 'no-store');
     response.headers.set('x-auth-origin-guard', 'mismatch');
     response.headers.set('x-allowed-origins', allowedOrigins.join(','));
