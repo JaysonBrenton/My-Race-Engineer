@@ -276,7 +276,9 @@ export const createLoginAction = (
               retryAfterMs: rateLimit.retryAfterMs,
               durationMs: Date.now() - requestStartedAt,
             });
-            const result = buildErrorResult('rate-limited', { retryAfterMs: rateLimit.retryAfterMs });
+            const result = buildErrorResult('rate-limited', {
+              retryAfterMs: rateLimit.retryAfterMs,
+            });
             recordOutcome(result, 'rate-limited');
             return result;
           }
@@ -361,7 +363,11 @@ export const createLoginAction = (
             });
             const result = buildErrorResult('validation', {
               fieldErrors: issues.map((issue) => ({ field: issue.path, message: issue.message })),
-              prefill: toPrefill(buildPrefill({ identifier: getFormValue(formData, 'identifier') })),
+              prefill: toPrefill(
+                buildPrefill({
+                  identifier: getFormValue(formData, 'identifier'),
+                }),
+              ),
             });
             recordOutcome(result, 'validation');
             return result;
@@ -399,7 +405,11 @@ export const createLoginAction = (
             });
             const result = buildErrorResult('validation', {
               fieldErrors: issues.map((issue) => ({ field: issue.path, message: issue.message })),
-              prefill: toPrefill(buildPrefill({ identifier: rawIdentifier })),
+              prefill: toPrefill(
+                buildPrefill({
+                  identifier: rawIdentifier,
+                }),
+              ),
             });
             recordOutcome(result, 'validation');
             return result;

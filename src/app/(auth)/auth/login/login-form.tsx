@@ -105,7 +105,12 @@ export function LoginForm(props: LoginFormProps) {
 
   return (
     <>
-      <form className={styles.form} method="post" action={formAction} aria-describedby="auth-login-status">
+      <form
+        className={styles.form}
+        method="post"
+        action={formAction}
+        aria-describedby="auth-login-status"
+      >
         {formToken ? <input type="hidden" name="formToken" value={formToken} /> : null}
         {bannerMessage ? (
           <div className={`${styles.inlineBanner} ${styles.inlineBannerError}`} role="alert">
