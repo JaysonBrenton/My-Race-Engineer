@@ -15,6 +15,8 @@ import styles from '../auth.module.css';
 
 type PageProps = AppPageProps;
 
+const EMPTY_SEARCH_PARAMS: ResolvedSearchParams<PageProps> = {};
+
 const PAGE_TITLE = 'Reset your My Race Engineer password';
 const PAGE_DESCRIPTION =
   'Request a secure password reset link and get back to analysing race telemetry.';
@@ -121,7 +123,7 @@ const getStatusClassName = (tone: ResetStatusTone) => {
 };
 
 export default async function Page({ searchParams }: PageProps) {
-  const sp = ((await searchParams) ?? {}) as ResolvedSearchParams<PageProps>;
+  const sp = (await searchParams) ?? EMPTY_SEARCH_PARAMS;
   noStore();
   let formToken: string | null = null;
   let configurationStatus: ResetStatusMessage | null = null;

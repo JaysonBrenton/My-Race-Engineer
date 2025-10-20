@@ -18,7 +18,11 @@ import { MissingAuthFormTokenSecretError, generateAuthFormToken } from '@/lib/au
 import { canonicalFor } from '@/lib/seo';
 
 import styles from '../auth.module.css';
-import { asOptionalTrimmedString, firstParamValue, safeParseJsonRecord } from '../shared/search-params';
+import {
+  asOptionalTrimmedString,
+  firstParamValue,
+  safeParseJsonRecord,
+} from '../shared/search-params';
 import {
   buildStatusMessage,
   parseDriverNameSuggestionsParam,
@@ -28,6 +32,8 @@ import {
 import { registerAction } from './actions';
 
 type PageProps = AppPageProps;
+
+const EMPTY_SEARCH_PARAMS: ResolvedSearchParams<PageProps> = {};
 
 const PAGE_TITLE = 'Create your My Race Engineer account';
 const PAGE_DESCRIPTION =
@@ -113,7 +119,7 @@ const buildConfigurationErrorStatus = (): StatusMessage => ({
 });
 
 export default async function Page({ searchParams }: PageProps) {
-  const sp = ((await searchParams) ?? {}) as ResolvedSearchParams<PageProps>;
+  const sp = (await searchParams) ?? EMPTY_SEARCH_PARAMS;
   noStore();
   let formToken: string | null = null;
   let configurationStatus: StatusMessage | null = null;

@@ -15,6 +15,8 @@ import styles from '../../auth.module.css';
 
 type PageProps = AppPageProps;
 
+const EMPTY_SEARCH_PARAMS: ResolvedSearchParams<PageProps> = {};
+
 const PAGE_TITLE = 'Choose a new password';
 const PAGE_DESCRIPTION =
   'Set a new password to regain access to telemetry dashboards and race insights.';
@@ -119,7 +121,7 @@ const buildConfigurationStatus = (): StatusMessage => ({
 });
 
 export default async function Page({ searchParams }: PageProps) {
-  const sp = ((await searchParams) ?? {}) as ResolvedSearchParams<PageProps>;
+  const sp = (await searchParams) ?? EMPTY_SEARCH_PARAMS;
   noStore();
   const resetToken = getParam(sp.token);
   const errorCode = getParam(sp.error);
