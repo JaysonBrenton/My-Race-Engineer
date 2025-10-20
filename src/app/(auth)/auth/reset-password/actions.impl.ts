@@ -51,7 +51,7 @@ const getFormValue = (data: FormData, key: string) => {
 
 export type RequestPasswordResetDependencies = {
   headers: typeof headers;
-  redirect: typeof redirect;
+  redirect: (href: RedirectHref) => never;
   guardAuthPostOrigin: typeof guardAuthPostOrigin;
   checkPasswordResetRateLimit: typeof checkPasswordResetRateLimit;
   validateAuthFormToken: typeof validateAuthFormToken;

@@ -9,6 +9,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { cookies, headers } from 'next/headers';
+import type { Route } from 'next';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
@@ -21,6 +22,8 @@ import { extractClientIdentifier } from '@/lib/request/clientIdentifier';
 import { computeCookieSecure, type CookieSecureStrategy } from '@/server/runtime/cookies';
 import { guardAuthPostOrigin } from '@/server/security/origin';
 import type { AuthActionDebugEvent } from '@/server/security/authDebug';
+
+type RedirectHref = Parameters<typeof redirect>[0];
 
 // This server action executes the full login flow: it validates inputs, enforces
 // rate limits, delegates credential checks to the domain service, and finally
@@ -59,7 +62,10 @@ const loginSchema = z.object({
 // Helper for rebuilding the login URL with query-string flags.  We rely on
 // redirects instead of rendering in-place so that the page stays statically
 // typed and resilient across refreshes.
-const buildRedirectUrl = (pathname: string, searchParams: Record<string, string | undefined>) => {
+const buildRedirectUrl = (
+  pathname: Route,
+  searchParams: Record<string, string | undefined>,
+): RedirectHref => {
   const params = new URLSearchParams();
   Object.entries(searchParams).forEach(([key, value]) => {
     if (value) {
@@ -68,7 +74,8 @@ const buildRedirectUrl = (pathname: string, searchParams: Record<string, string 
   });
 
   const query = params.toString();
-  return query ? `${pathname}?${query}` : pathname;
+  const target = query ? `${pathname}?${query}` : pathname;
+  return target as RedirectHref;
 };
 
 // FormData can return strings, File objects, or nulls; this helper standardises
@@ -105,7 +112,7 @@ type LoginService = Pick<typeof loginUserService, 'login'>;
 export type LoginActionDependencies = {
   headers: typeof headers;
   cookies: typeof cookies;
-  redirect: (url: string) => never;
+  redirect: (url: RedirectHref) => never;
   guardAuthPostOrigin: typeof guardAuthPostOrigin;
   checkLoginRateLimit: typeof checkLoginRateLimit;
   validateAuthFormToken: typeof validateAuthFormToken;
@@ -124,7 +131,7 @@ export type LoginActionOptions = {
 const defaultLoginActionDependencies: LoginActionDependencies = {
   headers,
   cookies,
-  redirect: redirect as (url: string) => never,
+  redirect,
   guardAuthPostOrigin,
   checkLoginRateLimit,
   validateAuthFormToken,

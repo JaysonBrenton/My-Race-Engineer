@@ -7,8 +7,9 @@
  */
 
 import type { Route } from 'next';
+import { redirect } from 'next/navigation';
 
-type RedirectHref = Parameters<(typeof import('next/navigation'))['redirect']>[0];
+type RedirectHref = Parameters<typeof redirect>[0];
 
 export type StatusTone = 'info' | 'error' | 'success';
 

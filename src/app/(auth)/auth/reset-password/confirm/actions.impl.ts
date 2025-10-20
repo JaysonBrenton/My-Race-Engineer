@@ -1,4 +1,5 @@
 import { headers } from 'next/headers';
+import type { Route } from 'next';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
@@ -10,6 +11,8 @@ import { extractClientIdentifier } from '@/lib/request/clientIdentifier';
 import { guardAuthPostOrigin } from '@/server/security/origin';
 import { createErrorLogContext } from '../logging';
 import type { ConfirmPasswordResetResult, Logger } from '@core/app';
+
+type RedirectHref = Parameters<typeof redirect>[0];
 
 type RateLimitResult = ReturnType<typeof checkPasswordResetConfirmRateLimit>;
 
@@ -39,7 +42,10 @@ const confirmationSchema = z
     }
   });
 
-const buildRedirectUrl = (pathname: string, searchParams: Record<string, string | undefined>) => {
+const buildRedirectUrl = (
+  pathname: Route,
+  searchParams: Record<string, string | undefined>,
+): RedirectHref => {
   const params = new URLSearchParams();
   Object.entries(searchParams).forEach(([key, value]) => {
     if (value) {
@@ -48,7 +54,8 @@ const buildRedirectUrl = (pathname: string, searchParams: Record<string, string 
   });
 
   const query = params.toString();
-  return query ? `${pathname}?${query}` : pathname;
+  const target = query ? `${pathname}?${query}` : pathname;
+  return target as RedirectHref;
 };
 
 const getFormValue = (data: FormData, key: string) => {
@@ -58,7 +65,7 @@ const getFormValue = (data: FormData, key: string) => {
 
 export type ConfirmPasswordResetDependencies = {
   headers: typeof headers;
-  redirect: typeof redirect;
+  redirect: (href: RedirectHref) => never;
   guardAuthPostOrigin: typeof guardAuthPostOrigin;
   checkPasswordResetConfirmRateLimit: typeof checkPasswordResetConfirmRateLimit;
   validateAuthFormToken: typeof validateAuthFormToken;
@@ -80,7 +87,7 @@ const defaultDependencies: ConfirmPasswordResetDependencies = {
   logger: applicationLogger.withContext({ route: 'auth/reset-password/confirm-action' }),
 };
 
-const redirectTo = (target: string, deps: ConfirmPasswordResetDependencies): never =>
+const redirectTo = (target: RedirectHref, deps: ConfirmPasswordResetDependencies): never =>
   deps.redirect(target);
 
 export const createConfirmPasswordResetAction = (

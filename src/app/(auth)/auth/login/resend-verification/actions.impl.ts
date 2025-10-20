@@ -4,8 +4,8 @@
  */
 
 import { headers } from 'next/headers';
-import { redirect } from 'next/navigation';
 import type { Route } from 'next';
+import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
 import { resendVerificationEmailService } from '@/dependencies/auth';
@@ -16,6 +16,8 @@ import { extractClientIdentifier } from '@/lib/request/clientIdentifier';
 import { guardAuthPostOrigin } from '@/server/security/origin';
 
 import type { Logger } from '@core/app';
+
+type RedirectHref = Parameters<typeof redirect>[0];
 
 const requestSchema = z.object({
   email: z
@@ -31,8 +33,6 @@ const getFormValue = (data: FormData, key: string) => {
   const value = data.get(key);
   return typeof value === 'string' ? value : undefined;
 };
-
-type RedirectHref = Parameters<typeof redirect>[0];
 
 const buildPrefillParam = (identifier: string): string => {
   try {
@@ -55,12 +55,13 @@ const buildRedirectUrl = (
   }
 
   const query = params.toString();
-  return query ? `${pathname}?${query}` : pathname;
+  const target = query ? `${pathname}?${query}` : pathname;
+  return target as RedirectHref;
 };
 
 type ResendDependencies = {
   headers: typeof headers;
-  redirect: typeof redirect;
+  redirect: (href: RedirectHref) => never;
   guardAuthPostOrigin: typeof guardAuthPostOrigin;
   extractClientIdentifier: typeof extractClientIdentifier;
   checkVerificationResendRateLimit: typeof checkVerificationResendRateLimit;
