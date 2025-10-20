@@ -40,6 +40,20 @@
   max-width: 40rem;
 }
 
+.statusMessage {
+  margin: 0.75rem 0 0;
+  padding: 0.875rem 1rem;
+  border-radius: 1rem;
+  border: 1px solid color-mix(in srgb, var(--color-danger) 55%, var(--color-border) 45%);
+  background: color-mix(in srgb, var(--color-danger) 16%, var(--color-surface) 84%);
+  color: var(--color-danger);
+}
+
+.statusMessage p {
+  margin: 0;
+  line-height: 1.5;
+}
+
 .grid {
   display: grid;
   gap: 1.75rem;
