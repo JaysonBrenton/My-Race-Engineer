@@ -1,3 +1,10 @@
+/**
+ * Author: Jayson Brenton + The Brainy One
+ * Date: 2025-10-20
+ * Purpose: Use shared typed routes for home page navigation and metadata.
+ * License: MIT
+ */
+
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import Script from 'next/script';
@@ -8,13 +15,14 @@ import {
   buildWebsiteJsonLd,
   canonicalFor,
 } from '@/lib/seo';
+import { ROUTE_HOME, ROUTE_LOGIN } from '@/app/routes';
 import styles from './page.module.css';
 
 const PAGE_TITLE = 'My Race Engineer telemetry insights';
 const PAGE_DESCRIPTION = 'Baseline lap telemetry dashboards for racing teams.';
 
 export function generateMetadata(): Metadata {
-  const canonical = canonicalFor('/');
+  const canonical = canonicalFor(ROUTE_HOME);
 
   return {
     title: PAGE_TITLE,
@@ -37,7 +45,7 @@ export function generateMetadata(): Metadata {
 }
 
 export default function Home() {
-  const canonical = canonicalFor('/');
+  const canonical = canonicalFor(ROUTE_HOME);
 
   const structuredData = [
     buildOrganizationJsonLd({
@@ -51,11 +59,11 @@ export default function Home() {
     ...buildSiteNavigationJsonLd([
       {
         name: 'Home',
-        path: '/',
+        path: ROUTE_HOME,
       },
       {
         name: 'Sign in',
-        path: '/auth/login',
+        path: ROUTE_LOGIN,
       },
     ]),
   ];
@@ -72,7 +80,7 @@ export default function Home() {
         <h1 className={styles.heroTitle}>My Race Engineer</h1>
         <p className={styles.heroDescription}>{PAGE_DESCRIPTION}</p>
         <div className={styles.heroActions}>
-          <Link className={styles.heroCta} href="/auth/login">
+          <Link className={styles.heroCta} href={ROUTE_LOGIN}>
             Sign in to your telemetry
           </Link>
         </div>

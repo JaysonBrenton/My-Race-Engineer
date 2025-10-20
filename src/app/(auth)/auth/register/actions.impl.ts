@@ -1,15 +1,15 @@
 /**
- * Filename: src/app/(auth)/auth/register/actions.impl.ts
- * Purpose: Handle account registration submissions with validation, security checks, and session provisioning.
- * Author: Jayson Brenton
- * Date: 2025-03-18
- * License: MIT License
+ * Author: Jayson Brenton + The Brainy One
+ * Date: 2025-10-20
+ * Purpose: Guarantee registration redirects use typed Next.js routes.
+ * License: MIT
  */
 
 import { randomUUID } from 'node:crypto';
 
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import type { Route } from 'next';
 import { z } from 'zod';
 
 import { getAuthRequestLogger, registerUserService } from '@/dependencies/auth';
@@ -21,6 +21,7 @@ import { extractClientIdentifier } from '@/lib/request/clientIdentifier';
 import { computeCookieSecure, type CookieSecureStrategy } from '@/server/runtime/cookies';
 import { guardAuthPostOrigin } from '@/server/security/origin';
 import type { AuthActionDebugEvent } from '@/server/security/authDebug';
+import { ROUTE_LOGIN } from '@/app/routes';
 
 import {
   buildDriverNameSuggestionsParam,
@@ -36,6 +37,8 @@ type RegistrationPrefillInput = {
   driverName?: string | null | undefined;
   email?: string | null | undefined;
 };
+
+const REGISTER_ROUTE: Route = ('/auth/register') as Route; // safe: canonical register path
 
 // The server action owns the full registration happy-path orchestration, so we keep
 // the validation rules alongside it. This schema mirrors the policy enforced at the
@@ -243,7 +246,7 @@ export const createRegisterAction = (
             options.driverNameSuggestions && options.driverNameSuggestions.length > 0
               ? buildDriverNameSuggestionsParam(options.driverNameSuggestions)
               : undefined;
-          const redirectUrl = buildRedirectUrl('/auth/register', {
+          const redirectUrl = buildRedirectUrl(REGISTER_ROUTE, {
             error: errorCode,
             prefill: buildPrefillParam(normalisedPrefills),
             name: normalisedPrefills.name || undefined,
@@ -469,7 +472,7 @@ export const createRegisterAction = (
               durationMs: Date.now() - requestStartedAt,
             });
             {
-              const target = buildRedirectUrl('/auth/login', {
+              const target = buildRedirectUrl(ROUTE_LOGIN, {
                 status: 'verify-email',
                 prefill: buildLoginPrefillParam(email),
               });
@@ -487,7 +490,7 @@ export const createRegisterAction = (
               durationMs: Date.now() - requestStartedAt,
             });
             {
-              const target = buildRedirectUrl('/auth/login', {
+              const target = buildRedirectUrl(ROUTE_LOGIN, {
                 status: 'verify-email-awaiting-approval',
                 prefill: buildLoginPrefillParam(email),
               });
@@ -509,7 +512,7 @@ export const createRegisterAction = (
               durationMs: Date.now() - requestStartedAt,
             });
             {
-              const target = buildRedirectUrl('/auth/login', {
+              const target = buildRedirectUrl(ROUTE_LOGIN, {
                 status: 'awaiting-approval',
                 prefill: buildLoginPrefillParam(email),
               });

@@ -1,7 +1,16 @@
+/**
+ * Author: Jayson Brenton + The Brainy One
+ * Date: 2025-10-20
+ * Purpose: Keep dashboard call-to-actions aligned with typed navigation routes.
+ * License: MIT
+ */
+
 import Link from 'next/link';
 import type { Metadata } from 'next';
+import type { Route } from 'next';
 
 import { requireAuthenticatedUser } from '@/lib/auth/serverSession';
+import { ROUTE_HOME } from '@/app/routes';
 
 import styles from './page.module.css';
 
@@ -16,6 +25,7 @@ export const metadata: Metadata = {
 
 export default async function DashboardPage() {
   const { user } = await requireAuthenticatedUser();
+  const importRoute: Route = ('/import') as Route; // safe: import wizard root
 
   return (
     <section className={styles.container} aria-labelledby="dashboard-heading">
@@ -25,10 +35,10 @@ export default async function DashboardPage() {
         </h1>
         <p className={styles.description}>{PAGE_DESCRIPTION}</p>
         <div className={styles.actions}>
-          <Link className={styles.primaryLink} href="/import">
+          <Link className={styles.primaryLink} href={importRoute}>
             Start a new import
           </Link>
-          <Link className={styles.secondaryLink} href="/">
+          <Link className={styles.secondaryLink} href={ROUTE_HOME}>
             View marketing site
           </Link>
         </div>

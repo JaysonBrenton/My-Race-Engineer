@@ -1,13 +1,12 @@
-'use server';
-
 /**
- * Filename: src/app/actions/logout.ts
- * Purpose: Server action to revoke the active session and clear the browser cookie during logout.
- * Author: OpenAI ChatGPT (gpt-5-codex)
- * Date: 2025-01-15
+ * Author: Jayson Brenton + The Brainy One
+ * Date: 2025-10-20
+ * Purpose: Provide a typed logout action that respects Next.js typed routes.
  * License: MIT
  */
+'use server';
 
+import type { Route } from 'next';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 
@@ -16,6 +15,7 @@ import { applicationLogger } from '@/dependencies/logger';
 import { SESSION_COOKIE_NAME } from '@/lib/auth/constants';
 import { getSessionFromCookies } from '@/lib/auth/serverSession';
 import { createErrorLogContext } from '@/lib/logging/error';
+import { ROUTE_LOGIN, loginWithStatus } from '@/app/routes';
 
 const logger = applicationLogger.withContext({ route: 'auth/logout-action' });
 
@@ -23,7 +23,7 @@ export const logout = async (formData: FormData): Promise<void> => {
   void formData;
 
   const cookieJar = await cookies();
-  let redirectTarget = '/auth/login';
+  let redirectTarget: Route = loginWithStatus('logout');
   let userAnonId: string | undefined;
 
   try {
@@ -37,7 +37,7 @@ export const logout = async (formData: FormData): Promise<void> => {
       });
     }
   } catch (error: unknown) {
-    redirectTarget = '/auth/login?error=server-error';
+    redirectTarget = (`${ROUTE_LOGIN}?error=server-error`) as Route; // safe: fixed base + static error tag
     logger.error(
       'Failed to revoke session during logout.',
       createErrorLogContext(

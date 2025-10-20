@@ -1,6 +1,8 @@
 /**
- * Filename: src/app/(auth)/auth/login/resend-verification/actions.impl.ts
- * Purpose: Handle verification email resend submissions with rate limiting and CSRF protection.
+ * Author: Jayson Brenton + The Brainy One
+ * Date: 2025-10-20
+ * Purpose: Enforce typed redirects for the login verification resend flow.
+ * License: MIT
  */
 
 import { headers } from 'next/headers';
@@ -16,6 +18,7 @@ import { extractClientIdentifier } from '@/lib/request/clientIdentifier';
 import { guardAuthPostOrigin } from '@/server/security/origin';
 
 import type { Logger } from '@core/app';
+import { ROUTE_LOGIN } from '@/app/routes';
 
 type RedirectHref = Parameters<typeof redirect>[0];
 
@@ -95,7 +98,7 @@ export const createResendVerificationEmailAction = (
       headersList,
       () =>
         redirectTo(
-          buildRedirectUrl('/auth/login', {
+          buildRedirectUrl(ROUTE_LOGIN, {
             error: 'invalid-origin',
           }),
           deps,
@@ -109,7 +112,7 @@ export const createResendVerificationEmailAction = (
     if (!rateLimit.ok) {
       const emailValue = getFormValue(formData, 'email');
       return redirectTo(
-        buildRedirectUrl('/auth/login', {
+        buildRedirectUrl(ROUTE_LOGIN, {
           error: 'verification-rate-limited',
           email: emailValue ?? undefined,
           prefill: emailValue ? buildPrefillParam(emailValue) : undefined,
@@ -124,7 +127,7 @@ export const createResendVerificationEmailAction = (
     if (!tokenValidation.ok) {
       const emailValue = getFormValue(formData, 'email');
       return redirectTo(
-        buildRedirectUrl('/auth/login', {
+        buildRedirectUrl(ROUTE_LOGIN, {
           error: 'verification-invalid-token',
           email: emailValue ?? undefined,
           prefill: emailValue ? buildPrefillParam(emailValue) : undefined,
@@ -138,7 +141,7 @@ export const createResendVerificationEmailAction = (
 
     if (!parseResult.success) {
       return redirectTo(
-        buildRedirectUrl('/auth/login', {
+        buildRedirectUrl(ROUTE_LOGIN, {
           error: 'verification-validation',
           email: emailRaw ?? undefined,
         }),
@@ -158,7 +161,7 @@ export const createResendVerificationEmailAction = (
       });
 
       return redirectTo(
-        buildRedirectUrl('/auth/login', {
+        buildRedirectUrl(ROUTE_LOGIN, {
           error: 'verification-server-error',
           email,
           prefill: buildPrefillParam(email),
@@ -173,7 +176,7 @@ export const createResendVerificationEmailAction = (
     });
 
     return redirectTo(
-      buildRedirectUrl('/auth/login', {
+      buildRedirectUrl(ROUTE_LOGIN, {
         status: 'verification-resent',
         prefill: buildPrefillParam(email),
         email,

@@ -1,8 +1,15 @@
+/**
+ * Author: Jayson Brenton + The Brainy One
+ * Date: 2025-10-20
+ * Purpose: Provide typed navigation targets for login form secondary links.
+ * License: MIT
+ */
 'use client';
 
 import { useActionState, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import type { Route } from 'next';
 
 import styles from '../auth.module.css';
 import { loginAction, type LoginActionState } from './actions';
@@ -11,6 +18,8 @@ import { VerificationStatusPanel } from './verification-status-panel';
 import { resendVerificationEmailAction } from './resend-verification/actions';
 
 const INITIAL_STATE: LoginActionState = null;
+const REGISTER_ROUTE: Route = ('/auth/register') as Route; // safe: static register path
+const RESET_PASSWORD_ROUTE: Route = ('/auth/reset-password') as Route; // safe: static reset path
 
 const getStatusClassName = (tone: StatusMessage['tone']) => {
   switch (tone) {
@@ -174,10 +183,10 @@ export function LoginForm(props: LoginFormProps) {
             Sign in
           </button>
           <div className={styles.linkRow}>
-            <Link className={styles.secondaryLink} href="/auth/register">
+            <Link className={styles.secondaryLink} href={REGISTER_ROUTE}>
               Create an account
             </Link>
-            <Link className={styles.secondaryLink} href="/auth/reset-password">
+            <Link className={styles.secondaryLink} href={RESET_PASSWORD_ROUTE}>
               Forgot password?
             </Link>
           </div>

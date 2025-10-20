@@ -1,15 +1,16 @@
 /**
- * Filename: src/app/(auth)/auth/register/register-form.tsx
- * Purpose: Client-side wrapper that binds the registration server action to the form while preserving field values on errors.
- * Author: Jayson Brenton
- * Date: 2025-03-18
- * License: MIT License
+ * Author: Jayson Brenton + The Brainy One
+ * Date: 2025-10-20
+ * Purpose: Wire register form client links through typed Next routes.
+ * License: MIT
  */
 
 'use client';
 
 import { useFormState, useFormStatus } from 'react-dom';
 import Link from 'next/link';
+
+import { ROUTE_LOGIN } from '@/app/routes';
 
 import styles from '../auth.module.css';
 import type { RegisterActionState } from './state';
@@ -180,7 +181,7 @@ const FormFields = ({ formToken, state, inlineBannerMessage }: FormFieldsProps) 
       </div>
       <div className={styles.actions}>
         <SubmitButton disabled={!formToken} />
-        <Link className={styles.secondaryLink} href="/auth/login">
+        <Link className={styles.secondaryLink} href={ROUTE_LOGIN}>
           Already have an account? Sign in
         </Link>
       </div>

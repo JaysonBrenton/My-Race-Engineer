@@ -1,3 +1,10 @@
+/**
+ * Author: Jayson Brenton + The Brainy One
+ * Date: 2025-10-20
+ * Purpose: Align reset-password server action redirects with typed Next routes.
+ * License: MIT
+ */
+
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import type { Route } from 'next';
@@ -49,6 +56,8 @@ const getFormValue = (data: FormData, key: string) => {
   return typeof value === 'string' ? value : undefined;
 };
 
+const RESET_PASSWORD_ROUTE: Route = ('/auth/reset-password') as Route; // safe: canonical reset-request path
+
 export type RequestPasswordResetDependencies = {
   headers: typeof headers;
   redirect: (href: RedirectHref) => never;
@@ -85,7 +94,7 @@ export const createRequestPasswordResetAction = (
       headersList,
       () =>
         redirectTo(
-          buildRedirectUrl('/auth/reset-password', {
+          buildRedirectUrl(RESET_PASSWORD_ROUTE, {
             error: 'invalid-origin',
           }),
           deps,
@@ -100,7 +109,7 @@ export const createRequestPasswordResetAction = (
 
     if (!rateLimit.ok) {
       return redirectTo(
-        buildRedirectUrl('/auth/reset-password', {
+        buildRedirectUrl(RESET_PASSWORD_ROUTE, {
           error: 'rate-limited',
         }),
         deps,
@@ -112,7 +121,7 @@ export const createRequestPasswordResetAction = (
 
     if (!tokenValidation.ok) {
       return redirectTo(
-        buildRedirectUrl('/auth/reset-password', {
+        buildRedirectUrl(RESET_PASSWORD_ROUTE, {
           error: 'invalid-token',
         }),
         deps,
@@ -125,7 +134,7 @@ export const createRequestPasswordResetAction = (
 
     if (!parseResult.success) {
       return redirectTo(
-        buildRedirectUrl('/auth/reset-password', {
+        buildRedirectUrl(RESET_PASSWORD_ROUTE, {
           error: 'validation',
           email: getFormValue(formData, 'email'),
         }),
@@ -149,7 +158,7 @@ export const createRequestPasswordResetAction = (
         ),
       );
       return redirectTo(
-        buildRedirectUrl('/auth/reset-password', {
+        buildRedirectUrl(RESET_PASSWORD_ROUTE, {
           error: 'server-error',
         }),
         deps,
@@ -157,7 +166,7 @@ export const createRequestPasswordResetAction = (
     }
 
     return redirectTo(
-      buildRedirectUrl('/auth/reset-password', {
+      buildRedirectUrl(RESET_PASSWORD_ROUTE, {
         status: 'sent',
       }),
       deps,

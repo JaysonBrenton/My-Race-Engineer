@@ -1,3 +1,10 @@
+/**
+ * Author: Jayson Brenton + The Brainy One
+ * Date: 2025-10-20
+ * Purpose: Apply typed routes to reset password navigation elements.
+ * License: MIT
+ */
+
 import type { Metadata } from 'next';
 import type { AppPageProps, ResolvedSearchParams } from '@/types/app-page-props';
 import { unstable_noStore as noStore } from 'next/cache';
@@ -10,6 +17,7 @@ import { MissingAuthFormTokenSecretError, generateAuthFormToken } from '@/lib/au
 import { canonicalFor } from '@/lib/seo';
 
 import { requestPasswordResetAction } from './actions';
+import { ROUTE_LOGIN } from '@/app/routes';
 
 import styles from '../auth.module.css';
 
@@ -188,7 +196,7 @@ export default async function Page({ searchParams }: PageProps) {
             <button type="submit" className={styles.primaryButton} disabled={isFormDisabled}>
               Send reset link
             </button>
-            <Link className={styles.secondaryLink} href="/auth/login">
+            <Link className={styles.secondaryLink} href={ROUTE_LOGIN}>
               Return to sign in
             </Link>
           </div>

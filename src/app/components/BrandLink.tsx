@@ -1,7 +1,16 @@
+/**
+ * Author: Jayson Brenton + The Brainy One
+ * Date: 2025-10-20
+ * Purpose: Centralize header brand link around typed home route.
+ * License: MIT
+ */
+
 'use client';
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+
+import { ROUTE_HOME } from '@/app/routes';
 
 export function BrandLink() {
   const pathname = usePathname();
@@ -16,7 +25,7 @@ export function BrandLink() {
   }
 
   return (
-    <Link href="/" className="app-header__brand">
+    <Link href={ROUTE_HOME} className="app-header__brand">
       My Race Engineer
     </Link>
   );
