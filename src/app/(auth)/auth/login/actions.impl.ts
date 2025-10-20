@@ -10,7 +10,6 @@ import { randomUUID } from 'node:crypto';
 
 import { cookies, headers } from 'next/headers';
 import type { Route } from 'next';
-import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
 import { getAuthRequestLogger, loginUserService } from '@/dependencies/auth';
@@ -23,7 +22,7 @@ import { computeCookieSecure, type CookieSecureStrategy } from '@/server/runtime
 import { guardAuthPostOrigin } from '@/server/security/origin';
 import type { AuthActionDebugEvent } from '@/server/security/authDebug';
 
-type RedirectHref = Parameters<typeof redirect>[0];
+import { buildStatusMessage, type StatusMessage } from './status';
 
 // This server action executes the full login flow: it validates inputs, enforces
 // rate limits, delegates credential checks to the domain service, and finally
@@ -62,22 +61,6 @@ const loginSchema = z.object({
 // Helper for rebuilding the login URL with query-string flags.  We rely on
 // redirects instead of rendering in-place so that the page stays statically
 // typed and resilient across refreshes.
-const buildRedirectUrl = (
-  pathname: Route,
-  searchParams: Record<string, string | undefined>,
-): RedirectHref => {
-  const params = new URLSearchParams();
-  Object.entries(searchParams).forEach(([key, value]) => {
-    if (value) {
-      params.set(key, value);
-    }
-  });
-
-  const query = params.toString();
-  const target = query ? `${pathname}?${query}` : pathname;
-  return target as RedirectHref;
-};
-
 // FormData can return strings, File objects, or nulls; this helper standardises
 // access to optional text fields.
 const getFormValue = (data: FormData, key: string) => {
@@ -91,28 +74,52 @@ type LoginPrefillInput = {
   identifier?: string | null | undefined;
 };
 
-const buildPrefillParam = (prefill: LoginPrefillInput): string | undefined => {
-  const safeEntries = Object.entries(prefill)
-    .filter(([, value]) => typeof value === 'string' && value.trim().length > 0)
-    .map(([key, value]) => [key, (value as string).trim()]);
+const buildPrefill = (prefill: LoginPrefillInput): LoginPrefill | undefined => {
+  const identifierValue = typeof prefill.identifier === 'string' ? prefill.identifier.trim() : '';
 
-  if (safeEntries.length === 0) {
+  if (!identifierValue) {
     return undefined;
   }
 
-  try {
-    return JSON.stringify(Object.fromEntries(safeEntries));
-  } catch {
-    return undefined;
-  }
+  return { identifier: identifierValue };
 };
 
 type LoginService = Pick<typeof loginUserService, 'login'>;
 
+type LoginPrefill = {
+  identifier?: string | null | undefined;
+};
+
+export type LoginErrorCode =
+  | 'invalid-origin'
+  | 'invalid-token'
+  | 'validation'
+  | 'rate-limited'
+  | 'invalid-credentials'
+  | 'email-not-verified'
+  | 'account-pending'
+  | 'account-suspended'
+  | 'server-error';
+
+export type LoginActionSuccessResult = {
+  status: 'success';
+  redirectTo: Route;
+};
+
+export type LoginActionErrorResult = {
+  status: 'error';
+  error: LoginErrorCode;
+  statusMessage: StatusMessage;
+  prefill?: LoginPrefill;
+  fieldErrors?: Array<{ field: string; message: string }>;
+  retryAfterMs?: number;
+};
+
+export type LoginActionResult = LoginActionSuccessResult | LoginActionErrorResult;
+
 export type LoginActionDependencies = {
   headers: typeof headers;
   cookies: typeof cookies;
-  redirect: (url: RedirectHref) => never;
   guardAuthPostOrigin: typeof guardAuthPostOrigin;
   checkLoginRateLimit: typeof checkLoginRateLimit;
   validateAuthFormToken: typeof validateAuthFormToken;
@@ -131,7 +138,6 @@ export type LoginActionOptions = {
 const defaultLoginActionDependencies: LoginActionDependencies = {
   headers,
   cookies,
-  redirect,
   guardAuthPostOrigin,
   checkLoginRateLimit,
   validateAuthFormToken,
@@ -156,32 +162,66 @@ const resolveCookieSecureStrategy = (): CookieSecureStrategy =>
     process.env.COOKIE_SECURE_STRATEGY as CookieSecureStrategy | undefined,
   ) ?? (process.env.NODE_ENV === 'production' ? 'auto' : 'never');
 
-export type LoginAction = (formData: FormData) => Promise<void>;
+class LoginActionAbort extends Error {
+  constructor(public readonly result: LoginActionResult) {
+    super('LoginActionAbort');
+    this.name = 'LoginActionAbort';
+  }
+}
+
+const toPrefill = (value: LoginPrefill | undefined): LoginPrefill | undefined =>
+  value ? { identifier: value.identifier } : undefined;
+
+const buildErrorResult = (
+  error: LoginErrorCode,
+  overrides: Partial<LoginActionErrorResult> = {},
+): LoginActionErrorResult => ({
+  status: 'error',
+  error,
+  statusMessage: buildStatusMessage(undefined, error),
+  ...overrides,
+});
+
+export type LoginAction = (formData: FormData) => Promise<LoginActionResult>;
 
 export const createLoginAction = (
   deps: LoginActionDependencies = defaultLoginActionDependencies,
   options: LoginActionOptions = {},
 ): LoginAction => {
-  return async (formData: FormData): Promise<void> => {
+  return async (formData: FormData): Promise<LoginActionResult> => {
     const requestStartedAt = Date.now();
-    // The client identifier combines IP and user-agent hints so the rate limiter
-    // can throttle burst attempts without locking out legitimate users sharing an
-    // address (e.g. team pit wall).
     const headersList = await deps.headers();
     const requestId = headersList.get('x-request-id') ?? randomUUID();
     const emitDebugEvent = options.onDebugEvent;
 
-    await deps.withSpan(
+    return deps.withSpan(
       'auth.login',
       {
         'mre.request_id': requestId,
         'http.route': 'auth/login',
       },
-      async (span: SpanAdapter): Promise<void> => {
+      async (span: SpanAdapter): Promise<LoginActionResult> => {
         const logger = deps.getAuthRequestLogger({
           requestId,
           route: 'auth/login',
         });
+
+        const recordOutcome = (result: LoginActionResult, statusKey?: string) => {
+          const outcomeKind = result.status === 'success' ? 'redirect' : 'rerender';
+          const target = result.status === 'success' ? result.redirectTo : undefined;
+          logger.info('Login outcome resolved.', {
+            event: 'auth.login.outcome',
+            kind: outcomeKind,
+            target,
+            statusKey,
+          });
+          emitDebugEvent?.({
+            type: 'outcome',
+            kind: outcomeKind,
+            target,
+            statusKey: statusKey ?? (result.status === 'error' ? result.error : undefined),
+          });
+        };
 
         const originHeader = headersList.get('origin');
         const originGuardHeader = headersList.get('x-auth-origin-guard');
@@ -198,302 +238,284 @@ export const createLoginAction = (
           method: methodHeader,
         });
 
-        const recordOutcome = (outcome: {
-          kind: 'redirect' | 'rerender';
-          target?: string;
-          statusKey?: string;
-        }) => {
-          logger.info('Login outcome resolved.', {
-            event: 'auth.login.outcome',
-            kind: outcome.kind,
-            target: outcome.target,
-            statusKey: outcome.statusKey,
-          });
-          emitDebugEvent?.({
-            type: 'outcome',
-            kind: outcome.kind,
-            target: outcome.target,
-            statusKey: outcome.statusKey,
-          });
-        };
+        try {
+          deps.guardAuthPostOrigin(
+            headersList,
+            () => {
+              const result = buildErrorResult('invalid-origin');
+              recordOutcome(result, 'invalid-origin');
+              throw new LoginActionAbort(result);
+            },
+            {
+              route: 'auth/login',
+              logger,
+            },
+          );
 
-        deps.guardAuthPostOrigin(
-          headersList,
-          () => {
-            const target = buildRedirectUrl('/auth/login', {
-              error: 'invalid-origin',
+          const identifier = deps.extractClientIdentifier(headersList);
+          const clientFingerprint =
+            identifier === 'unknown' ? undefined : deps.createLogFingerprint(identifier);
+          if (clientFingerprint) {
+            span.setAttribute('mre.auth.client_fingerprint', clientFingerprint);
+          }
+
+          logger.info('Processing login submission.', {
+            event: 'auth.login.submission_received',
+            outcome: 'processing',
+            clientFingerprint,
+          });
+
+          const rateLimit = deps.checkLoginRateLimit(identifier);
+          if (!rateLimit.ok) {
+            span.setAttribute('mre.auth.outcome', 'rate_limited');
+            span.setAttribute('mre.auth.retry_after_ms', rateLimit.retryAfterMs);
+            logger.warn('Login blocked by rate limiter.', {
+              event: 'auth.login.rate_limited',
+              outcome: 'blocked',
+              clientFingerprint,
+              retryAfterMs: rateLimit.retryAfterMs,
+              durationMs: Date.now() - requestStartedAt,
             });
-            recordOutcome({ kind: 'redirect', target, statusKey: 'invalid-origin' });
-            return deps.redirect(target);
-          },
-          {
-            route: 'auth/login',
-            logger,
-          },
-        );
+            const result = buildErrorResult('rate-limited', { retryAfterMs: rateLimit.retryAfterMs });
+            recordOutcome(result, 'rate-limited');
+            return result;
+          }
 
-        const identifier = deps.extractClientIdentifier(headersList);
-        const clientFingerprint =
-          identifier === 'unknown' ? undefined : deps.createLogFingerprint(identifier);
-        if (clientFingerprint) {
-          span.setAttribute('mre.auth.client_fingerprint', clientFingerprint);
-        }
+          const token = getFormValue(formData, 'formToken');
+          const tokenFingerprint = token ? fingerprintAuthFormToken(token) : null;
+          const tokenValidation = deps.validateAuthFormToken(token ?? null, 'login');
+          const tokenAgeMs = tokenValidation.ok
+            ? Date.now() - tokenValidation.issuedAt.getTime()
+            : null;
 
-        logger.info('Processing login submission.', {
-          event: 'auth.login.submission_received',
-          outcome: 'processing',
-          clientFingerprint,
-        });
+          if (tokenValidation.ok) {
+            logger.info('Login form token validated.', {
+              event: 'auth.formToken.validate',
+              result: 'ok',
+              action: 'login',
+              tokenFingerprint,
+              tokenAgeMs,
+            });
+            emitDebugEvent?.({
+              type: 'token-validation',
+              status: 'ok',
+              fingerprint: tokenFingerprint,
+              ageMs: tokenAgeMs,
+            });
+          } else {
+            const status = tokenValidation.reason === 'expired' ? 'expired' : 'invalid';
+            logger.warn('Login form token rejected.', {
+              event: 'auth.formToken.validate',
+              result: status,
+              action: 'login',
+              reason: tokenValidation.reason,
+              tokenFingerprint,
+              tokenAgeMs,
+            });
+            emitDebugEvent?.({
+              type: 'token-validation',
+              status,
+              reason: tokenValidation.reason,
+              fingerprint: tokenFingerprint,
+              ageMs: tokenAgeMs,
+            });
+          }
 
-        const rateLimit = deps.checkLoginRateLimit(identifier);
-        if (!rateLimit.ok) {
-          span.setAttribute('mre.auth.outcome', 'rate_limited');
-          span.setAttribute('mre.auth.retry_after_ms', rateLimit.retryAfterMs);
-          // When the rate limiter trips we short-circuit to the login page with a
-          // dedicated error code.  The redirect prevents timing attacks that could
-          // differentiate between throttled and rejected credentials.
-          logger.warn('Login blocked by rate limiter.', {
-            event: 'auth.login.rate_limited',
-            outcome: 'blocked',
-            clientFingerprint,
-            retryAfterMs: rateLimit.retryAfterMs,
-            durationMs: Date.now() - requestStartedAt,
+          if (!tokenValidation.ok) {
+            span.setAttribute('mre.auth.outcome', 'invalid_token');
+            logger.warn('Login rejected due to invalid form token.', {
+              event: 'auth.login.invalid_token',
+              outcome: 'rejected',
+              clientFingerprint,
+              durationMs: Date.now() - requestStartedAt,
+            });
+            const result = buildErrorResult('invalid-token');
+            recordOutcome(result, 'invalid-token');
+            return result;
+          }
+
+          const parseResult = loginSchema.safeParse({
+            identifier: getFormValue(formData, 'identifier'),
+            password: getFormValue(formData, 'password'),
+            remember: getFormValue(formData, 'remember'),
           });
-          const target = buildRedirectUrl('/auth/login', {
-            error: 'rate-limited',
-          });
-          recordOutcome({ kind: 'redirect', target, statusKey: 'rate-limited' });
-          deps.redirect(target);
-        }
 
-        const token = getFormValue(formData, 'formToken');
-        const tokenFingerprint = token ? fingerprintAuthFormToken(token) : null;
-        const tokenValidation = deps.validateAuthFormToken(token ?? null, 'login');
-        const tokenAgeMs = tokenValidation.ok
-          ? Date.now() - tokenValidation.issuedAt.getTime()
-          : null;
+          if (!parseResult.success) {
+            span.setAttribute('mre.auth.outcome', 'validation_failed');
+            const issues = parseResult.error.issues.map((issue) => ({
+              path: issue.path.map((segment) => segment.toString()).join('.') || 'root',
+              code: issue.code,
+              message: issue.message,
+            }));
+            logger.warn('Login rejected due to validation errors.', {
+              event: 'auth.login.validation_failed',
+              outcome: 'rejected',
+              clientFingerprint,
+              validationIssues: issues,
+              durationMs: Date.now() - requestStartedAt,
+            });
+            logger.info('Login validation summary.', {
+              event: 'auth.login.validation',
+              result: 'invalid',
+              issues: issues.map((issue) => issue.path),
+            });
+            const result = buildErrorResult('validation', {
+              fieldErrors: issues.map((issue) => ({ field: issue.path, message: issue.message })),
+              prefill: toPrefill(buildPrefill({ identifier: getFormValue(formData, 'identifier') })),
+            });
+            recordOutcome(result, 'validation');
+            return result;
+          }
 
-        if (tokenValidation.ok) {
-          logger.info('Login form token validated.', {
-            event: 'auth.formToken.validate',
+          logger.info('Login validation summary.', {
+            event: 'auth.login.validation',
             result: 'ok',
-            action: 'login',
-            tokenFingerprint,
-            tokenAgeMs,
           });
-          emitDebugEvent?.({
-            type: 'token-validation',
-            status: 'ok',
-            fingerprint: tokenFingerprint,
-            ageMs: tokenAgeMs,
-          });
-        } else {
-          const status = tokenValidation.reason === 'expired' ? 'expired' : 'invalid';
-          logger.warn('Login form token rejected.', {
-            event: 'auth.formToken.validate',
-            result: status,
-            action: 'login',
-            reason: tokenValidation.reason,
-            tokenFingerprint,
-            tokenAgeMs,
-          });
-          emitDebugEvent?.({
-            type: 'token-validation',
-            status,
-            reason: tokenValidation.reason,
-            fingerprint: tokenFingerprint,
-            ageMs: tokenAgeMs,
-          });
-        }
 
-        if (!tokenValidation.ok) {
-          span.setAttribute('mre.auth.outcome', 'invalid_token');
-          // Missing or stale CSRF tokens are treated as an invalid session.  The UI
-          // invites the user to refresh so they pick up a fresh token value.
-          logger.warn('Login rejected due to invalid form token.', {
-            event: 'auth.login.invalid_token',
-            outcome: 'rejected',
-            clientFingerprint,
-            durationMs: Date.now() - requestStartedAt,
-          });
-          const target = buildRedirectUrl('/auth/login', {
-            error: 'invalid-token',
-          });
-          recordOutcome({ kind: 'redirect', target, statusKey: 'invalid-token' });
-          deps.redirect(target);
-        }
+          const { identifier: rawIdentifier, password, remember } = parseResult.data;
+          const identifierLooksLikeEmail = rawIdentifier.includes('@');
+          const identifierCheck = identifierLooksLikeEmail
+            ? emailIdentifierSchema.safeParse(rawIdentifier)
+            : driverNameIdentifierSchema.safeParse(rawIdentifier);
 
-        const parseResult = loginSchema.safeParse({
-          identifier: getFormValue(formData, 'identifier'),
-          password: getFormValue(formData, 'password'),
-          remember: getFormValue(formData, 'remember'),
-        });
+          if (!identifierCheck.success) {
+            span.setAttribute('mre.auth.outcome', 'validation_failed');
+            const issues = identifierCheck.error.issues.map((issue) => ({
+              path: 'identifier',
+              code: issue.code,
+              message: issue.message,
+            }));
+            logger.warn('Login rejected due to validation errors.', {
+              event: 'auth.login.validation_failed',
+              outcome: 'rejected',
+              clientFingerprint,
+              validationIssues: issues,
+              durationMs: Date.now() - requestStartedAt,
+            });
+            logger.info('Login validation summary.', {
+              event: 'auth.login.validation',
+              result: 'invalid',
+              issues: issues.map((issue) => issue.path),
+            });
+            const result = buildErrorResult('validation', {
+              fieldErrors: issues.map((issue) => ({ field: issue.path, message: issue.message })),
+              prefill: toPrefill(buildPrefill({ identifier: rawIdentifier })),
+            });
+            recordOutcome(result, 'validation');
+            return result;
+          }
 
-        if (!parseResult.success) {
-          span.setAttribute('mre.auth.outcome', 'validation_failed');
-          // Validation failures flow back with the identifier preserved so the user does
-          // not have to re-type it, reducing friction for simple typos.
-          const issues = parseResult.error.issues.map((issue) => ({
-            path: issue.path.map((segment) => segment.toString()).join('.') || 'root',
-            code: issue.code,
-            message: issue.message,
-          }));
-          logger.warn('Login rejected due to validation errors.', {
-            event: 'auth.login.validation_failed',
-            outcome: 'rejected',
-            clientFingerprint,
-            validationIssues: issues,
-            durationMs: Date.now() - requestStartedAt,
-          });
-          logger.info('Login validation summary.', {
-            event: 'auth.login.validation',
-            result: 'invalid',
-            issues: issues.map((issue) => issue.path),
-          });
-          const target = buildRedirectUrl('/auth/login', {
-            error: 'validation',
-            prefill: buildPrefillParam({ identifier: getFormValue(formData, 'identifier') }),
-          });
-          recordOutcome({ kind: 'redirect', target, statusKey: 'validation' });
-          deps.redirect(target);
-        }
+          const normalisedIdentifier = identifierCheck.data;
+          const identifierKind = identifierLooksLikeEmail ? 'email' : 'driver-name';
+          const userAgent = headersList.get('user-agent');
+          const identifierFingerprint = deps.createLogFingerprint(normalisedIdentifier);
+          const rememberSession = remember === 'true';
 
-        logger.info('Login validation summary.', {
-          event: 'auth.login.validation',
-          result: 'ok',
-        });
+          span.setAttribute('mre.auth.identifier_type', identifierKind);
+          if (identifierKind === 'email' && identifierFingerprint) {
+            span.setAttribute('mre.auth.email_fingerprint', identifierFingerprint);
+          }
+          if (identifierKind === 'driver-name' && identifierFingerprint) {
+            span.setAttribute('mre.auth.driver_name_fingerprint', identifierFingerprint);
+          }
+          span.setAttribute('mre.auth.remember_session', rememberSession);
 
-        const { identifier: rawIdentifier, password, remember } = parseResult.data;
-        const identifierLooksLikeEmail = rawIdentifier.includes('@');
-        const identifierCheck = identifierLooksLikeEmail
-          ? emailIdentifierSchema.safeParse(rawIdentifier)
-          : driverNameIdentifierSchema.safeParse(rawIdentifier);
-
-        if (!identifierCheck.success) {
-          span.setAttribute('mre.auth.outcome', 'validation_failed');
-          const issues = identifierCheck.error.issues.map((issue) => ({
-            path: 'identifier',
-            code: issue.code,
-            message: issue.message,
-          }));
-          logger.warn('Login rejected due to validation errors.', {
-            event: 'auth.login.validation_failed',
-            outcome: 'rejected',
-            clientFingerprint,
-            validationIssues: issues,
-            durationMs: Date.now() - requestStartedAt,
-          });
-          logger.info('Login validation summary.', {
-            event: 'auth.login.validation',
-            result: 'invalid',
-            issues: issues.map((issue) => issue.path),
-          });
-          const target = buildRedirectUrl('/auth/login', {
-            error: 'validation',
-            prefill: buildPrefillParam({ identifier: rawIdentifier }),
-          });
-          recordOutcome({ kind: 'redirect', target, statusKey: 'validation' });
-          deps.redirect(target);
-        }
-
-        const normalisedIdentifier = identifierCheck.data;
-        const identifierKind = identifierLooksLikeEmail ? 'email' : 'driver-name';
-        const userAgent = headersList.get('user-agent');
-        const identifierFingerprint = deps.createLogFingerprint(normalisedIdentifier);
-        const rememberSession = remember === 'true';
-
-        span.setAttribute('mre.auth.identifier_type', identifierKind);
-        if (identifierKind === 'email' && identifierFingerprint) {
-          span.setAttribute('mre.auth.email_fingerprint', identifierFingerprint);
-        }
-        if (identifierKind === 'driver-name' && identifierFingerprint) {
-          span.setAttribute('mre.auth.driver_name_fingerprint', identifierFingerprint);
-        }
-        span.setAttribute('mre.auth.remember_session', rememberSession);
-
-        logger.info('Login payload validated.', {
-          event: 'auth.login.payload_validated',
-          outcome: 'processing',
-          clientFingerprint,
-          ...(identifierKind === 'email'
-            ? { emailFingerprint: identifierFingerprint }
-            : { driverNameFingerprint: identifierFingerprint }),
-          rememberSession,
-        });
-
-        const result = await deps.loginUserService.login({
-          identifier: { kind: identifierKind, value: normalisedIdentifier },
-          password,
-          rememberSession,
-          sessionContext: {
-            ipAddress: identifier === 'unknown' ? null : identifier,
-            userAgent,
-          },
-        });
-
-        if (!result.ok) {
-          // Domain-level errors (unverified email, suspended account, etc.) are
-          // surfaced to the page so we can display precise guidance without leaking
-          // sensitive details to the attacker.
-          span.setAttribute('mre.auth.outcome', result.reason);
-          logger.info('Login attempt failed in domain service.', {
-            event: `auth.login.${result.reason.replace(/-/g, '_')}`,
-            outcome: 'rejected',
+          logger.info('Login payload validated.', {
+            event: 'auth.login.payload_validated',
+            outcome: 'processing',
             clientFingerprint,
             ...(identifierKind === 'email'
               ? { emailFingerprint: identifierFingerprint }
               : { driverNameFingerprint: identifierFingerprint }),
+            rememberSession,
+          });
+
+          const serviceResult = await deps.loginUserService.login({
+            identifier: { kind: identifierKind, value: normalisedIdentifier },
+            password,
+            rememberSession,
+            sessionContext: {
+              ipAddress: identifier === 'unknown' ? null : identifier,
+              userAgent,
+            },
+          });
+
+          if (!serviceResult.ok) {
+            span.setAttribute('mre.auth.outcome', serviceResult.reason);
+            logger.info('Login attempt failed in domain service.', {
+              event: `auth.login.${serviceResult.reason.replace(/-/g, '_')}`,
+              outcome: 'rejected',
+              clientFingerprint,
+              ...(identifierKind === 'email'
+                ? { emailFingerprint: identifierFingerprint }
+                : { driverNameFingerprint: identifierFingerprint }),
+              durationMs: Date.now() - requestStartedAt,
+            });
+            const result = buildErrorResult(serviceResult.reason, {
+              prefill: toPrefill(buildPrefill({ identifier: rawIdentifier })),
+            });
+            recordOutcome(result, serviceResult.reason);
+            return result;
+          }
+
+          const cookieJar = await deps.cookies();
+          const expiresAt = serviceResult.expiresAt;
+          const maxAge = Math.max(Math.floor((expiresAt.getTime() - Date.now()) / 1000), 1);
+          const secure = await deps.computeCookieSecure({
+            strategy: resolveCookieSecureStrategy(),
+            trustProxy: process.env.TRUST_PROXY === 'true',
+            appUrl: process.env.APP_URL ?? null,
+            forwardedProto: headersList.get('x-forwarded-proto'),
+          });
+
+          cookieJar.set({
+            name: 'mre_session',
+            value: serviceResult.sessionToken,
+            httpOnly: true,
+            sameSite: 'lax',
+            secure,
+            path: '/',
+            expires: expiresAt,
+            maxAge,
+          });
+
+          span.setAttribute('mre.auth.outcome', 'success');
+          span.setAttribute('mre.auth.session_expires_at', expiresAt.toISOString());
+
+          logger.info('Login succeeded; session cookie issued.', {
+            event: 'auth.login.success',
+            outcome: 'success',
+            clientFingerprint,
+            ...(identifierKind === 'email'
+              ? { emailFingerprint: identifierFingerprint }
+              : { driverNameFingerprint: identifierFingerprint }),
+            rememberSession,
+            sessionExpiresAt: serviceResult.expiresAt.toISOString(),
             durationMs: Date.now() - requestStartedAt,
           });
-          const target = buildRedirectUrl('/auth/login', {
-            error: result.reason,
-            prefill: buildPrefillParam({ identifier: rawIdentifier }),
+
+          const successResult: LoginActionSuccessResult = {
+            status: 'success',
+            redirectTo: '/dashboard',
+          };
+          recordOutcome(successResult, 'session-created');
+          return successResult;
+        } catch (error) {
+          if (error instanceof LoginActionAbort) {
+            return error.result;
+          }
+
+          span.setAttribute('mre.auth.outcome', 'server_error');
+          logger.error('Login action failed unexpectedly.', {
+            event: 'auth.login.unexpected_error',
+            outcome: 'error',
+            durationMs: Date.now() - requestStartedAt,
+            error: error instanceof Error ? error.message : 'unknown-error',
           });
-          recordOutcome({ kind: 'redirect', target, statusKey: result.reason });
-          deps.redirect(target);
+          const result = buildErrorResult('server-error');
+          recordOutcome(result, 'server-error');
+          return result;
         }
-
-        const cookieJar = await deps.cookies();
-        const expiresAt = result.expiresAt;
-        const maxAge = Math.max(Math.floor((expiresAt.getTime() - Date.now()) / 1000), 1);
-        // The session cookie is httpOnly and same-site lax so it is resilient against
-        // XSS and CSRF while still allowing multi-tab usage.  We rely on the TTL
-        // returned by the service to synchronise browser and database expirations.
-        const secure = await deps.computeCookieSecure({
-          strategy: resolveCookieSecureStrategy(),
-          trustProxy: process.env.TRUST_PROXY === 'true',
-          appUrl: process.env.APP_URL ?? null,
-          forwardedProto: headersList.get('x-forwarded-proto'),
-        });
-
-        cookieJar.set({
-          name: 'mre_session',
-          value: result.sessionToken,
-          httpOnly: true,
-          sameSite: 'lax',
-          secure,
-          path: '/',
-          expires: expiresAt,
-          maxAge,
-        });
-
-        span.setAttribute('mre.auth.outcome', 'success');
-        span.setAttribute('mre.auth.session_expires_at', expiresAt.toISOString());
-
-        logger.info('Login succeeded; session cookie issued.', {
-          event: 'auth.login.success',
-          outcome: 'success',
-          clientFingerprint,
-          ...(identifierKind === 'email'
-            ? { emailFingerprint: identifierFingerprint }
-            : { driverNameFingerprint: identifierFingerprint }),
-          rememberSession,
-          sessionExpiresAt: result.expiresAt.toISOString(),
-          durationMs: Date.now() - requestStartedAt,
-        });
-
-        recordOutcome({ kind: 'redirect', target: '/dashboard', statusKey: 'session-created' });
-        deps.redirect('/dashboard');
       },
     );
   };

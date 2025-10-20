@@ -7,10 +7,15 @@
  * Purpose: Expose the login server action entrypoint while keeping implementation details in a non-server module.
  */
 
-import { createLoginAction } from './actions.impl';
+import { createLoginAction, type LoginActionResult } from './actions.impl';
 
 const loginActionImpl = createLoginAction();
 
-export async function loginAction(formData: FormData): Promise<void> {
+export type LoginActionState = LoginActionResult | null;
+
+export async function loginAction(
+  _prevState: LoginActionState,
+  formData: FormData,
+): Promise<LoginActionState> {
   return loginActionImpl(formData);
 }
