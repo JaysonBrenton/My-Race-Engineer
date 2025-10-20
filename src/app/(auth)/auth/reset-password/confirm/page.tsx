@@ -1,4 +1,12 @@
+/**
+ * Author: Jayson Brenton + The Brainy One
+ * Date: 2025-10-20
+ * Purpose: Enforce typed routes for reset-password confirmation navigation.
+ * License: MIT
+ */
+
 import type { Metadata } from 'next';
+import type { Route } from 'next';
 import type { AppPageProps, ResolvedSearchParams } from '@/types/app-page-props';
 import { unstable_noStore as noStore } from 'next/cache';
 import Link from 'next/link';
@@ -12,6 +20,8 @@ import { canonicalFor } from '@/lib/seo';
 import { confirmPasswordResetAction } from './actions';
 
 import styles from '../../auth.module.css';
+
+const RESET_REQUEST_ROUTE: Route = ('/auth/reset-password') as Route; // safe: static reset request path
 
 type PageProps = AppPageProps;
 
@@ -204,7 +214,7 @@ export default async function Page({ searchParams }: PageProps) {
             <button type="submit" className={styles.primaryButton} disabled={isFormDisabled}>
               Update password
             </button>
-            <Link className={styles.secondaryLink} href="/auth/reset-password">
+            <Link className={styles.secondaryLink} href={RESET_REQUEST_ROUTE}>
               Request a new link
             </Link>
           </div>

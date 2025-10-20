@@ -1,9 +1,8 @@
 /**
- * Filename: src/app/(auth)/auth/register/state.ts
- * Purpose: Share registration form state shapes and helpers across server actions, routes, and UI.
- * Author: Jayson Brenton
- * Date: 2025-10-11
- * License: MIT License
+ * Author: Jayson Brenton + The Brainy One
+ * Date: 2025-10-20
+ * Purpose: Keep registration state helpers aligned with typed Next.js routes.
+ * License: MIT
  */
 
 import type { Route } from 'next';

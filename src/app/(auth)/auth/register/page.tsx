@@ -1,9 +1,8 @@
 /**
- * Filename: src/app/(auth)/auth/register/page.tsx
- * Purpose: Render the registration form with safe prefills, inline error states, and cache disabling.
- * Author: Jayson Brenton
- * Date: 2025-10-11
- * License: MIT License
+ * Author: Jayson Brenton + The Brainy One
+ * Date: 2025-10-20
+ * Purpose: Maintain typed routes for register page navigation helpers.
+ * License: MIT
  */
 
 import type { Metadata } from 'next';
@@ -30,6 +29,7 @@ import {
   type StatusMessage,
 } from './state';
 import { registerAction } from './actions';
+import { ROUTE_LOGIN } from '@/app/routes';
 
 type PageProps = AppPageProps;
 
@@ -303,7 +303,7 @@ export default async function Page({ searchParams }: PageProps) {
             <button type="submit" className={styles.primaryButton} disabled={isFormDisabled}>
               Create account
             </button>
-            <Link className={styles.secondaryLink} href="/auth/login">
+            <Link className={styles.secondaryLink} href={ROUTE_LOGIN}>
               Already have an account? Sign in
             </Link>
           </div>
