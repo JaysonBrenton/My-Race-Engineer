@@ -14,5 +14,5 @@ export const ROUTE_HOME: Route = '/';
 export const ROUTE_LOGIN: Route = '/auth/login';
 
 export function loginWithStatus(status: 'logout' | 'reset' | 'verify'): Route {
-  return (`${ROUTE_LOGIN}?status=${status}`) as Route; // safe: fixed base + constrained status
+  return `${ROUTE_LOGIN}?status=${status}` as Route; // safe: fixed base + constrained status
 }

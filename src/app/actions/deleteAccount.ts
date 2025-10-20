@@ -27,8 +27,8 @@ export const deleteAccount = async (formData: FormData): Promise<void> => {
   const { user } = await requireAuthenticatedUser();
   const cookieJar = await cookies();
 
-  const deleteFailedTarget: Route = ('/settings/account?error=delete-failed') as Route; // safe: static path + error tag
-  const accountDeletedTarget: Route = (`${ROUTE_LOGIN}?deleted=1`) as Route; // safe: fixed base + static deleted flag
+  const deleteFailedTarget: Route = '/settings/account?error=delete-failed' as Route; // safe: static path + error tag
+  const accountDeletedTarget: Route = `${ROUTE_LOGIN}?deleted=1` as Route; // safe: fixed base + static deleted flag
 
   try {
     await deleteUserAccountService.execute(user.id);
