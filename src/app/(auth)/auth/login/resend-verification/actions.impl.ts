@@ -32,6 +32,8 @@ const getFormValue = (data: FormData, key: string) => {
   return typeof value === 'string' ? value : undefined;
 };
 
+type RedirectHref = Parameters<typeof redirect>[0];
+
 const buildPrefillParam = (identifier: string): string => {
   try {
     return JSON.stringify({ identifier });
@@ -43,7 +45,7 @@ const buildPrefillParam = (identifier: string): string => {
 const buildRedirectUrl = (
   pathname: Route,
   searchParams: Record<string, string | undefined>,
-): Route => {
+): RedirectHref => {
   const params = new URLSearchParams();
 
   for (const [key, value] of Object.entries(searchParams)) {
@@ -53,7 +55,7 @@ const buildRedirectUrl = (
   }
 
   const query = params.toString();
-  return query ? (`${pathname}?${query}` as Route) : pathname;
+  return query ? `${pathname}?${query}` : pathname;
 };
 
 type ResendDependencies = {
@@ -79,8 +81,6 @@ const defaultDependencies: ResendDependencies = {
   resendVerificationEmailService,
   logger: applicationLogger.withContext({ route: 'auth/login/resend-verification' }),
 };
-
-type RedirectHref = Parameters<typeof redirect>[0];
 
 const redirectTo = (target: RedirectHref, deps: ResendDependencies): never => deps.redirect(target);
 
