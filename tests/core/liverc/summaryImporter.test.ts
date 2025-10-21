@@ -19,6 +19,7 @@ import type {
   ResultRowUpsertInput,
   SessionRepository,
   SessionUpsertInput,
+  LiveRcTelemetry,
 } from '../../../src/core/app';
 import type { Driver, Entrant, Event, RaceClass, ResultRow, Session } from '../../../src/core/domain';
 import { LiveRcSummaryImporter } from '../../../src/core/app';
@@ -864,4 +865,122 @@ test('LiveRC summary importer keeps duplicate display names separate', async () 
     const lapIds = new Set(laps.map((lap) => lap.id));
     assert.equal(lapIds.size, 2, 'expected unique lap ids per entrant when drivers share a name');
   }
+});
+
+test('LiveRC summary importer emits telemetry for session ingestion', async () => {
+  const eventHtml = await loadFixture('sample-event-overview-small.html');
+  const buggySessionHtml = await loadFixture('sample-session-pro-buggy-main.html');
+  const truggySessionHtml = await loadFixture('sample-session-pro-truggy-main.html');
+
+  const htmlByUrl = new Map<string, string>([
+    ['https://www.liverc.com/results/sample-event', eventHtml],
+    ['https://www.liverc.com/results/sample-event/', eventHtml],
+    ['https://www.liverc.com/results/sample-event/pro-buggy/main/a-main', buggySessionHtml],
+    ['https://www.liverc.com/results/sample-event/pro-truggy/main/a-main', truggySessionHtml],
+  ]);
+
+  const jsonByUrl = new Map<string, unknown>([
+    [
+      'https://www.liverc.com/results/sample-event/pro-buggy/main/a-main.json',
+      {
+        event_id: 'sample-event',
+        class_id: 'pro-buggy',
+        race_id: 'a-main',
+        laps: [
+          { entry_id: 'ryan-maifield', driver_name: 'Ryan Maifield', lap: 1, lap_time: 29.123 },
+          { entry_id: 'ryan-maifield', driver_name: 'Ryan Maifield', lap: 2, lap_time: 29.321 },
+          { entry_id: 'spencer-rivkin', driver_name: 'Spencer Rivkin', lap: 1, lap_time: 29.45 },
+          { entry_id: 'spencer-rivkin', driver_name: 'Spencer Rivkin', lap: 2, lap_time: 29.632 },
+        ],
+      },
+    ],
+    [
+      'https://www.liverc.com/results/sample-event/pro-truggy/main/a-main.json',
+      {
+        event_id: 'sample-event',
+        class_id: 'pro-truggy',
+        race_id: 'a-main',
+        laps: [
+          { entry_id: 'dakotah-phend', driver_name: 'Dakotah Phend', lap: 1, lap_time: 32.0 },
+          { entry_id: 'dakotah-phend', driver_name: 'Dakotah Phend', lap: 2, lap_time: 32.112 },
+          { entry_id: 'ty-tessmann', driver_name: 'Ty Tessmann', lap: 1, lap_time: 32.41 },
+          { entry_id: 'ty-tessmann', driver_name: 'Ty Tessmann', lap: 2, lap_time: 32.534 },
+        ],
+      },
+    ],
+  ]);
+
+  const client = {
+    async getEventOverview(url: string) {
+      const match = htmlByUrl.get(url);
+      if (!match) {
+        throw new Error(`Missing LiveRC event fixture for URL: ${url}`);
+      }
+      return match;
+    },
+    async getSessionPage(url: string) {
+      const match = htmlByUrl.get(url);
+      if (!match) {
+        throw new Error(`Missing LiveRC session fixture for URL: ${url}`);
+      }
+      return match;
+    },
+    resolveJsonUrlFromHtml(html: string) {
+      if (html.includes('Pro Buggy A Main')) {
+        return 'https://www.liverc.com/results/sample-event/pro-buggy/main/a-main.json';
+      }
+      if (html.includes('Pro Truggy A Main')) {
+        return 'https://www.liverc.com/results/sample-event/pro-truggy/main/a-main.json';
+      }
+      return null;
+    },
+    async fetchJson<T>(url: string): Promise<T> {
+      const payload = jsonByUrl.get(url);
+      if (!payload) {
+        throw new Error(`Missing LiveRC JSON fixture for URL: ${url}`);
+      }
+      return payload as T;
+    },
+  };
+
+  const eventRepository = new InMemoryEventRepository();
+  const raceClassRepository = new InMemoryRaceClassRepository();
+  const sessionRepository = new InMemorySessionRepository();
+  const driverRepository = new InMemoryDriverRepository();
+  const resultRowRepository = new InMemoryResultRowRepository();
+  const entrantRepository = new InMemoryEntrantRepository();
+  const lapRepository = new InMemoryLapRepository();
+
+  const telemetryEvents: Array<{ outcome: string; sessionType?: string | null }> = [];
+  const telemetry: LiveRcTelemetry = {
+    recordPlanRequest: () => {},
+    recordApplyRequest: () => {},
+    recordEventIngestion: () => {},
+    recordSessionIngestion: (event) => {
+      telemetryEvents.push({ outcome: event.outcome, sessionType: event.sessionType });
+    },
+  };
+
+  const importer = new LiveRcSummaryImporter({
+    client,
+    eventRepository,
+    raceClassRepository,
+    sessionRepository,
+    driverRepository,
+    resultRowRepository,
+    entrantRepository,
+    lapRepository,
+    telemetry,
+  });
+
+  const result = await importer.ingestEventSummary('https://www.liverc.com/results/sample-event');
+
+  assert.equal(result.sessionsImported, 2);
+  assert.equal(result.resultRowsImported, 4);
+  assert.equal(result.lapsImported, 8);
+  assert.equal(result.driversWithLaps, 4);
+  assert.equal(result.lapsSkipped, 0);
+
+  const successfulTelemetryEvents = telemetryEvents.filter((event) => event.outcome === 'success');
+  assert.equal(successfulTelemetryEvents.length, 2);
 });

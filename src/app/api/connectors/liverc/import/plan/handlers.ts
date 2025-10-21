@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto';
 
-import type { Logger } from '@core/app';
-import type { LiveRcImportPlanService } from '@core/app';
+import type { Logger, LiveRcImportPlanService, LiveRcTelemetry } from '@core/app';
 import { LiveRcClientError } from '@core/app/connectors/liverc/client';
 import { z } from 'zod';
 
 import { liveRcImportPlanService } from '@/dependencies/liverc';
 import { applicationLogger } from '@/dependencies/logger';
+import { livercTelemetry } from '@/dependencies/telemetry';
 import { liveRcImportPlanStore, type LiveRcImportPlanStore } from '../planStore';
 
 const baseHeaders = {
@@ -27,12 +27,14 @@ type ResolvedDependencies = {
   service: PlanService;
   logger: Logger;
   planStore: LiveRcImportPlanStore;
+  telemetry: LiveRcTelemetry;
 };
 
 const defaultDependencies: ResolvedDependencies = {
   service: liveRcImportPlanService,
   logger: applicationLogger,
   planStore: liveRcImportPlanStore,
+  telemetry: livercTelemetry,
 };
 
 export type ImportPlanRouteDependencies = Partial<ResolvedDependencies>;
@@ -155,6 +157,14 @@ export const createImportPlanRouteHandlers = (
           error: storeError,
         });
 
+        dependencies.telemetry.recordPlanRequest({
+          outcome: 'failure',
+          durationMs: Date.now() - requestStartedAt,
+          planId: plan.planId,
+          requestedEvents: parsed.data.events.length,
+          reason: 'plan_persistence_failed',
+        });
+
         return buildJsonResponse(
           500,
           {
@@ -175,9 +185,7 @@ export const createImportPlanRouteHandlers = (
         eventCount: plan.items.length,
       });
 
-      requestLogger.debug('TODO ingest.plan telemetry hook', {
-        event: 'liverc.telemetry.todo',
-        metric: 'ingest.plan',
+      dependencies.telemetry.recordPlanRequest({
         outcome: 'success',
         durationMs: Date.now() - requestStartedAt,
         planId: plan.planId,
@@ -204,14 +212,11 @@ export const createImportPlanRouteHandlers = (
           details: error.details,
         });
 
-        requestLogger.debug('TODO ingest.plan telemetry hook', {
-          event: 'liverc.telemetry.todo',
-          metric: 'ingest.plan',
+        dependencies.telemetry.recordPlanRequest({
           outcome: 'failure',
           durationMs: Date.now() - requestStartedAt,
           requestedEvents: parsed.data.events.length,
-          errorCode: error.code,
-          errorStatus: error.status,
+          reason: 'upstream_error',
         });
 
         return buildJsonResponse(
@@ -234,12 +239,11 @@ export const createImportPlanRouteHandlers = (
         error,
       });
 
-      requestLogger.debug('TODO ingest.plan telemetry hook', {
-        event: 'liverc.telemetry.todo',
-        metric: 'ingest.plan',
+      dependencies.telemetry.recordPlanRequest({
         outcome: 'failure',
         durationMs: Date.now() - requestStartedAt,
         requestedEvents: parsed.data.events.length,
+        reason: 'unexpected_error',
       });
 
       return buildJsonResponse(

@@ -1,9 +1,6 @@
 import type { Metadata } from 'next';
 import type { AppPageProps, ResolvedSearchParams } from '@/types/app-page-props';
-import {
-  MissingAuthFormTokenSecretError,
-  generateAuthFormToken,
-} from '@/lib/auth/formTokens';
+import { MissingAuthFormTokenSecretError, generateAuthFormToken } from '@/lib/auth/formTokens';
 import { EnvironmentValidationError } from '@/server/config/environment';
 
 import ImportForm from './ImportForm';
@@ -14,7 +11,8 @@ export const metadata: Metadata = {
   description: 'Preview LiveRC results links before triggering an import.',
 };
 
-const enableWizard = process.env.ENABLE_IMPORT_WIZARD === '1';
+const importWizardFlag = process.env.ENABLE_IMPORT_WIZARD?.trim().toLowerCase();
+const enableWizard = importWizardFlag === '0' || importWizardFlag === 'false' ? false : true;
 const resolvedAppOrigin =
   process.env.NEXT_PUBLIC_APP_ORIGIN?.trim() ||
   process.env.NEXT_PUBLIC_APP_URL?.trim() ||

@@ -182,7 +182,7 @@ Dev server listens on `http://localhost:3001/` (also `http://0.0.0.0:3001/`).
 | Tracing | `TRACING_ENABLED`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`, `OTEL_EXPORTER_OTLP_HEADERS` | Set `TRACING_ENABLED=true` to enable tracing; endpoint + service name become mandatory (headers optional) |
 | Rate limiting | `INGEST_RATE_LIMIT_WINDOW_MS`, `INGEST_RATE_LIMIT_MAX_REQUESTS` | Provide both as positive integers to enable ingestion throttling |
 | Mailer (SMTP) | `MAILER_DRIVER`, `SMTP_URL`, `MAIL_FROM_EMAIL`, `MAIL_FROM_NAME`, `MAIL_DEFAULT_LOCALE`, `MAIL_DELIVERY_MODE` | `MAILER_DRIVER` defaults to `console`; switch to `smtp` to require SMTP configuration. `MAIL_DELIVERY_MODE` defaults to background queuing in production deployments |
-| LiveRC | `ENABLE_IMPORT_WIZARD`, `ENABLE_LIVERC_RESOLVER`, `ENABLE_IMPORT_FILE`, `ENABLE_LIVERC_FIXTURE_PROXY`, `LIVERC_HTTP_BASE` | When any toggle is truthy (`1`/`true`), configure `LIVERC_HTTP_BASE` to a valid HTTP(S) endpoint |
+| LiveRC | `ENABLE_IMPORT_WIZARD` (defaults to `1`), `ENABLE_LIVERC_RESOLVER`, `ENABLE_IMPORT_FILE`, `ENABLE_LIVERC_FIXTURE_PROXY`, `LIVERC_HTTP_BASE` | When the wizard or any toggle is enabled (`1`/`true`), configure `LIVERC_HTTP_BASE` to a valid HTTP(S) endpoint |
 
 ---
 
@@ -242,6 +242,7 @@ Expect a `303` redirect to `/auth/login?error=invalid-origin` and `x-auth-origin
 - `npm run test:cookie:unit` — cookie storage strategy unit tests
 - `npm run test:seo` — metadata and SEO assertions
 - `npm run test:e2e` — Playwright browser + raw POST auth flows
+- `tsx scripts/seed-liverc-catalogue.ts` — seed Prisma with baseline LiveRC clubs, events, and sessions
 
 **PR gates:** `typecheck`, `lint`, `build` (and tests when present) must pass.
 

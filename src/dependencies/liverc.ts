@@ -20,6 +20,7 @@ import {
 } from '@core/infra';
 
 import { applicationLogger } from '@/dependencies/logger';
+import { livercTelemetry } from '@/dependencies/telemetry';
 
 const liveRcJsonClient = new LiveRcHttpClient();
 const liveRcHtmlClient = new HttpLiveRcClient();
@@ -43,6 +44,7 @@ const liveRcSummaryImporter = new LiveRcSummaryImporter({
   entrantRepository,
   lapRepository,
   logger: applicationLogger,
+  telemetry: livercTelemetry,
 });
 
 export const liveRcImportService = new LiveRcImportService({
@@ -71,6 +73,7 @@ export const liveRcImportJobQueue = new LiveRcJobQueue({
   repository: importJobRepository,
   summaryImporter: liveRcSummaryImporter,
   logger: applicationLogger,
+  telemetry: livercTelemetry,
 });
 
 export const startLiveRcImportJobQueue = () => liveRcImportJobQueue.start();
@@ -92,6 +95,7 @@ export const liveRcDependencies = {
   summaryImporter: liveRcSummaryImporter,
   jobQueue: liveRcImportJobQueue,
   logger: applicationLogger,
+  telemetry: livercTelemetry,
 };
 
 export const isPrismaUnavailableError = isPrismaClientInitializationError;

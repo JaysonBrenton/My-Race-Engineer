@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
 
-import type { Logger } from '@core/app';
-import type { LiveRcImportPlanService, LiveRcJobQueue } from '@core/app';
+import type { Logger, LiveRcImportPlanService, LiveRcJobQueue, LiveRcTelemetry } from '@core/app';
 import { z } from 'zod';
 
 import { liveRcImportPlanService, liveRcImportJobQueue } from '@/dependencies/liverc';
 import { applicationLogger } from '@/dependencies/logger';
+import { livercTelemetry } from '@/dependencies/telemetry';
 import { liveRcImportPlanStore, type LiveRcImportPlanStore } from '../planStore';
 
 type RouteHandler = (req: Request) => Promise<Response> | Response;
@@ -24,6 +24,7 @@ type ResolvedDependencies = {
   jobQueue: JobQueue;
   planStore: LiveRcImportPlanStore;
   logger: Logger;
+  telemetry: LiveRcTelemetry;
 };
 
 const baseHeaders = {
@@ -39,6 +40,7 @@ const defaultDependencies: ResolvedDependencies = {
   jobQueue: liveRcImportJobQueue,
   planStore: liveRcImportPlanStore,
   logger: applicationLogger,
+  telemetry: livercTelemetry,
 };
 
 export type ImportApplyRouteDependencies = Partial<ResolvedDependencies>;
@@ -204,6 +206,15 @@ export const createImportApplyRouteHandlers = (
         planId,
       });
 
+      dependencies.telemetry.recordApplyRequest({
+        outcome: 'rejected',
+        durationMs: Date.now() - requestStartedAt,
+        planId,
+        reason: 'plan_not_found',
+        eventCount: 0,
+        estimatedLaps: 0,
+      });
+
       return buildJsonResponse(
         404,
         {
@@ -229,6 +240,13 @@ export const createImportApplyRouteHandlers = (
           outcome: 'failure',
           planId,
           error,
+        });
+
+        dependencies.telemetry.recordApplyRequest({
+          outcome: 'failure',
+          durationMs: Date.now() - requestStartedAt,
+          planId,
+          reason: 'plan_recompute_failed',
         });
 
         return buildJsonResponse(
@@ -267,14 +285,13 @@ export const createImportApplyRouteHandlers = (
         },
       });
 
-      requestLogger.debug('TODO ingest.apply telemetry hook', {
-        event: 'liverc.telemetry.todo',
-        metric: 'ingest.apply',
+      dependencies.telemetry.recordApplyRequest({
         outcome: 'rejected',
         durationMs: Date.now() - requestStartedAt,
         planId,
         eventCount: totals.eventCount,
         estimatedLaps: totals.estimatedLaps,
+        reason: 'guardrails',
       });
 
       return buildJsonResponse(
@@ -323,9 +340,7 @@ export const createImportApplyRouteHandlers = (
         estimatedLaps: totals.estimatedLaps,
       });
 
-      requestLogger.debug('TODO ingest.apply telemetry hook', {
-        event: 'liverc.telemetry.todo',
-        metric: 'ingest.apply',
+      dependencies.telemetry.recordApplyRequest({
         outcome: 'accepted',
         durationMs: Date.now() - requestStartedAt,
         planId,
@@ -349,6 +364,15 @@ export const createImportApplyRouteHandlers = (
         outcome: 'failure',
         planId,
         error,
+      });
+
+      dependencies.telemetry.recordApplyRequest({
+        outcome: 'failure',
+        durationMs: Date.now() - requestStartedAt,
+        planId,
+        eventCount: totals.eventCount,
+        estimatedLaps: totals.estimatedLaps,
+        reason: 'enqueue_failed',
       });
 
       return buildJsonResponse(

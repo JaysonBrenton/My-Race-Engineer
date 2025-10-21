@@ -5,6 +5,7 @@ import type {
   ImportJobRecord,
   ImportJobRepository,
   UpdateImportJobItemInput,
+  LiveRcTelemetry,
 } from '../../../src/core/app';
 import { LiveRcJobQueue } from '../../../src/core/app';
 import type { LiveRcSummaryImporter } from '../../../src/core/app';
@@ -76,8 +77,18 @@ test('LiveRC job queue processes event items and updates counts', async () => {
 
   let importerCalls = 0;
 
+  const telemetryEvents: Array<{ outcome: string; counts?: unknown }> = [];
+  const telemetry: LiveRcTelemetry = {
+    recordPlanRequest: () => {},
+    recordApplyRequest: () => {},
+    recordEventIngestion: (event) => {
+      telemetryEvents.push({ outcome: event.outcome, counts: event.counts });
+    },
+    recordSessionIngestion: () => {},
+  };
+
   const queue = new LiveRcJobQueue(
-    { repository, summaryImporter, logger: undefined },
+    { repository, summaryImporter, logger: undefined, telemetry },
     { pollIntervalMs: 5, processingDelayMs: 0 },
   );
 
@@ -98,4 +109,92 @@ test('LiveRC job queue processes event items and updates counts', async () => {
   assert.ok(progressUpdates.some((entry) => entry.jobId === 'job-1' && entry.progress === 100));
   assert.equal(repositoryState.markedSucceeded, 1);
   assert.deepEqual(repositoryState.markedFailed, []);
+  assert.equal(telemetryEvents.length, 1);
+  assert.equal(telemetryEvents[0]?.outcome, 'success');
+});
+
+test('LiveRC job queue records telemetry when event ingestion fails', async () => {
+  const processedItems: UpdateImportJobItemInput[] = [];
+  const repository: ImportJobRepository = {
+    async createJob() {
+      throw new Error('not implemented');
+    },
+    async getJob() {
+      return null;
+    },
+    takeNextQueuedJob: (() => {
+      let taken = false;
+      const job: ImportJobRecord = {
+        jobId: 'job-2',
+        state: 'RUNNING',
+        progressPct: 0,
+        message: undefined,
+        items: [
+          {
+            id: 'item-2',
+            targetType: 'EVENT',
+            targetRef: 'https://www.liverc.com/results/failure-event',
+            state: 'RUNNING',
+            counts: undefined,
+          },
+        ],
+      };
+
+      return async () => {
+        if (taken) {
+          return null;
+        }
+        taken = true;
+        return job;
+      };
+    })(),
+    async markJobSucceeded() {
+      throw new Error('should not succeed');
+    },
+    async markJobFailed(jobId, message) {
+      repositoryState.markedFailed.push({ jobId, message });
+    },
+    async updateJobProgress() {
+      return;
+    },
+    async updateJobItem(input) {
+      processedItems.push(input);
+    },
+  } as ImportJobRepository;
+
+  const repositoryState = {
+    markedFailed: [] as { jobId: string; message: string }[],
+  };
+
+  const summaryImporter: StubSummaryImporter = {
+    async ingestEventSummary() {
+      throw new Error('ingestion failed');
+    },
+  };
+
+  const telemetryEvents: Array<{ outcome: string; reason?: string }> = [];
+  const telemetry: LiveRcTelemetry = {
+    recordPlanRequest: () => {},
+    recordApplyRequest: () => {},
+    recordEventIngestion: (event) => {
+      telemetryEvents.push({ outcome: event.outcome, reason: event.reason });
+    },
+    recordSessionIngestion: () => {},
+  };
+
+  const queue = new LiveRcJobQueue(
+    { repository, summaryImporter, logger: undefined, telemetry },
+    { pollIntervalMs: 5, processingDelayMs: 0 },
+  );
+
+  queue.start();
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  queue.stop();
+
+  assert.equal(processedItems.length, 1);
+  assert.equal(processedItems[0]?.state, 'FAILED');
+  assert.equal(repositoryState.markedFailed.length, 1);
+  assert.equal(repositoryState.markedFailed[0]?.jobId, 'job-2');
+  assert.equal(telemetryEvents.length, 1);
+  assert.equal(telemetryEvents[0]?.outcome, 'failure');
 });

@@ -12,6 +12,7 @@ import type {
   ImportJobRepository,
   UpdateImportJobItemInput,
 } from '@core/app/ports/importJobRepository';
+import type { LiveRcTelemetry } from '../../ports/telemetry';
 
 import type { LiveRcSummaryImporter, LiveRcSummaryImportCounts } from './summary';
 
@@ -24,6 +25,7 @@ export type LiveRcJobQueueDependencies = {
   repository: ImportJobRepository;
   summaryImporter: SummaryImporter;
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>;
+  telemetry?: LiveRcTelemetry;
 };
 
 export type EnqueueJobItemInput = {
@@ -188,14 +190,6 @@ export class LiveRcJobQueue {
       let counts: LiveRcSummaryImportCounts;
       const eventStartedAt = Date.now();
 
-      this.dependencies.logger?.debug?.('TODO ingest.event.start telemetry hook', {
-        event: 'liverc.telemetry.todo',
-        metric: 'ingest.event.start',
-        jobId: job.jobId,
-        itemId: item.id,
-        targetRef: item.targetRef,
-      });
-
       try {
         this.dependencies.logger?.info?.('LiveRC summary import started for event.', {
           event: 'liverc.jobRunner.item_started',
@@ -223,16 +217,17 @@ export class LiveRcJobQueue {
           error,
         });
 
-        this.dependencies.logger?.debug?.('TODO ingest.event.finish telemetry hook', {
-          event: 'liverc.telemetry.todo',
-          metric: 'ingest.event.finish',
-          outcome: 'failure',
-          jobId: job.jobId,
-          itemId: item.id,
-          targetRef: item.targetRef,
-          durationMs: Date.now() - eventStartedAt,
-          error,
-        });
+        const telemetry: LiveRcTelemetry | undefined = this.dependencies.telemetry;
+        if (telemetry) {
+          telemetry.recordEventIngestion({
+            outcome: 'failure',
+            durationMs: Date.now() - eventStartedAt,
+            jobId: job.jobId,
+            itemId: item.id,
+            targetRef: item.targetRef,
+            reason: 'error',
+          });
+        }
 
         throw error;
       }
@@ -258,16 +253,17 @@ export class LiveRcJobQueue {
         counts,
       });
 
-      this.dependencies.logger?.debug?.('TODO ingest.event.finish telemetry hook', {
-        event: 'liverc.telemetry.todo',
-        metric: 'ingest.event.finish',
-        outcome: 'success',
-        jobId: job.jobId,
-        itemId: item.id,
-        targetRef: item.targetRef,
-        durationMs: Date.now() - eventStartedAt,
-        counts,
-      });
+      const telemetry: LiveRcTelemetry | undefined = this.dependencies.telemetry;
+      if (telemetry) {
+        telemetry.recordEventIngestion({
+          outcome: 'success',
+          durationMs: Date.now() - eventStartedAt,
+          jobId: job.jobId,
+          itemId: item.id,
+          targetRef: item.targetRef,
+          counts,
+        });
+      }
     }
   }
 
