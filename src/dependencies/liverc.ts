@@ -5,6 +5,7 @@ import {
   LiveRcSummaryImporter,
 } from '@core/app';
 import { HttpLiveRcClient } from '@core/app/connectors/liverc/client';
+import { LiveRcDiscoveryService } from '@core/app/connectors/liverc/discovery';
 import {
   LiveRcHttpClient,
   PrismaEntrantRepository,
@@ -24,6 +25,10 @@ import { livercTelemetry } from '@/dependencies/telemetry';
 
 const liveRcJsonClient = new LiveRcHttpClient();
 const liveRcHtmlClient = new HttpLiveRcClient();
+export const liveRcDiscoveryService = new LiveRcDiscoveryService({
+  client: liveRcHtmlClient,
+  logger: applicationLogger,
+});
 const eventRepository = new PrismaEventRepository();
 const raceClassRepository = new PrismaRaceClassRepository();
 const sessionRepository = new PrismaSessionRepository();
@@ -83,6 +88,7 @@ export const stopLiveRcImportJobQueue = () => liveRcImportJobQueue.stop();
 export const liveRcDependencies = {
   liveRcJsonClient,
   liveRcHtmlClient,
+  liveRcDiscoveryService,
   eventRepository,
   raceClassRepository,
   sessionRepository,
