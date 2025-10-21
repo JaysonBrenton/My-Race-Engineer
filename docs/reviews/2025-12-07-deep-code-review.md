@@ -4,24 +4,18 @@
 - LiveRC import HTTP endpoints and supporting middleware.
 - Import dashboard client experience, including resolver affordances and the wizard flow.
 
-## Critical issues
+## Current assessment
 
-1. **LiveRC import endpoints accept unauthenticated writes.**
-   - The `/api/liverc/import` route simply instantiates the handlers and exposes `POST` without checking for a session or CSRF token.【F:src/app/api/liverc/import/route.ts†L3-L23】【F:src/app/api/liverc/import/handlers.ts†L19-L210】
-   - Middleware currently only guards `/auth`, `/dashboard`, and `/import`, leaving all `/api/liverc/*` calls reachable to anonymous callers. Attackers can therefore enqueue arbitrary imports that mutate persistence state without logging in.【F:src/middleware.ts†L81-L151】
-   - The import-file endpoint follows the same pattern, so uploaded payloads can be ingested anonymously as well.【F:src/app/api/liverc/import-file/route.ts†L1-L120】
+1. **Import endpoints now require authenticated, tokenised callers.** Both JSON and file ingestion routes invoke `authorizeImportRequest` before they read the request body, enforcing session cookies, origin allow-listing, and per-request form tokens so anonymous submissions are rejected upstream.【F:src/app/api/liverc/import/handlers.ts†L146-L166】【F:src/app/api/liverc/import-file/route.ts†L33-L47】【F:src/app/api/liverc/authGuard.ts†L90-L166】
 
-2. **Resolver affordances are permanently disabled in the browser build.**
-   - The import form marks the resolver as enabled only when `process.env.ENABLE_LIVERC_RESOLVER === '1'`, and checks for the internal proxy via `process.env.LIVERC_HTTP_BASE`. These variables are server-only; when bundled for the client they become `undefined`, so the booleans are always false.【F:src/app/(dashboard)/import/ImportForm.tsx†L111-L114】
-   - Downstream UI (Resolve button, modal, QA proxy guidance) is gated on those flags, meaning the resolver workflow never appears regardless of deployment configuration.【F:src/app/(dashboard)/import/ImportForm.tsx†L1078-L1213】
+2. **Resolver affordances are configurable and exposed to the client.** The import page resolves resolver and proxy flags on the server and passes them through props, allowing the client form to toggle Resolve button behaviour and modal guidance at runtime instead of hard-coding falsey fallbacks.【F:src/app/(dashboard)/import/page.tsx†L17-L91】【F:src/app/(dashboard)/import/ImportForm.tsx†L616-L934】
 
-3. **Wizard history writes can crash on storage-restricted browsers.**
-   - The wizard reads localStorage behind a try/catch, but its subsequent `setItem` is unguarded. In Safari private browsing or exhausted quotas, that call throws synchronously during render, tearing down the wizard whenever state updates fire.【F:src/app/(dashboard)/import/Wizard.tsx†L46-L77】
+3. **Wizard localStorage access is resilient to browser quota limits.** Both the initial read and subsequent writes are wrapped in try/catch guards; the component tracks failed writes and falls back to in-memory history to avoid runtime crashes when storage is unavailable.【F:src/app/(dashboard)/import/Wizard.tsx†L34-L82】
 
 ## Suggested next steps
-- Enforce authentication (session check plus anti-CSRF token) or move the LiveRC ingestion behind a server action so anonymous callers cannot write telemetry data.
-- Surface resolver/proxy flags to the client via `NEXT_PUBLIC_…` variables or a server-provided config endpoint, and add a regression test that the Resolve button renders when the flag is enabled.
-- Wrap the wizard’s `localStorage.setItem` in a try/catch (and degrade gracefully to in-memory history) so storage quota errors do not break the UI.
+- Keep the authentication helper under unit/integration coverage so changes to session or form token semantics cannot silently weaken the guardrails.
+- Add end-to-end coverage that verifies the resolver controls render when the server sets the flag, exercising both HTML and JSON flows in CI.
+- Periodically exercise the wizard in storage-restricted browser contexts (e.g., automated Safari private mode runs) to confirm the defensive path stays healthy.
 
 ## Resolution status — 2025-10-20
 - ✅ Authentication and anti-CSRF validation now live in `src/app/api/liverc/authGuard.ts`, and both the JSON import and file import routes invoke it before reading the request body.
