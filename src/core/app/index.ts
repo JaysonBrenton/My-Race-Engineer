@@ -33,6 +33,7 @@ export * from './services/liveRcUrlParser';
 export * from './connectors/liverc/plan';
 export * from './connectors/liverc/jobs';
 export * from './connectors/liverc/summary';
+export * from './connectors/liverc/discovery';
 export * from './services/auth/registerUser';
 export * from './services/auth/loginUser';
 export * from './services/auth/verifyEmail';
