@@ -10,7 +10,7 @@ import type { Metadata } from 'next';
 import { requireAuthenticatedUser } from '@/lib/auth/serverSession';
 
 import styles from './page.module.css';
-const PAGE_TITLE = 'Telemetry dashboard';
+const PAGE_TITLE = 'Dashboard';
 const PAGE_DESCRIPTION =
   'Review your latest race imports, jump into lap analysis, or kick off a new telemetry import.';
 
