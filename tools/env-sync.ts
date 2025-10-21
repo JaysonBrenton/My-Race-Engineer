@@ -95,7 +95,14 @@ function isRateLimitingConfigured(env: Map<string, string>): boolean {
 }
 
 function isLiveRcEnabled(env: Map<string, string>): boolean {
-  return LIVERC_FLAG_KEYS.some((key) => isTruthyFlag(env.get(key)));
+  const wizardRaw = env.get('ENABLE_IMPORT_WIZARD');
+  const wizardEnabled = wizardRaw === undefined ? true : isTruthyFlag(wizardRaw);
+
+  if (wizardEnabled) {
+    return true;
+  }
+
+  return LIVERC_FLAG_KEYS.some((key) => key !== 'ENABLE_IMPORT_WIZARD' && isTruthyFlag(env.get(key)));
 }
 
 function isTruthyFlag(value: string | undefined): boolean {

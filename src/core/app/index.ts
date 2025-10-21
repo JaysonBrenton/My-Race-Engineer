@@ -17,6 +17,7 @@ export * from './ports/driverRepository';
 export * from './ports/resultRowRepository';
 export * from './ports/importPlanRepository';
 export * from './ports/importJobRepository';
+export * from './ports/telemetry';
 export * from './ports/auth/passwordHasher';
 export * from './ports/auth/userRepository';
 export * from './ports/auth/userSessionRepository';

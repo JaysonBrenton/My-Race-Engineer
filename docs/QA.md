@@ -21,7 +21,7 @@ cp -n .env.example .env || true
 npx prisma generate
 npx prisma migrate dev --name qa-prep
   ```
-- [ ] Enable importer flags (JSON wizard, resolver, file upload):
+- [ ] Enable importer flags (JSON wizard defaults to enabled, ensure resolver & file upload are on):
   ```bash
 sed -i 's/^ENABLE_IMPORT_WIZARD=.*/ENABLE_IMPORT_WIZARD=1/' .env
 sed -i 's/^ENABLE_LIVERC_RESOLVER=.*/ENABLE_LIVERC_RESOLVER=1/' .env

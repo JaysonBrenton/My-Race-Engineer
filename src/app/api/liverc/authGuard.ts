@@ -1,10 +1,7 @@
 import type { Logger } from '@core/app';
 import type { User, UserSession } from '@core/domain';
 
-import {
-  evaluateOriginHeader,
-  parseAllowedOrigins,
-} from '@/core/security/origin';
+import { evaluateOriginHeader, parseAllowedOrigins } from '@/core/security/origin';
 import { validateSessionTokenService } from '@/dependencies/auth';
 import { applicationLogger } from '@/dependencies/logger';
 import {
@@ -14,9 +11,7 @@ import {
 } from '@/lib/auth/formTokens';
 import { SESSION_COOKIE_NAME } from '@/lib/auth/constants';
 import { IMPORT_FORM_TOKEN_HEADER } from '@/lib/liverc/importAuth';
-import type {
-  ValidateSessionTokenResult,
-} from '@/core/app/services/auth/validateSessionToken';
+import type { ValidateSessionTokenResult } from '@/core/app/services/auth/validateSessionToken';
 
 type ValidateSessionToken = (token: string) => Promise<ValidateSessionTokenResult>;
 type ValidateImportFormToken = (token: string | null) => ValidateAuthFormTokenResult;
@@ -49,9 +44,7 @@ export type ImportAuthorizationFailure = {
   };
 };
 
-export type ImportAuthorizationResult =
-  | ImportAuthorizationSuccess
-  | ImportAuthorizationFailure;
+export type ImportAuthorizationResult = ImportAuthorizationSuccess | ImportAuthorizationFailure;
 
 const defaultValidateSessionToken: ValidateSessionToken = (token) =>
   validateSessionTokenService.validate({ token });
@@ -114,7 +107,11 @@ export async function authorizeImportRequest(
         evaluation: evaluation.reason,
       });
 
-      return buildFailure(403, 'INVALID_ORIGIN', 'Request origin is not allowed for LiveRC imports.');
+      return buildFailure(
+        403,
+        'INVALID_ORIGIN',
+        'Request origin is not allowed for LiveRC imports.',
+      );
     }
   }
 
@@ -128,7 +125,11 @@ export async function authorizeImportRequest(
       requestId,
     });
 
-    return buildFailure(401, 'UNAUTHENTICATED', 'Authentication is required to import LiveRC data.');
+    return buildFailure(
+      401,
+      'UNAUTHENTICATED',
+      'Authentication is required to import LiveRC data.',
+    );
   }
 
   const sessionValidation = await validateSessionToken(sessionToken);
@@ -141,7 +142,11 @@ export async function authorizeImportRequest(
       reason: sessionValidation.reason,
     });
 
-    return buildFailure(401, 'INVALID_SESSION', 'Session is invalid or expired. Please sign in again.');
+    return buildFailure(
+      401,
+      'INVALID_SESSION',
+      'Session is invalid or expired. Please sign in again.',
+    );
   }
 
   const rawFormToken = request.headers.get(IMPORT_FORM_TOKEN_HEADER);

@@ -16,6 +16,7 @@ import type {
   SessionRepository,
 } from '@core/app';
 import type { Logger } from '@core/app/ports/logger';
+import type { LiveRcTelemetry } from '../../ports/telemetry';
 
 import type { Driver, RaceClass, Session } from '@core/domain';
 import { mapRaceResultResponse } from '../../liverc/responseMappers';
@@ -55,6 +56,7 @@ type Dependencies = {
   entrantRepository: EntrantRepository;
   lapRepository: LapRepository;
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>;
+  telemetry?: LiveRcTelemetry;
 };
 
 type DriverSummaryDetail = {
@@ -145,15 +147,6 @@ export class LiveRcSummaryImporter {
   }> {
     const { summary, sessionRef, eventMeta, eventId } = input;
     const sessionStartedAt = Date.now();
-
-    this.dependencies.logger?.debug?.('TODO ingest.session.start telemetry hook', {
-      event: 'liverc.telemetry.todo',
-      metric: 'ingest.session.start',
-      sessionRef,
-      eventId,
-      className: summary.className,
-      sessionType: summary.type,
-    });
 
     try {
       const sessionHtml = await this.dependencies.client.getSessionPage(sessionRef);
@@ -292,27 +285,38 @@ export class LiveRcSummaryImporter {
         lapsSkipped: lapImport.lapsSkipped,
       };
 
-      this.dependencies.logger?.debug?.('TODO ingest.session.finish telemetry hook', {
-        event: 'liverc.telemetry.todo',
-        metric: 'ingest.session.finish',
-        outcome: 'success',
-        sessionRef,
-        eventId,
-        durationMs: Date.now() - sessionStartedAt,
-        counts: result,
-      });
+      const telemetry: LiveRcTelemetry | undefined = this.dependencies.telemetry;
+      if (telemetry) {
+        telemetry.recordSessionIngestion({
+          outcome: 'success',
+          durationMs: Date.now() - sessionStartedAt,
+          sessionRef,
+          eventId,
+          className: summary.className,
+          sessionType: summary.type ?? null,
+          counts: {
+            resultRowsImported: result.resultRowsImported,
+            lapsImported: result.lapsImported,
+            driversWithLaps: result.driversWithLaps,
+            lapsSkipped: result.lapsSkipped,
+          },
+        });
+      }
 
       return result;
     } catch (error) {
-      this.dependencies.logger?.debug?.('TODO ingest.session.finish telemetry hook', {
-        event: 'liverc.telemetry.todo',
-        metric: 'ingest.session.finish',
-        outcome: 'failure',
-        sessionRef,
-        eventId,
-        durationMs: Date.now() - sessionStartedAt,
-        error,
-      });
+      const telemetry: LiveRcTelemetry | undefined = this.dependencies.telemetry;
+      if (telemetry) {
+        telemetry.recordSessionIngestion({
+          outcome: 'failure',
+          durationMs: Date.now() - sessionStartedAt,
+          sessionRef,
+          eventId,
+          className: summary.className,
+          sessionType: summary.type ?? null,
+          reason: 'error',
+        });
+      }
 
       throw error;
     }

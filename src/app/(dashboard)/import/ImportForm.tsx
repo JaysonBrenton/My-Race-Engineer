@@ -15,7 +15,6 @@ import {
 
 import {
   LiveRcUrlInvalidReasons,
-  type LiveRcJsonUrlParseResult,
   type LiveRcUrlParseResult,
   parseLiveRcUrl,
 } from '@core/app/services/liveRcUrlParser';
@@ -50,7 +49,7 @@ type ImportFailure = {
   statusCode: number;
   requestId?: string;
   error: unknown;
-    };
+};
 
 type SubmissionState = ImportSuccess | ImportFailure | null;
 
@@ -71,6 +70,7 @@ type BulkImportRow = {
 };
 
 const BULK_IMPORT_CONCURRENCY = 4;
+const EMPTY_IMPORT_HEADERS: Record<string, string> = {};
 
 type FileImportPreview = {
   fileName: string;
@@ -614,7 +614,7 @@ const BulkImportTab = ({
 };
 
 export default function ImportForm({
-  enableWizard = false,
+  enableWizard = true,
   initialUrl,
   enableFileImport = false,
   resolverEnabled = false,
@@ -644,7 +644,7 @@ export default function ImportForm({
   const bulkPanelId = `${tabSetId}-bulk-panel`;
   const securityDisabled = !importFormToken;
   const importAuthHeaders = useMemo<Record<string, string>>(
-    () => (importFormToken ? { [IMPORT_FORM_TOKEN_HEADER]: importFormToken } : {}),
+    () => (importFormToken ? { [IMPORT_FORM_TOKEN_HEADER]: importFormToken } : EMPTY_IMPORT_HEADERS),
     [importFormToken],
   );
 
@@ -1108,7 +1108,8 @@ export default function ImportForm({
     <div className={styles.formWrapper}>
       {securityDisabled ? (
         <p className={styles.error} role="alert">
-          LiveRC imports are temporarily unavailable while we refresh your session. Reload the page and try again.
+          LiveRC imports are temporarily unavailable while we refresh your session. Reload the page
+          and try again.
         </p>
       ) : null}
       <div className={styles.tabList} role="tablist" aria-label="Import mode">

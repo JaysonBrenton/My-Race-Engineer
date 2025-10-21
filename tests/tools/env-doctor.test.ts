@@ -48,7 +48,7 @@ const baseExampleValues: Record<string, string> = {
   SMTP_URL: 'smtp://user:pass@smtp.example.com:587',
   MAIL_FROM_EMAIL: 'ops@example.com',
   MAIL_FROM_NAME: 'Ops Team',
-  ENABLE_IMPORT_WIZARD: '0',
+  ENABLE_IMPORT_WIZARD: '1',
   ENABLE_LIVERC_RESOLVER: '0',
   ENABLE_IMPORT_FILE: '0',
   ENABLE_LIVERC_FIXTURE_PROXY: '0',

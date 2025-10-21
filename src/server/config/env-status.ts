@@ -575,18 +575,44 @@ export function evaluateEnvironment(options: {
     }
   }
 
-  const liveRcEnabled = LIVERC_FLAG_KEYS.some((key) => {
+  const wizardValue = readValue('ENABLE_IMPORT_WIZARD');
+  let wizardEnabled = true;
+  if (wizardValue.raw !== undefined && wizardValue.trimmed.length > 0) {
+    const parsed = parseBooleanFlagValue(wizardValue.trimmed);
+    if (parsed === null) {
+      invalid.push({
+        key: 'ENABLE_IMPORT_WIZARD',
+        message: 'ENABLE_IMPORT_WIZARD must be set to "true" or "false".',
+      });
+      wizardEnabled = false;
+    } else {
+      wizardEnabled = parsed;
+    }
+  }
+
+  let otherLiveRcFlagsEnabled = false;
+  for (const key of LIVERC_FLAG_KEYS) {
+    if (key === 'ENABLE_IMPORT_WIZARD') {
+      continue;
+    }
+
     const { raw, trimmed } = readValue(key);
     if (raw === undefined || trimmed.length === 0) {
-      return false;
+      continue;
     }
+
     const parsed = parseBooleanFlagValue(trimmed);
     if (parsed === null) {
       invalid.push({ key, message: `${key} must be set to "true" or "false".` });
-      return false;
+      continue;
     }
-    return parsed;
-  });
+
+    if (parsed) {
+      otherLiveRcFlagsEnabled = true;
+    }
+  }
+
+  const liveRcEnabled = wizardEnabled || otherLiveRcFlagsEnabled;
 
   const { raw: liveRcBaseRaw, trimmed: liveRcBaseTrimmed } = readValue('LIVERC_HTTP_BASE');
   if (liveRcEnabled) {
