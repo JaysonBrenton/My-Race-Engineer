@@ -19,6 +19,14 @@
   letter-spacing: -0.01em;
 }
 
+.welcome {
+  margin: 0;
+  max-width: 42rem;
+  font-size: 1.1rem;
+  color: var(--color-fg-muted);
+  text-align: left;
+}
+
 .description {
   margin: 0;
   font-size: 1.05rem;

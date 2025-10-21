@@ -10,8 +10,6 @@ import type { Metadata } from 'next';
 import { requireAuthenticatedUser } from '@/lib/auth/serverSession';
 
 import styles from './page.module.css';
-import LiveRcQuickImport from './LiveRcQuickImport';
-
 const PAGE_TITLE = 'Telemetry dashboard';
 const PAGE_DESCRIPTION =
   'Review your latest race imports, jump into lap analysis, or kick off a new telemetry import.';
@@ -28,10 +26,10 @@ export default async function DashboardPage() {
     <section className={styles.container} aria-labelledby="dashboard-heading">
       <header className={styles.header}>
         <h1 className={styles.title} id="dashboard-heading">
-          Welcome back to your telemetry hub {user.driverName}
+          {PAGE_TITLE}
         </h1>
-        <LiveRcQuickImport />
       </header>
+      <p className={styles.welcome}>Welcome back to your telemetry hub {user.driverName}</p>
     </section>
   );
 }
