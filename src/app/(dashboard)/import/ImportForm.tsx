@@ -643,10 +643,13 @@ export default function ImportForm({
   const singlePanelId = `${tabSetId}-single-panel`;
   const bulkPanelId = `${tabSetId}-bulk-panel`;
   const securityDisabled = !importFormToken;
-  const importAuthHeaders = useMemo<Record<string, string>>(
-    () => (importFormToken ? { [IMPORT_FORM_TOKEN_HEADER]: importFormToken } : EMPTY_IMPORT_HEADERS),
-    [importFormToken],
-  );
+  const importAuthHeaders = useMemo<Record<string, string>>(() => {
+    if (!importFormToken) {
+      return EMPTY_IMPORT_HEADERS;
+    }
+
+    return { [IMPORT_FORM_TOKEN_HEADER]: importFormToken };
+  }, [importFormToken]);
 
   const handleSelectSingle = useCallback(() => {
     setActiveTab('single');
