@@ -174,7 +174,10 @@ const clampLimit = (limit: number | undefined): number => {
   return Math.floor(limit);
 };
 
-const parseDiscoveryEventsFromHtml = (html: string, fallbackDate: Date): ParsedDiscoveryEvent[] => {
+const parseDiscoveryEventsFromHtml = (
+  html: string,
+  fallbackDate: Date,
+): ParsedDiscoveryEvent[] => {
   const root = parse(html, {
     lowerCaseTagName: false,
     blockTextElements: {
@@ -190,13 +193,9 @@ const parseDiscoveryEventsFromHtml = (html: string, fallbackDate: Date): ParsedD
   const parsed: ParsedDiscoveryEvent[] = [];
   const fallbackIso = new Date(fallbackDate.getTime()).toISOString();
 
-  for (const node of headingAnchors) {
-    if (!(node instanceof ParsedHTMLElement)) {
-      continue;
-    }
-
-    const href = node.getAttribute('href');
-    const title = normaliseText(node.textContent ?? '');
+  for (const anchor of headingAnchors as ParsedHTMLElement[]) {
+    const href = anchor.getAttribute('href');
+    const title = normaliseText(anchor.textContent ?? '');
 
     if (!href || !title) {
       continue;
@@ -207,9 +206,9 @@ const parseDiscoveryEventsFromHtml = (html: string, fallbackDate: Date): ParsedD
       continue;
     }
 
-    const container = findEventContainer(node);
+    const container = findEventContainer(anchor);
     const description = container?.querySelector('p')?.textContent ?? '';
-    const whenText = extractWhenText(container, node);
+    const whenText = extractWhenText(container, anchor);
     const searchableValue = buildSearchableValue(title, description, container);
     const whenIso = parseWhenToIso(whenText, fallbackDate) ?? fallbackIso;
     const whenSortValue = parseIsoToMillis(whenIso);
@@ -229,13 +228,9 @@ const parseDiscoveryEventsFromHtml = (html: string, fallbackDate: Date): ParsedD
 
   // Fallback: scan anchors directly if no heading-based cards were found.
   const anchors = root.querySelectorAll('a[href]');
-  for (const node of anchors) {
-    if (!(node instanceof ParsedHTMLElement)) {
-      continue;
-    }
-
-    const href = node.getAttribute('href');
-    const title = normaliseText(node.textContent ?? '');
+  for (const anchor of anchors as ParsedHTMLElement[]) {
+    const href = anchor.getAttribute('href');
+    const title = normaliseText(anchor.textContent ?? '');
     if (!href || !title) {
       continue;
     }
@@ -250,10 +245,9 @@ const parseDiscoveryEventsFromHtml = (html: string, fallbackDate: Date): ParsedD
     }
 
     const containerCandidate =
-      findEventContainer(node) ??
-      (node.parentNode instanceof ParsedHTMLElement ? node.parentNode : null);
+      findEventContainer(anchor) ?? (anchor.parentNode instanceof ParsedHTMLElement ? anchor.parentNode : null);
     const description = containerCandidate?.textContent ?? '';
-    const whenText = extractWhenText(containerCandidate, node);
+    const whenText = extractWhenText(containerCandidate, anchor);
     const searchableValue = buildSearchableValue(title, description, containerCandidate);
     const whenIso = parseWhenToIso(whenText, fallbackDate) ?? fallbackIso;
     const whenSortValue = parseIsoToMillis(whenIso);
@@ -319,8 +313,7 @@ const extractWhenText = (
     }
   }
 
-  const siblingTime =
-    anchor.parentNode instanceof ParsedHTMLElement ? anchor.parentNode.querySelector('time') : null;
+  const siblingTime = anchor.parentNode instanceof ParsedHTMLElement ? anchor.parentNode.querySelector('time') : null;
   if (siblingTime) {
     const datetimeAttr = siblingTime.getAttribute('datetime');
     if (datetimeAttr) {
@@ -351,9 +344,7 @@ const buildSearchableValue = (
   }
 
   if (container) {
-    const trackElements = container.querySelectorAll(
-      '[data-track], [data-track-name], .event-location, .event-track, .portfolio-meta',
-    );
+    const trackElements = container.querySelectorAll('[data-track], [data-track-name], .event-location, .event-track, .portfolio-meta');
     for (const element of trackElements) {
       const text = normaliseText(element.textContent ?? '');
       if (text) {
