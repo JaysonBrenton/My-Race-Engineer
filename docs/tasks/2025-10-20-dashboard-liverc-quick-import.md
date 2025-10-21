@@ -1,16 +1,3 @@
-# docs/tasks/2025-10-20-dashboard-liverc-quick-import.md
-
-## Purpose (explicit)
-Implement a **LiveRC Quick Import** panel on the Dashboard that replaces legacy CTAs/sections and enables a signed‑in user to:
-1) Enter **Search Start Date** and **Search End Date** (labels exactly as written) in **DD-MM-YYYY** format (example: 18-10-2025 to 21-10-2025).
-2) Enter a **Track name** filter (free text, case‑insensitive substring match).
-3) **Discover** matching LiveRC event candidates across the inclusive date range.
-4) **Select** one or more discovered events to import.
-5) **Create plan** (server generates an import plan with guardrails applied).
-6) **Apply** the plan to enqueue an import job.
-
-> The date **range is REQUIRED**. Enforce a maximum length of **7 days** (inclusive).
-
 ---
 
 ## UX (specific for implementation)
@@ -26,40 +13,40 @@ Implement a **LiveRC Quick Import** panel on the Dashboard that replaces legacy 
 
 ### New panel: **LiveRC quick import** (client component)
 - **Fields**
-  - **Search Start Date** (text input)
-    - Placeholder: `DD-MM-YYYY`
-    - Required; accepts only two digits, dash, two digits, dash, four digits; rejects impossible dates (incl. leap years).
-    - Convert to ISO `YYYY-MM-DD` before API calls.
-  - **Search End Date** (text input)
-    - Placeholder: `DD-MM-YYYY`
-    - Required; same validation as start date.
-    - Must be ≥ start date.
-    - Range length (end−start+1) must be ≤ **7** days.
-  - **Track name** (text input)
-    - Placeholder: `e.g. Canberra, Keilor, Logan`
-    - Required; minimum length 2; case‑insensitive **substring** match.
+- **Search Start Date** (text input)
+- Placeholder: `DD-MM-YYYY`
+- Required; accepts only two digits, dash, two digits, dash, four digits; rejects impossible dates (incl. leap years).
+- Convert to ISO `YYYY-MM-DD` before API calls.
+- **Search End Date** (text input)
+- Placeholder: `DD-MM-YYYY`
+- Required; same validation as start date.
+- Must be ≥ start date.
+- Range length (end−start+1) must be ≤ **7** days.
+- **Track name** (text input)
+- Placeholder: `e.g. Canberra, Keilor, Logan`
+- Required; minimum length 2; case‑insensitive **substring** match.
 - **Actions**
-  - **Discover events** (primary)
-    - Enabled only when all fields valid and range ≤ 7 days.
-    - Calls `POST /api/connectors/liverc/discover` with `{ startDate: "YYYY-MM-DD", endDate: "YYYY-MM-DD", track: "...", limit: 40 }`.
-  - **Create plan** (secondary)
-    - Enabled when one or more results are checked.
-    - Calls `POST /api/connectors/liverc/import/plan` with `{ events: [{ eventRef }] }`.
-  - **Apply plan** (secondary)
-    - Enabled when a `planId` exists and guardrails are satisfied.
-    - Calls `POST /api/connectors/liverc/import/apply` with `{ planId }`.
+- **Discover events** (primary)
+- Enabled only when all fields valid and range ≤ 7 days.
+- Calls `POST /api/connectors/liverc/discover` with `{ startDate: "YYYY-MM-DD", endDate: "YYYY-MM-DD", track: "...", limit: 40 }`.
+- **Create plan** (secondary)
+- Enabled when one or more results are checked.
+- Calls `POST /api/connectors/liverc/import/plan` with `{ events: [{ eventRef }] }`.
+- **Apply plan** (secondary)
+- Enabled when a `planId` exists and guardrails are satisfied.
+- Calls `POST /api/connectors/liverc/import/apply` with `{ planId }`.
 - **Results list (after Discover)**
-  - Columns: **Select** (checkbox), **Event Title**, **Date/Time (local)**, **Link** (canonical LiveRC URL).
-  - Sort: by **match score desc**, then **date/time asc**.
-  - De-duplicate by `eventRef` across days.
-  - Already-imported events: **shown but unchecked** by default.
-  - Empty state: “No events found for {Start Date}–{End Date} at ‘{Track name}’.”
+- Columns: **Select** (checkbox), **Event Title**, **Date/Time (local)**, **Link** (canonical LiveRC URL).
+- Sort: by **match score desc**, then **date/time asc**.
+- De‑duplicate by `eventRef` across days.
+- Already‑imported events: **shown but unchecked** by default.
+- Empty state: “No events found for {Start Date}–{End Date} at ‘{Track name}’.”
 - **Plan summary (after Create plan)**
-  - Show **planId**, **selected event count**, and **estimated laps** (if provided per item).
-  - If guardrail errors occur (too many events/laps), render the message inline and keep **Apply** disabled.
+- Show **planId**, **selected event count**, and **estimated laps** (if provided per item).
+- If guardrail errors occur (too many events/laps), render the message inline and keep **Apply** disabled.
 - **Status & errors**
-  - Inline statuses: Loading…, Error: <message>.
-  - Never crash the panel—always render a recoverable state.
+- Inline statuses: Loading…, Error: <message>.
+- Never crash the panel—always render a recoverable state.
 
 ---
 
@@ -77,70 +64,77 @@ Implement a **LiveRC Quick Import** panel on the Dashboard that replaces legacy 
 ## API contracts (RANGE required)
 
 ### POST `/api/connectors/liverc/discover`
-- **Request** (client sends ISO after converting DD-MM-YYYY):
-  ```json
-  { "startDate": "2025-10-18", "endDate": "2025-10-21", "track": "Canberra", "limit": 40 }
-```
+- **Request** (client sends ISO after converting DD‑MM‑YYYY):
+```json
+{ "startDate": "2025-10-18", "endDate": "2025-10-21", "track": "Canberra", "limit": 40 }
+Validation
 
-* **Validation**
+startDate and endDate must be valid ISO dates (YYYY‑MM‑DD).
 
-  * `startDate` and `endDate` must be valid ISO dates (YYYY-MM-DD).
-  * `startDate` ≤ `endDate` and range length ≤ **7** days.
-  * `track` length ≥ 2.
-* **Response (200)**
+startDate ≤ endDate and range length ≤ 7 days.
 
-  ```json
-  { "data": { "events": [
-      { "eventRef": "https://liverc.com/results/2025-10-20-canberra-offroad-challenge",
-        "title": "Canberra Off Road Challenge",
-        "whenIso": "2025-10-20T09:00:00Z",
-        "score": 1.5 }
-    ] },
-    "requestId": "..." }
-  ```
-* **Errors**
+track length ≥ 2.
 
-  * `INVALID_JSON`, `INVALID_REQUEST`, `DISCOVERY_UPSTREAM_ERROR`, `UNEXPECTED_ERROR`
+Response (200)
+{ "data": { "events": [
+{ "eventRef": "https://liverc.com/results/2025-10-20-canberra-offroad-challenge",
+"title": "Canberra Off Road Challenge",
+"whenIso": "2025-10-20T09:00:00Z",
+"score": 1.5 }
+] },
+"requestId": "..." }
+Errors
 
-### POST `/api/connectors/liverc/import/plan`
+INVALID_JSON, INVALID_REQUEST, DISCOVERY_UPSTREAM_ERROR, UNEXPECTED_ERROR
 
-* **Request:** `{ "events": [{ "eventRef": "https://liverc.com/results/..." }] }`
-* **Response:** `{ "data": { "planId": "...", "items": [ ... ] } }`
+POST /api/connectors/liverc/import/plan
 
-### POST `/api/connectors/liverc/import/apply`
+Request: { "events": [{ "eventRef": "https://liverc.com/results/..." }] }
 
-* **Request:** `{ "planId": "..." }`
-* **Response:** `202 Accepted`, body `{ "data": { "jobId": "..." } }` and optional `Location` header.
+Response: { "data": { "planId": "...", "items": [ ... ] } }
 
----
+POST /api/connectors/liverc/import/apply
 
-## Validation & Edge cases (UI)
+Request: { "planId": "..." }
 
-* Dates must be valid; reject impossible dates.
-* End date must be ≥ start date; range length ≤ 7.
-* Track must be at least 2 characters; trim whitespace.
-* Discovery with zero results is not an error.
-* Guardrail blocks prevent **Apply** and show message.
+Response: 202 Accepted, body { "data": { "jobId": "..." } } and optional Location header.
 
----
+Validation & Edge cases (UI)
 
-## Acceptance criteria
+Dates must be valid; reject impossible dates.
 
-1. Dashboard shows header + welcome + **LiveRC quick import** only.
-2. Entering `18-10-2025` → `21-10-2025` and `Canberra`, **Discover events** renders results (or clean empty state). The request payload contains ISO `startDate`/`endDate`.
-3. Selecting events and **Create plan** returns a **planId** and item counts.
-4. **Apply plan** returns **202** and shows the **jobId**.
-5. Errors are visible, human-readable, and recoverable without reload.
+End date must be ≥ start date; range length ≤ 7.
 
----
+Track must be at least 2 characters; trim whitespace.
 
-## Commit guidance
+Discovery with zero results is not an error.
+
+Guardrail blocks prevent Apply and show message.
+
+Acceptance criteria
+
+Dashboard shows header + welcome + LiveRC quick import only.
+
+Entering 18-10-2025 → 21-10-2025 and Canberra, Discover events renders results (or clean empty state). The request payload contains ISO startDate/endDate.
+
+Selecting events and Create plan returns a planId and item counts.
+
+Apply plan returns 202 and shows the jobId.
+
+Errors are visible, human‑readable, and recoverable without reload.
+
+Commit guidance
 
 Small, reviewable commits only:
 
-* `feat(dashboard): replace CTAs with LiveRC quick import scaffold`
-* `feat(api): add /api/connectors/liverc/discover route (range)`
-* `feat(core): add LiveRcDiscoveryService for date-range + track`
-* `feat(dashboard): implement DD-MM-YYYY range handling in quick import`
-* `test(liverc): add discovery and route tests`
-* `docs(tasks): add 2025-10-20-dashboard-liverc-quick-import`
+feat(dashboard): replace CTAs with LiveRC quick import scaffold
+
+feat(api): add /api/connectors/liverc/discover route (range)
+
+feat(core): add LiveRcDiscoveryService for date-range + track
+
+feat(dashboard): implement DD-MM-YYYY range handling in quick import
+
+test(liverc): add discovery and route tests
+
+docs(tasks): add 2025-10-20-dashboard-liverc-quick-import ---END FILE---
