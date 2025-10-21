@@ -25,11 +25,11 @@ export default async function DashboardPage() {
   return (
     <section className={styles.container} aria-labelledby="dashboard-heading">
       <header className={styles.header}>
-        <!--
+        /*
         <h1 className={styles.title} id="dashboard-heading">
           {PAGE_TITLE}
         </h1>
-        -->
+        */
       </header>
       <p className={styles.welcome}>Welcome back to your telemetry hub {user.driverName}</p>
     </section>
