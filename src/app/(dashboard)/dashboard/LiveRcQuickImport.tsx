@@ -18,13 +18,13 @@ export default function LiveRcQuickImport({ importRoute, marketingRoute }: LiveR
           LiveRC quick import
         </h2>
         <p className={styles.description}>
-          Sync your latest LiveRC session data in a few clicks. We will pull race metadata, heats,
-          and lap times so you can dive straight into analysis.
+          Sync your latest LiveRC session data in a few clicks. We will pull race metadata, heats, and lap times so you can dive
+          straight into analysis.
         </p>
       </header>
 
       <div className={styles.content}>
-        <ul className={styles.bullets}>
+        <ul className={styles.bullets} role="list">
           <li>Authenticate with LiveRC once — we securely store your API token.</li>
           <li>Choose the event you want to import or paste a broadcast link.</li>
           <li>Review lap data before sharing insights with your team.</li>
