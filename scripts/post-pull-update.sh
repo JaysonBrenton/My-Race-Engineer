@@ -53,7 +53,10 @@ if [[ -f prisma/schema.prisma ]]; then
 fi
 
 echo "$ARROW Running lint checks…"
-npm run lint
+if ! npm run lint; then
+  echo "$ERR Lint checks failed. Fix issues and re-run this script."
+  exit 1
+fi
 
 echo "$ARROW Building Next.js (production)…"
 npm run build

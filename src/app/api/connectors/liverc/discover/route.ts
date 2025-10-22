@@ -24,18 +24,21 @@ const Body = z
   .refine(({ startDate, endDate }) => startDate <= endDate, {
     message: 'startDate must be <= endDate',
   })
-  .refine(({ startDate, endDate }) => {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-      return false;
-    }
+  .refine(
+    ({ startDate, endDate }) => {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+        return false;
+      }
 
-    const rangeDays = (end.getTime() - start.getTime()) / 86400000 + 1;
-    return rangeDays <= 7;
-  }, {
-    message: 'Date range must be 7 days or fewer',
-  });
+      const rangeDays = (end.getTime() - start.getTime()) / 86400000 + 1;
+      return rangeDays <= 7;
+    },
+    {
+      message: 'Date range must be 7 days or fewer',
+    },
+  );
 
 const buildJsonResponse = (status: number, payload: unknown, requestId: string): Response =>
   new Response(JSON.stringify(payload), {
