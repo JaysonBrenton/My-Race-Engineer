@@ -52,6 +52,9 @@ if [[ -f prisma/schema.prisma ]]; then
   npx prisma migrate deploy
 fi
 
+echo "$ARROW Running lint checks…"
+npm run lint
+
 echo "$ARROW Building Next.js (production)…"
 npm run build
 
