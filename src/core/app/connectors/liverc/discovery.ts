@@ -174,10 +174,7 @@ const clampLimit = (limit: number | undefined): number => {
   return Math.floor(limit);
 };
 
-const parseDiscoveryEventsFromHtml = (
-  html: string,
-  fallbackDate: Date,
-): ParsedDiscoveryEvent[] => {
+const parseDiscoveryEventsFromHtml = (html: string, fallbackDate: Date): ParsedDiscoveryEvent[] => {
   const root = parse(html, {
     lowerCaseTagName: false,
     blockTextElements: {
@@ -193,7 +190,7 @@ const parseDiscoveryEventsFromHtml = (
   const parsed: ParsedDiscoveryEvent[] = [];
   const fallbackIso = new Date(fallbackDate.getTime()).toISOString();
 
-  for (const anchor of headingAnchors as ParsedHTMLElement[]) {
+  for (const anchor of headingAnchors) {
     const href = anchor.getAttribute('href');
     const title = normaliseText(anchor.textContent ?? '');
 
@@ -228,7 +225,7 @@ const parseDiscoveryEventsFromHtml = (
 
   // Fallback: scan anchors directly if no heading-based cards were found.
   const anchors = root.querySelectorAll('a[href]');
-  for (const anchor of anchors as ParsedHTMLElement[]) {
+  for (const anchor of anchors) {
     const href = anchor.getAttribute('href');
     const title = normaliseText(anchor.textContent ?? '');
     if (!href || !title) {
@@ -245,7 +242,8 @@ const parseDiscoveryEventsFromHtml = (
     }
 
     const containerCandidate =
-      findEventContainer(anchor) ?? (anchor.parentNode instanceof ParsedHTMLElement ? anchor.parentNode : null);
+      findEventContainer(anchor) ??
+      (anchor.parentNode instanceof ParsedHTMLElement ? anchor.parentNode : null);
     const description = containerCandidate?.textContent ?? '';
     const whenText = extractWhenText(containerCandidate, anchor);
     const searchableValue = buildSearchableValue(title, description, containerCandidate);
@@ -313,7 +311,8 @@ const extractWhenText = (
     }
   }
 
-  const siblingTime = anchor.parentNode instanceof ParsedHTMLElement ? anchor.parentNode.querySelector('time') : null;
+  const siblingTime =
+    anchor.parentNode instanceof ParsedHTMLElement ? anchor.parentNode.querySelector('time') : null;
   if (siblingTime) {
     const datetimeAttr = siblingTime.getAttribute('datetime');
     if (datetimeAttr) {
@@ -344,7 +343,9 @@ const buildSearchableValue = (
   }
 
   if (container) {
-    const trackElements = container.querySelectorAll('[data-track], [data-track-name], .event-location, .event-track, .portfolio-meta');
+    const trackElements = container.querySelectorAll(
+      '[data-track], [data-track-name], .event-location, .event-track, .portfolio-meta',
+    );
     for (const element of trackElements) {
       const text = normaliseText(element.textContent ?? '');
       if (text) {
