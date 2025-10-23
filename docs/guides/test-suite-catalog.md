@@ -21,13 +21,13 @@ This guide lists every automated test that currently lives in the repository, ex
 
 ## Quick reference: npm scripts
 
-| Command | What it runs | Purpose |
-| --- | --- | --- |
-| `npm run test:auth` | `tsx --test tests/core/auth/*.test.ts` | Domain/application auth flow coverage (registration, origin guard, session validation). 【F:package.json†L16-L22】|
-| `npm run test:auth:e2e` | `tsx --test tests/core/auth/auth-flow.e2e.test.ts` | Isolated run of the cross-service registration/login happy path. 【F:package.json†L16-L22】|
-| `npm run test:cookie:unit` | `tsx --test tests/server/runtime/cookies.strategy.test.ts` | Verifies the server cookie storage strategy. 【F:package.json†L16-L22】【F:tests/server/runtime/cookies.strategy.test.ts†L1-L9】|
-| `npm run test:seo` | `tsx --test tests/seo.test.ts` | Checks default metadata exports and canonical URLs. 【F:package.json†L16-L22】【F:tests/seo.test.ts†L1-L26】|
-| `npm run test:e2e` | `playwright test` | Launches the Playwright auth end-to-end suite (form + raw POST scenarios). 【F:package.json†L16-L23】【F:playwright.config.ts†L1-L21】|
+| Command                    | What it runs                                               | Purpose                                                                                                                                |
+| -------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run test:auth`        | `tsx --test tests/core/auth/*.test.ts`                     | Domain/application auth flow coverage (registration, origin guard, session validation). 【F:package.json†L16-L22】                     |
+| `npm run test:auth:e2e`    | `tsx --test tests/core/auth/auth-flow.e2e.test.ts`         | Isolated run of the cross-service registration/login happy path. 【F:package.json†L16-L22】                                            |
+| `npm run test:cookie:unit` | `tsx --test tests/server/runtime/cookies.strategy.test.ts` | Verifies the server cookie storage strategy. 【F:package.json†L16-L22】【F:tests/server/runtime/cookies.strategy.test.ts†L1-L9】       |
+| `npm run test:seo`         | `tsx --test tests/seo.test.ts`                             | Checks default metadata exports and canonical URLs. 【F:package.json†L16-L22】【F:tests/seo.test.ts†L1-L26】                           |
+| `npm run test:e2e`         | `playwright test`                                          | Launches the Playwright auth end-to-end suite (form + raw POST scenarios). 【F:package.json†L16-L23】【F:playwright.config.ts†L1-L21】 |
 
 All other specs run through the same `tsx --test` runner; use `npx tsx --test <path>` to execute them individually.
 
@@ -47,6 +47,7 @@ Run everything together with `npm run test:auth` or target a single file via `np
 - `tests/app/auth/form-submission.test.ts` — covers the `registerAction` and `loginAction` server actions, including cookie handling and redirect outcomes. 【F:tests/app/auth/form-submission.test.ts†L1-L33】
 
 Command:
+
 ```bash
 npx tsx --test tests/app/auth/form-submission.test.ts
 ```
@@ -76,21 +77,20 @@ Run each with `npx tsx --test <path>`.
 - `tests/parse-live-rc-url.test.ts` — checks slug parsing and validation for LiveRC URLs. 【F:tests/parse-live-rc-url.test.ts†L1-L18】
 
 Run each with:
+
 ```bash
 npx tsx --test tests/<file>.test.ts
 ```
 
-### API route handlers (LiveRC importer)
+### API route handlers (LiveRC connectors)
 
 These specs hit the Next.js route handlers with in-memory Prisma/SQLite fallbacks:
 
-- `tests/liverc-import-route.test.ts` — single import endpoint happy-path and failure cases. 【F:tests/liverc-import-route.test.ts†L1-L11】
-- `tests/livercImportRoute.test.ts` — additional regression tests for the same endpoint. 【F:tests/livercImportRoute.test.ts†L1-L11】
-- `tests/livercImportPlanRoute.test.ts` — `/api/liverc/import-plan` validation and payload shaping. 【F:tests/livercImportPlanRoute.test.ts†L1-L14】
-- `tests/livercImportApplyRoute.test.ts` — `/api/liverc/import-apply` branching and background job creation. 【F:tests/livercImportApplyRoute.test.ts†L1-L14】
+- `tests/livercImportPlanRoute.test.ts` — `/api/connectors/liverc/import/plan` validation and payload shaping. 【F:tests/livercImportPlanRoute.test.ts†L1-L14】
+- `tests/livercImportApplyRoute.test.ts` — `/api/connectors/liverc/import/apply` branching and background job creation. 【F:tests/livercImportApplyRoute.test.ts†L1-L14】
 - `tests/dev-liverc-results-proxy-route.test.ts` — dev-only proxy for fetching LiveRC results. 【F:tests/dev-liverc-results-proxy-route.test.ts†L1-L18】
 
-All of them may be executed individually via `npx tsx --test <path>`; the importer route tests set an in-memory `DATABASE_URL` when one is not provided so they do not require Postgres for local runs. 【F:tests/liverc-import-route.test.ts†L1-L11】
+Execute any of them via `npx tsx --test <path>`; the connector route tests set an in-memory `DATABASE_URL` when one is not provided so they do not require Postgres for local runs.
 
 ### Build & middleware manifests
 

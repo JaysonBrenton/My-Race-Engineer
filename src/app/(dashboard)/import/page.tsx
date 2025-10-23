@@ -1,14 +1,12 @@
 import type { Metadata } from 'next';
 import type { AppPageProps, ResolvedSearchParams } from '@/types/app-page-props';
-import { MissingAuthFormTokenSecretError, generateAuthFormToken } from '@/lib/auth/formTokens';
-import { EnvironmentValidationError } from '@/server/config/environment';
 
 import ImportForm from './ImportForm';
 import styles from './page.module.css';
 
 export const metadata: Metadata = {
   title: 'Import from LiveRC',
-  description: 'Preview LiveRC results links before triggering an import.',
+  description: 'Preview LiveRC results links before scheduling connector-based imports.',
 };
 
 const importWizardFlag = process.env.ENABLE_IMPORT_WIZARD?.trim().toLowerCase();
@@ -45,27 +43,13 @@ export default async function Page({ searchParams }: PageProps) {
     }
   }
 
-  let importFormToken: string | null = null;
-
-  try {
-    importFormToken = generateAuthFormToken('liverc-import');
-  } catch (error) {
-    if (
-      error instanceof MissingAuthFormTokenSecretError ||
-      error instanceof EnvironmentValidationError
-    ) {
-      importFormToken = null;
-    } else {
-      throw error;
-    }
-  }
-
   return (
     <div className={styles.container}>
       <header className={styles.header}>
         <h1 className={styles.title}>Import from LiveRC</h1>
         <p className={styles.subtitle}>
-          Paste a LiveRC results link to see whether it resolves to an import-ready JSON endpoint.
+          Paste a LiveRC results link to validate JSON availability, then use the connector workflow
+          to plan and apply the import.
         </p>
       </header>
       <section className={styles.bookmarkletCard}>
@@ -84,7 +68,6 @@ export default async function Page({ searchParams }: PageProps) {
         enableFileImport={enableFileImport}
         resolverEnabled={resolverEnabled}
         hasInternalProxy={hasInternalProxy}
-        importFormToken={importFormToken}
       />
     </div>
   );

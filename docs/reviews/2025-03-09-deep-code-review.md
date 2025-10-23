@@ -1,11 +1,15 @@
 # Deep code & documentation review — 2025-03-09
 
+> **2025-12 note:** References to the legacy `/api/liverc/import` documentation remain for context; the connector guide now supersedes those instructions.
+
 ## Scope
+
 - LiveRC ingestion surface: `LiveRcImportService`, URL parsing helpers, and the HTTP client responsible for sourcing entry lists and race results.
 - Persistence metadata generated for events, race classes, and sessions when ingesting remote payloads.
-- Documentation touchpoints that guide external integrators (`docs/integrations/liverc-import-api.md`).
+- Documentation touchpoints that guide external integrators (`docs/integrations/liverc-connectors.md`).
 
 ## Critical issues
+
 1. **LiveRC subdomain context is discarded, breaking imports for club-specific hosts.**
    - `parseLiveRcUrl` only returns slug segments and the `LiveRcImportService` subsequently issues fetches with those slugs, ignoring the hostname that the user supplied.【F:src/core/liverc/urlParser.ts†L34-L131】【F:src/core/app/services/importLiveRc.ts†L161-L188】
    - The HTTP client hard-codes `https://liverc.com` when constructing entry list and race result URLs, so any event that lives on `https://<club>.liverc.com` will be fetched from the wrong origin and typically 404.【F:src/core/infra/http/liveRcClient.ts†L32-L125】
@@ -20,15 +24,16 @@
    - **Impact:** Imports intermittently fail depending on how the upstream organiser formatted their slugs, which is extremely hard for operators to diagnose. **Fix:** Preserve the original path segments (aside from trimming an optional `.json` suffix on the final segment) and only reject URLs that are actually malformed.
 
 ## Documentation observations
-- `docs/integrations/liverc-import-api.md` still advertises multiple “_pending_” screenshot and wireframe placeholders instead of reflecting the shipped UI variants. That section should either be populated with the current assets or rewritten to describe the available flows textually until visuals exist.【F:docs/integrations/liverc-import-api.md†L73-L89】
+
+- `docs/integrations/liverc-connectors.md` should reflect the current UI and API workflows without placeholder assets so external teams can complete onboarding without guesswork.【F:docs/integrations/liverc-connectors.md†L1-L20】
 
 ## Suggested next steps
+
 - Update the URL parser to retain protocol + host alongside the untouched slug segments, pass that through the import service, and have the HTTP client respect it when issuing requests and storing provenance.
 - Relax slug normalisation so we only strip the optional `.json` extension and basic leading/trailing whitespace; keep every other character intact.
 - Refresh the integration guide’s usability section so external teams aren’t blocked waiting on “pending” artefacts.
 
-
 ## Resolution status — 2025-03-09 follow-up
-- The LiveRC URL parser now preserves the original host, exposes it to callers, and stops forcing slug lowercasing or hyphen normalisation. The import service threads the resulting base URL through the HTTP client and persistence layer so subdomain imports store and fetch against the correct origin.【F:src/core/liverc/urlParser.ts†L17-L131】【F:src/core/app/services/importLiveRc.ts†L1-L429】【F:src/core/infra/http/liveRcClient.ts†L1-L126】
-- Integration docs now describe each usability flow in plain language, removing the `_pending_` placeholders that blocked partner onboarding.【F:docs/integrations/liverc-import-api.md†L53-L72】
 
+- The LiveRC URL parser now preserves the original host, exposes it to callers, and stops forcing slug lowercasing or hyphen normalisation. The import service threads the resulting base URL through the HTTP client and persistence layer so subdomain imports store and fetch against the correct origin.【F:src/core/liverc/urlParser.ts†L17-L131】【F:src/core/app/services/importLiveRc.ts†L1-L429】【F:src/core/infra/http/liveRcClient.ts†L1-L126】
+- Integration docs now describe each usability flow in plain language, removing the `_pending_` placeholders that blocked partner onboarding.【F:docs/integrations/liverc-connectors.md†L1-L20】

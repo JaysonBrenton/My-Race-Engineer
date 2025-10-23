@@ -1,6 +1,9 @@
 # Deep code review — 2025-11-09
 
+> **2025-12 note:** The `/api/liverc/import` and `/api/liverc/import-file` routes reviewed here were retired; the connector workflow now owns ingestion. Findings remain for historical security context.
+
 ## Scope
+
 - LiveRC import API surface (`src/app/api/liverc/import` and `import-file` routes) and the shared `LiveRcImportService` orchestration that persists entry, session, entrant, and lap data.
 
 ## Critical issues
@@ -16,5 +19,6 @@
    - The fix is to resolve the entrant by `sourceEntrantId` (even for skipped/withdrawn rows) and invoke `replaceForEntrant` with an empty collection so their historical laps are purged when LiveRC says they should vanish.
 
 ## Suggested next steps
+
 - Tighten URL validation to permit only the known LiveRC hostnames, and add regression tests that cover both allowlisted and rejected origins to keep the SSRF protection intact.
 - Teach the import path to clear laps for withdrawn or missing entrants (e.g., by fetching existing entrants via `findBySourceEntrantId`) so subsequent imports stay faithful to the LiveRC dataset.
