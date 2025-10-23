@@ -5,10 +5,9 @@
  * License: MIT
  */
 
-import type { Metadata, Route } from 'next';
+import type { Metadata } from 'next';
 
 import { requireAuthenticatedUser } from '@/lib/auth/serverSession';
-import { ROUTE_HOME } from '@/app/routes';
 
 import LiveRcQuickImport from './LiveRcQuickImport';
 import styles from './page.module.css';
@@ -24,7 +23,6 @@ export const metadata: Metadata = {
 
 export default async function DashboardPage() {
   const { user } = await requireAuthenticatedUser();
-  const importRoute = '/import' as Route;
 
   return (
     <main className={styles.container} aria-labelledby="dashboard-heading">
@@ -36,7 +34,7 @@ export default async function DashboardPage() {
         <p className={styles.description}>{PAGE_DESCRIPTION}</p>
       </header>
 
-      <LiveRcQuickImport importRoute={importRoute} marketingRoute={ROUTE_HOME} />
+      <LiveRcQuickImport />
     </main>
   );
 }
