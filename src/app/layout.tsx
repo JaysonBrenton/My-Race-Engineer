@@ -6,6 +6,7 @@
  * License: MIT
  */
 
+import type { ReactNode } from 'react';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 
@@ -36,7 +37,7 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
   const sessionStatus = await getSessionFromCookies();
   const isAuthenticated = sessionStatus.status === 'authenticated';
 
