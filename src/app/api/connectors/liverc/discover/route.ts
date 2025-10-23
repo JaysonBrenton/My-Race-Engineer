@@ -72,13 +72,8 @@ export async function POST(request: Request): Promise<Response> {
   try {
     /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
     const rawBody = await request.json();
-    if (
-      rawBody &&
-      typeof rawBody === 'object' &&
-      'trackOrClub' in rawBody &&
-      !('track' in rawBody)
-    ) {
-      rawBody.track = rawBody.trackOrClub;
+    if (rawBody && typeof rawBody === 'object' && 'trackOrClub' in (rawBody as any) && !('track' in (rawBody as any))) {
+      (rawBody as any).track = (rawBody as any).trackOrClub;
     }
     /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 
