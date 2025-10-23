@@ -225,9 +225,8 @@ export function isAbsoluteUrl(value: string): boolean {
   }
 
   try {
-    // eslint-disable-next-line no-new
-    new URL(value);
-    return /^(http|https):/i.test(value);
+    const parsed = new URL(value);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
   } catch {
     return false;
   }

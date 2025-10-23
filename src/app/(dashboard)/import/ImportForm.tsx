@@ -429,13 +429,9 @@ const BulkImportTab = ({
 
     const workers = Array.from({ length: concurrencyLimit }, () =>
       (async () => {
-        // eslint-disable-next-line no-constant-condition
-        while (true) {
+        while (nextIndex < rowsToImport.length) {
           const currentIndex = nextIndex;
           nextIndex += 1;
-          if (currentIndex >= rowsToImport.length) {
-            break;
-          }
 
           const row = rowsToImport[currentIndex];
 

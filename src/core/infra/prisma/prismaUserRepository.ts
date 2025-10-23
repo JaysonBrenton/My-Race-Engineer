@@ -3,10 +3,8 @@ import { DuplicateUserDriverNameError, DuplicateUserEmailError } from '@core/app
 import { normaliseDriverName, type CreateUserInput, type User } from '@core/domain';
 /*
  * Prisma's generated client returns fully typed objects, but `@typescript-eslint`
- * currently reports them as `any` when accessed through helper mappers. We
- * intentionally suppress the false positives around these mappings.
+ * historically reported them as `any` when accessed through helper mappers.
  */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 import { $Enums, Prisma } from '@prisma/client';
 import type { PrismaClient, User as PrismaUser } from '@prisma/client';
 
@@ -140,4 +138,3 @@ export class PrismaUserRepository implements UserRepository {
     }
   }
 }
-/* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
