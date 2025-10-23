@@ -68,9 +68,21 @@ export async function POST(request: Request): Promise<Response> {
   const requestId = request.headers.get('x-request-id') ?? randomUUID();
   const logger = buildRequestLogger(requestId);
 
-  let rawBody: unknown;
+  let requestBody: unknown;
   try {
-    rawBody = await request.json();
+    /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
+    const rawBody = await request.json();
+    if (
+      rawBody &&
+      typeof rawBody === 'object' &&
+      'trackOrClub' in rawBody &&
+      !('track' in rawBody)
+    ) {
+      rawBody.track = rawBody.trackOrClub;
+    }
+    /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
+
+    requestBody = rawBody;
   } catch (error) {
     logger.warn('LiveRC discovery request payload is not valid JSON.', {
       event: 'liverc.discovery.invalid_json',
@@ -91,7 +103,7 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  const parsed = Body.safeParse(rawBody);
+  const parsed = Body.safeParse(requestBody);
   if (!parsed.success) {
     logger.warn('LiveRC discovery request failed validation.', {
       event: 'liverc.discovery.invalid_request',
