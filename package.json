@@ -23,6 +23,11 @@
     "test:cookie:unit": "tsx --test tests/server/runtime/cookies.strategy.test.ts",
     "test:e2e": "playwright test",
     "test:e2e:liverc": "LIVERC_E2E=1 tsx --test tests/connectors/liverc/live-smoke.test.ts",
+    "test:liverc:discover": "tsx --test tests/connectors/liverc/discover.route.test.ts",
+    "test:liverc:service": "tsx --test tests/core/liverc/discovery.service.test.ts",
+    "test:liverc:plan": "tsx --test tests/connectors/liverc/plan.route.test.ts",
+    "test:liverc:apply": "tsx --test tests/connectors/liverc/apply.route.test.ts",
+    "test:ui": "tsx --test --test-reporter=spec tests/app/dashboard/quick-import.form.test.tsx",
     "prepare": "husky install"
   },
   "lint-staged": {
@@ -62,6 +67,8 @@
     "@types/react-dom": "^18.3.0",
     "@typescript-eslint/eslint-plugin": "^8.46.1",
     "@typescript-eslint/parser": "^8.46.1",
+    "@testing-library/react": "^16.0.1",
+    "@testing-library/user-event": "^14.6.1",
     "eslint": "^9.38.0",
     "eslint-config-next": "^15.5.6",
     "eslint-config-prettier": "^9.1.0",
@@ -71,6 +78,7 @@
     "eslint-plugin-react-hooks": "^5.1.0",
     "eslint-plugin-unused-imports": "^4.2.0",
     "husky": "^8.0.3",
+    "jsdom": "^24.1.3",
     "lint-staged": "^15.2.10",
     "prettier": "^3.3.3",
     "prisma": "^5.20.0",
