@@ -22,7 +22,7 @@
 - Required; same validation as start date.
 - Must be ≥ start date.
 - Range length (end−start+1) must be ≤ **7** days.
-- **Track name** (text input)
+- **Track or club name** (text input)
 - Placeholder: `e.g. Canberra, Keilor, Logan`
 - Required; minimum length 2; case‑insensitive **substring** match.
 - **Actions**
@@ -40,7 +40,7 @@
 - Sort: by **match score desc**, then **date/time asc**.
 - De‑duplicate by `eventRef` across days.
 - Already‑imported events: **shown but unchecked** by default.
-- Empty state: “No events found for {Start Date}–{End Date} at ‘{Track name}’.”
+- Empty state: “No events found for {Start Date}–{End Date} at ‘{Track or club name}’.”
 - **Plan summary (after Create plan)**
 - Show **planId**, **selected event count**, and **estimated laps** (if provided per item).
 - If guardrail errors occur (too many events/laps), render the message inline and keep **Apply** disabled.
@@ -51,6 +51,7 @@
 ---
 
 ## Constraints & Guardrails
+
 - TypeScript strict. No new runtime dependencies.
 - Typed routes ON. Do not relax ESLint/Prettier. Do not wrap string literals in parentheses.
 - Layering: `web/` (Next) → API → services; no UI → infra shortcuts.
@@ -64,7 +65,9 @@
 ## API contracts (RANGE required)
 
 ### POST `/api/connectors/liverc/discover`
+
 - **Request** (client sends ISO after converting DD‑MM‑YYYY):
+
 ```json
 { "startDate": "2025-10-18", "endDate": "2025-10-21", "track": "Canberra", "limit": 40 }
 Validation
@@ -105,7 +108,7 @@ Dates must be valid; reject impossible dates.
 
 End date must be ≥ start date; range length ≤ 7.
 
-Track must be at least 2 characters; trim whitespace.
+Track or club name must be at least 2 characters; trim whitespace.
 
 Discovery with zero results is not an error.
 
@@ -138,3 +141,4 @@ feat(dashboard): implement DD-MM-YYYY range handling in quick import
 test(liverc): add discovery and route tests
 
 docs(tasks): add 2025-10-20-dashboard-liverc-quick-import ---END FILE---
+```
