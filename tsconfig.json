@@ -1,11 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": [
-      "DOM",
-      "DOM.Iterable",
-      "ES2022"
-    ],
+    "lib": ["DOM", "DOM.Iterable", "ES2022"],
     "allowJs": false,
     "skipLibCheck": true,
     "strict": true,
@@ -22,31 +18,15 @@
     "incremental": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "src/*"
-      ],
-      "@core/domain/*": [
-        "src/core/domain/*"
-      ],
-      "@core/app/*": [
-        "src/core/app/*"
-      ],
-      "@core/infra/*": [
-        "src/core/infra/*"
-      ],
-      "@core/app": [
-        "src/core/app/index.ts"
-      ],
-      "@core/domain": [
-        "src/core/domain/index.ts"
-      ],
-      "@core/infra": [
-        "src/core/infra/index.ts"
-      ]
+      "@/*": ["src/*"],
+      "@core/domain/*": ["src/core/domain/*"],
+      "@core/app/*": ["src/core/app/*"],
+      "@core/infra/*": ["src/core/infra/*"],
+      "@core/app": ["src/core/app/index.ts"],
+      "@core/domain": ["src/core/domain/index.ts"],
+      "@core/infra": ["src/core/infra/index.ts"]
     },
-    "types": [
-      "node"
-    ],
+    "types": ["node", "react", "react-dom", "react/next", "react-dom/next"],
     "noEmit": true,
     "plugins": [
       {
@@ -54,13 +34,6 @@
       }
     ]
   },
-  "include": [
-    "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts"
-  ],
-  "exclude": [
-    "node_modules"
-  ]
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
 }

@@ -35,6 +35,15 @@ if node -e "const pkg=require('./package.json');process.exit(pkg?.scripts?.['env
   fi
 fi
 
+# Verify foundational config guards (tsconfig ambient types, etc.)
+if node -e "const pkg=require('./package.json');process.exit(pkg?.scripts?.['config:doctor']?0:1);" >/dev/null 2>&1; then
+  echo "$ARROW Verifying TypeScript config guards (npm run config:doctor)…"
+  if ! npm run config:doctor --if-present; then
+    echo "$ERR Config guard failed. Restore required compilerOptions.types entries and re-run."
+    exit 1
+  fi
+fi
+
 # Install deps: prefer npm ci when a lockfile exists, else fallback to npm install
 if [[ -f package-lock.json ]]; then
   echo "$ARROW Installing deps (npm ci)…"
