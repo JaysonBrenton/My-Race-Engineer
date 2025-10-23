@@ -30,7 +30,7 @@ status: draft
 - Must be ≥ start date.
 - Range length (end−start+1) must be ≤ **7** days.
 - **Track or club name** (text input)
-- Placeholder: `e.g. Canberra, Keilor, Logan`
+- Placeholder: `e.g., Canberra Off-Road, Keilor, Logan City`
 - Required; minimum length 2; case‑insensitive **substring** match.
 - **Actions**
 - **Discover events** (primary)
@@ -47,7 +47,7 @@ status: draft
 - Sort: by **match score desc**, then **date/time asc**.
 - De‑duplicate by `eventRef` across days.
 - Already‑imported events: **shown but unchecked** by default.
-- Empty state: “No events found for {Start Date}–{End Date} at ‘{Track or club name}’.”
+- Empty state: “No events found for that date range and track/club.”
 - **Plan summary (after Create plan)**
 - Show **planId**, **selected event count**, and **estimated laps** (if provided per item).
 - If guardrail errors occur (too many events/laps), render the message inline and keep **Apply** disabled.

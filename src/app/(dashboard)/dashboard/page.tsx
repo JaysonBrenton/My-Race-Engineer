@@ -16,10 +16,10 @@ const PAGE_TITLE = 'Dashboard';
 const PAGE_DESCRIPTION =
   'Review your latest race imports, jump into lap analysis, or kick off a new telemetry import.';
 
-export const metadata: Metadata = {
+export const metadata = {
   title: PAGE_TITLE,
   description: PAGE_DESCRIPTION,
-};
+} satisfies Metadata;
 
 export default async function DashboardPage() {
   const { user } = await requireAuthenticatedUser();
