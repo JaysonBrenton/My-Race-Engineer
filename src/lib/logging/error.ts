@@ -26,7 +26,5 @@ export const createErrorLogContext = (
   error: unknown,
 ): LoggerContext => ({
   ...base,
-  // The logger serialiser safely normalises unknown error inputs.
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   error: toLoggableError(error),
 });

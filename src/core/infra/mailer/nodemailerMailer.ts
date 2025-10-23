@@ -1,10 +1,9 @@
 import type { MailerPort, MailMessage, Logger } from '@core/app';
 /*
  * Nodemailer exposes `sendMail` with loose typings that rely on `any` under the
- * hood. We wrap the transporter in a Promise-based helper and suppress the
- * resulting lint warnings in this module only.
+ * hood. We wrap the transporter in a Promise-based helper so the rest of the
+ * module can stay fully typed.
  */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
 import { createTransport } from 'nodemailer';
 import type SMTPPool from 'nodemailer/lib/smtp-pool';
 import type SMTPTransport from 'nodemailer/lib/smtp-transport';
@@ -75,4 +74,3 @@ export const createNodemailerMailer = (
   const transporter = createSafeTransporter(connectionUrl);
   return new NodemailerMailer(transporter, options, logger);
 };
-/* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
