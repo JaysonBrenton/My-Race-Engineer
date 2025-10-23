@@ -64,20 +64,39 @@ export function OPTIONS(): Response {
   });
 }
 
+const isJsonObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const normalizeRequestBody = (body: unknown): unknown => {
+  if (!isJsonObject(body)) {
+    return body;
+  }
+
+  if ('track' in body) {
+    return body;
+  }
+
+  if ('trackOrClub' in body) {
+    const { trackOrClub } = body;
+    if (typeof trackOrClub === 'string') {
+      return {
+        ...body,
+        track: trackOrClub,
+      } satisfies Record<string, unknown>;
+    }
+  }
+
+  return body;
+};
+
 export async function POST(request: Request): Promise<Response> {
   const requestId = request.headers.get('x-request-id') ?? randomUUID();
   const logger = buildRequestLogger(requestId);
 
   let requestBody: unknown;
   try {
-    /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
-    const rawBody = await request.json();
-    if (rawBody && typeof rawBody === 'object' && 'trackOrClub' in (rawBody as any) && !('track' in (rawBody as any))) {
-      (rawBody as any).track = (rawBody as any).trackOrClub;
-    }
-    /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
-
-    requestBody = rawBody;
+    const rawBody: unknown = await request.json();
+    requestBody = normalizeRequestBody(rawBody);
   } catch (error) {
     logger.warn('LiveRC discovery request payload is not valid JSON.', {
       event: 'liverc.discovery.invalid_json',
