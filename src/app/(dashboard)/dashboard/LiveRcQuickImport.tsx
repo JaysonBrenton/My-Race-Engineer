@@ -98,7 +98,8 @@ type DiscoveryState = {
   };
 };
 
-const DATE_PATTERN = /^(\d{2})-(\d{2})-(\d{4})$/;
+const DATE_PATTERN_DD_MM_YYYY = /^(\d{2})-(\d{2})-(\d{4})$/;
+const DATE_PATTERN_ISO = /^(\d{4})-(\d{2})-(\d{2})$/;
 const MAX_RANGE_DAYS = 7;
 const DISCOVERY_LIMIT = 40;
 
@@ -116,13 +117,35 @@ const STATUS_TITLES: Record<LiveRcPlanItemStatus, string> = {
 
 const parseDateInput = (value: string): { iso: string; date: Date } | null => {
   const trimmed = value.trim();
-  const match = DATE_PATTERN.exec(trimmed);
 
-  if (!match) {
+  if (!trimmed) {
     return null;
   }
 
-  const [, dayRaw, monthRaw, yearRaw] = match;
+  const isoMatch = DATE_PATTERN_ISO.exec(trimmed);
+  if (isoMatch) {
+    const [, yearRaw, monthRaw, dayRaw] = isoMatch;
+    return parseDateComponents({ dayRaw, monthRaw, yearRaw });
+  }
+
+  const legacyMatch = DATE_PATTERN_DD_MM_YYYY.exec(trimmed);
+  if (legacyMatch) {
+    const [, dayRaw, monthRaw, yearRaw] = legacyMatch;
+    return parseDateComponents({ dayRaw, monthRaw, yearRaw });
+  }
+
+  return null;
+};
+
+const parseDateComponents = ({
+  dayRaw,
+  monthRaw,
+  yearRaw,
+}: {
+  dayRaw: string;
+  monthRaw: string;
+  yearRaw: string;
+}): { iso: string; date: Date } | null => {
   const day = Number.parseInt(dayRaw, 10);
   const month = Number.parseInt(monthRaw, 10);
   const year = Number.parseInt(yearRaw, 10);
@@ -246,7 +269,7 @@ export default function LiveRcQuickImport(): JSX.Element {
     const endDate = parseDateInput(end);
 
     if (!startDate || !endDate) {
-      setError('Enter a valid date range using DD-MM-YYYY.');
+      setError('Select a valid date range.');
       return;
     }
 
@@ -308,8 +331,8 @@ export default function LiveRcQuickImport(): JSX.Element {
       setDiscovery({
         events: Array.from(uniqueEvents.values()),
         filters: {
-          start: start,
-          end: end,
+          start: startDate.iso,
+          end: endDate.iso,
           track: trimmedTrack,
         },
       });
@@ -516,9 +539,7 @@ export default function LiveRcQuickImport(): JSX.Element {
           <label htmlFor="start">Search Start Date</label>
           <input
             id="start"
-            inputMode="numeric"
-            pattern="\d{2}-\d{2}-\d{4}"
-            placeholder="DD-MM-YYYY"
+            type="date"
             value={start}
             onChange={(event) => {
               setStart(event.target.value);
@@ -532,9 +553,7 @@ export default function LiveRcQuickImport(): JSX.Element {
           <label htmlFor="end">Search End Date</label>
           <input
             id="end"
-            inputMode="numeric"
-            pattern="\d{2}-\d{2}-\d{4}"
-            placeholder="DD-MM-YYYY"
+            type="date"
             value={end}
             onChange={(event) => {
               setEnd(event.target.value);
