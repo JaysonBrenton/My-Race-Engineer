@@ -1,17 +1,24 @@
 ---
+title: Dashboard LiveRC quick import
+created: 2025-10-20
+status: draft
+---
 
 ## UX (specific for implementation)
 
 ### Dashboard shell (keep)
+
 - Brand link: **MY RACE ENGINEER**
 - Header buttons: **Settings**, **Sign out**
 - Welcome line: `Welcome back to your telemetry hub {driverName}`
 
 ### Dashboard shell (remove)
+
 - Buttons: **Start a new import**, **View marketing site**
 - Sections: **Recent activity**, **Next steps**
 
 ### New panel: **LiveRC quick import** (client component)
+
 - **Fields**
 - **Search Start Date** (text input)
 - Placeholder: `DD-MM-YYYY`
