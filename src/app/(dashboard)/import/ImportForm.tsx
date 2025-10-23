@@ -26,7 +26,6 @@ type LiveRcRaceResultResponse = ReturnType<typeof mapRaceResultResponse>;
 
 import styles from './ImportForm.module.css';
 import Wizard from './Wizard';
-import { IMPORT_FORM_TOKEN_HEADER } from '@/lib/liverc/importAuth';
 import { canShowResolveButton, type ParsedState } from './parsedState';
 
 type ImportFormProps = {
@@ -35,7 +34,6 @@ type ImportFormProps = {
   enableFileImport?: boolean;
   resolverEnabled?: boolean;
   hasInternalProxy?: boolean;
-  importFormToken?: string | null;
 };
 
 type ImportSuccess = {
@@ -70,7 +68,8 @@ type BulkImportRow = {
 };
 
 const BULK_IMPORT_CONCURRENCY = 4;
-const EMPTY_IMPORT_HEADERS: Record<string, string> = {};
+const DIRECT_IMPORT_RETIRED_MESSAGE =
+  'LiveRC direct import endpoints have been retired. Use the connector workflow (plan/apply) to ingest events.';
 
 type FileImportPreview = {
   fileName: string;
@@ -162,23 +161,6 @@ const formatError = (error: unknown) => {
   } catch {
     return 'Unexpected error payload.';
   }
-};
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-
-const isImportSummary = (value: unknown): value is LiveRcImportSummary => {
-  if (!isRecord(value)) {
-    return false;
-  }
-
-  return (
-    typeof value.eventId === 'string' &&
-    typeof value.raceClassId === 'string' &&
-    typeof value.sessionId === 'string' &&
-    typeof value.raceId === 'string' &&
-    typeof value.sourceUrl === 'string'
-  );
 };
 
 type CachedBulkParseResult = {
@@ -339,12 +321,10 @@ const BulkImportTab = ({
   tabPanelId,
   labelledById,
   securityDisabled,
-  importAuthHeaders,
 }: {
   tabPanelId: string;
   labelledById: string;
   securityDisabled: boolean;
-  importAuthHeaders: Record<string, string>;
 }) => {
   const [bulkInput, setBulkInput] = useState('');
   const [rows, setRows] = useState<BulkImportRow[]>([]);
@@ -409,108 +389,26 @@ const BulkImportTab = ({
     };
   }, [bulkInput]);
 
-  const handleImportAll = useCallback(async () => {
+  const handleImportAll = useCallback(() => {
     if (isImporting || readyRows.length === 0 || securityDisabled) {
       return;
     }
 
     setIsImporting(true);
-    const rowsToImport = [...readyRows];
 
     applyRowUpdates(
-      rowsToImport.map((row) => ({
+      readyRows.map((row) => ({
         id: row.id,
-        patch: { status: 'queued', statusMessage: undefined, requestId: undefined },
+        patch: {
+          status: 'error',
+          statusMessage: DIRECT_IMPORT_RETIRED_MESSAGE,
+          requestId: undefined,
+        },
       })),
     );
 
-    const concurrencyLimit = Math.min(BULK_IMPORT_CONCURRENCY, rowsToImport.length);
-    let nextIndex = 0;
-
-    const workers = Array.from({ length: concurrencyLimit }, () =>
-      (async () => {
-        while (nextIndex < rowsToImport.length) {
-          const currentIndex = nextIndex;
-          nextIndex += 1;
-
-          const row = rowsToImport[currentIndex];
-
-          applyRowUpdates([
-            {
-              id: row.id,
-              patch: { status: 'importing', statusMessage: undefined, requestId: undefined },
-            },
-          ]);
-
-          try {
-            const response = await fetch('/api/liverc/import', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                ...importAuthHeaders,
-              },
-              body: JSON.stringify({
-                url: row.canonicalAbsoluteJsonUrl,
-                includeOutlaps: false,
-              }),
-            });
-
-            const payload: unknown = await response.json().catch(() => null);
-            const requestId =
-              isRecord(payload) && typeof payload.requestId === 'string'
-                ? payload.requestId
-                : undefined;
-
-            if (response.ok) {
-              applyRowUpdates([
-                {
-                  id: row.id,
-                  patch: {
-                    status: 'done',
-                    statusMessage: requestId ? `Request ${requestId}` : undefined,
-                    requestId,
-                  },
-                },
-              ]);
-              continue;
-            }
-
-            let errorPayload: unknown = payload;
-            if (isRecord(payload) && 'error' in payload) {
-              errorPayload = payload.error;
-            }
-
-            applyRowUpdates([
-              {
-                id: row.id,
-                patch: {
-                  status: 'error',
-                  statusMessage: formatError(errorPayload),
-                  requestId,
-                },
-              },
-            ]);
-          } catch (error) {
-            applyRowUpdates([
-              {
-                id: row.id,
-                patch: {
-                  status: 'error',
-                  statusMessage: formatError(error),
-                },
-              },
-            ]);
-          }
-        }
-      })(),
-    );
-
-    try {
-      await Promise.all(workers);
-    } finally {
-      setIsImporting(false);
-    }
-  }, [applyRowUpdates, importAuthHeaders, isImporting, readyRows, securityDisabled]);
+    setIsImporting(false);
+  }, [applyRowUpdates, isImporting, readyRows, securityDisabled]);
 
   const toneClassMap: Record<StatusTone, string> = {
     default: styles.statusToneDefault,
@@ -615,7 +513,6 @@ export default function ImportForm({
   enableFileImport = false,
   resolverEnabled = false,
   hasInternalProxy = false,
-  importFormToken = null,
 }: ImportFormProps) {
   const [activeTab, setActiveTab] = useState<'single' | 'bulk'>('single');
   const [url, setUrl] = useState(() => initialUrl ?? '');
@@ -638,14 +535,7 @@ export default function ImportForm({
   const bulkTabId = `${tabSetId}-bulk-tab`;
   const singlePanelId = `${tabSetId}-single-panel`;
   const bulkPanelId = `${tabSetId}-bulk-panel`;
-  const securityDisabled = !importFormToken;
-  const importAuthHeaders = useMemo<Record<string, string>>(() => {
-    if (!importFormToken) {
-      return EMPTY_IMPORT_HEADERS;
-    }
-
-    return { [IMPORT_FORM_TOKEN_HEADER]: importFormToken };
-  }, [importFormToken]);
+  const securityDisabled = true;
 
   const handleSelectSingle = useCallback(() => {
     setActiveTab('single');
@@ -799,78 +689,19 @@ export default function ImportForm({
     [handleFileSelection],
   );
 
-  const handleImportFile = useCallback(async () => {
+  const handleImportFile = useCallback(() => {
     if (!enableFileImport || !filePreview || isFileImporting || securityDisabled) {
       return;
     }
 
     setIsFileImporting(true);
-    setFileSubmission(null);
-
-    try {
-      const response = await fetch('/api/liverc/import-file', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...importAuthHeaders,
-        },
-        body: JSON.stringify({
-          payload: filePreview.rawPayload,
-          metadata: {
-            fileName: filePreview.fileName,
-            fileSizeBytes: filePreview.fileSizeBytes,
-            lastModifiedEpochMs: filePreview.lastModifiedEpochMs ?? undefined,
-            uploadedAtEpochMs: filePreview.uploadedAtEpochMs,
-            fileHash: filePreview.fileHash || undefined,
-            uploadNamespace: filePreview.uploadNamespaceSeed,
-          },
-        }),
-      });
-
-      const payload: unknown = await response.json().catch(() => null);
-      const requestId =
-        isRecord(payload) && typeof payload.requestId === 'string' ? payload.requestId : undefined;
-
-      if (response.ok) {
-        const summary =
-          isRecord(payload) && 'data' in payload && isImportSummary(payload.data)
-            ? payload.data
-            : undefined;
-
-        if (summary) {
-          setFileSubmission({
-            status: 'success',
-            summary,
-            requestId,
-          });
-          return;
-        }
-
-        setFileSubmission({
-          status: 'error',
-          statusCode: response.status,
-          requestId,
-          error: 'Import succeeded but response payload was missing summary data.',
-        });
-        return;
-      }
-
-      setFileSubmission({
-        status: 'error',
-        statusCode: response.status,
-        requestId,
-        error: isRecord(payload) && 'error' in payload ? payload.error : payload,
-      });
-    } catch (error) {
-      setFileSubmission({
-        status: 'error',
-        statusCode: 0,
-        error,
-      });
-    } finally {
-      setIsFileImporting(false);
-    }
-  }, [enableFileImport, filePreview, importAuthHeaders, isFileImporting, securityDisabled]);
+    setFileSubmission({
+      status: 'error',
+      statusCode: 410,
+      error: DIRECT_IMPORT_RETIRED_MESSAGE,
+    });
+    setIsFileImporting(false);
+  }, [enableFileImport, filePreview, isFileImporting, securityDisabled]);
 
   useEffect(() => {
     if (typeof initialUrl === 'string' && initialUrl.length > 0) {
@@ -927,7 +758,7 @@ export default function ImportForm({
 
   const shouldShowResolveButton = canShowResolveButton(resolverEnabled, parsed);
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (parsed.kind !== 'json' || securityDisabled) {
@@ -935,64 +766,12 @@ export default function ImportForm({
     }
 
     setIsSubmitting(true);
-    setSubmission(null);
-
-    try {
-      const response = await fetch('/api/liverc/import', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...importAuthHeaders,
-        },
-        body: JSON.stringify({
-          url: parsed.canonicalAbsoluteJsonUrl,
-          includeOutlaps: false,
-        }),
-      });
-
-      const payload: unknown = await response.json().catch(() => null);
-      const requestId =
-        isRecord(payload) && typeof payload.requestId === 'string' ? payload.requestId : undefined;
-
-      if (response.ok) {
-        const summary =
-          isRecord(payload) && 'data' in payload && isImportSummary(payload.data)
-            ? payload.data
-            : undefined;
-
-        if (summary) {
-          setSubmission({
-            status: 'success',
-            summary,
-            requestId,
-          });
-          return;
-        }
-
-        setSubmission({
-          status: 'error',
-          statusCode: response.status,
-          requestId,
-          error: 'Import succeeded but response payload was missing summary data.',
-        });
-        return;
-      }
-
-      setSubmission({
-        status: 'error',
-        statusCode: response.status,
-        requestId,
-        error: isRecord(payload) && 'error' in payload ? payload.error : payload,
-      });
-    } catch (error) {
-      setSubmission({
-        status: 'error',
-        statusCode: 0,
-        error,
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+    setSubmission({
+      status: 'error',
+      statusCode: 410,
+      error: DIRECT_IMPORT_RETIRED_MESSAGE,
+    });
+    setIsSubmitting(false);
   };
 
   const renderPreview = () => {
@@ -1107,8 +886,7 @@ export default function ImportForm({
     <div className={styles.formWrapper}>
       {securityDisabled ? (
         <p className={styles.error} role="alert">
-          LiveRC imports are temporarily unavailable while we refresh your session. Reload the page
-          and try again.
+          {DIRECT_IMPORT_RETIRED_MESSAGE}
         </p>
       ) : null}
       <div className={styles.tabList} role="tablist" aria-label="Import mode">
@@ -1307,7 +1085,6 @@ export default function ImportForm({
           tabPanelId={bulkPanelId}
           labelledById={bulkTabId}
           securityDisabled={securityDisabled}
-          importAuthHeaders={importAuthHeaders}
         />
       )}
       {resolverEnabled && resolveModalOpen ? (

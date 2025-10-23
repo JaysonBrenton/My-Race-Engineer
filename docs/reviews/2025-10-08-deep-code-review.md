@@ -1,6 +1,9 @@
 # Deep code review — 2025-10-08
 
+> **2025-12 note:** The file-upload route referenced here (`/api/liverc/import-file`) has been removed; connector-based ingestion replaces it. These notes remain as an archival record of the prior behaviour.
+
 ## Scope
+
 - LiveRC file-upload ingestion pipeline (`src/app/api/liverc/import-file/route.ts`, `src/core/app/liverc/uploadNamespace.ts`, `src/core/app/services/importLiveRc.ts`, `src/core/app/liverc/responseMappers.ts`).
 - Offline lap summary fallbacks wired through `src/dependencies/server.ts` and exercised by `tests/lap-summary-dependencies.test.ts`.
 
@@ -19,5 +22,6 @@
    - **Fix:** derive the session ID from the caller’s context (e.g. allow the mock to look up the entrant before emitting laps) or, at minimum, scope the fallback laps to the baseline entrant only so other IDs fail fast instead of receiving mismatched data.
 
 ## Suggested next steps
+
 - Adjust the upload namespace helper so it produces a stable slug for identical files (hash/size/timestamps) and reserve request-specific entropy for optional overrides.
 - Update the mock lap repository to respect each entrant’s session (or restrict the fallback to the baseline seed) and extend the dependency test to assert the session ID so regressions trip immediately.
