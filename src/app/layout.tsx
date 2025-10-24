@@ -37,7 +37,11 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function RootLayout({ children }: { children: ReactNode }) {
+type RootLayoutProps = {
+  children: ReactNode;
+};
+
+export default async function RootLayout({ children }: RootLayoutProps) {
   const sessionStatus = await getSessionFromCookies();
   const isAuthenticated = sessionStatus.status === 'authenticated';
 
