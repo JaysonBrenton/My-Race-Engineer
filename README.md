@@ -1,7 +1,9 @@
 # My Race Engineer (MRE)
 
-**The one-stop lap logic shop.**  
+**The one-stop lap logic shop.**
 Next.js (App Router) + TypeScript + Prisma/PostgreSQL with clean layering, strict linting, structured error handling, and CI-friendly conventions.
+
+> Maintainer: **Jayson** (project owner and primary product stakeholder)
 
 > Repo: `JaysonBrenton/My-Race-Engineer` • Default port: **:3001** (binds `0.0.0.0`) • Timezone: **Australia/Sydney**
 
