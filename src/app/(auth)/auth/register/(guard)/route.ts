@@ -6,8 +6,12 @@
  * License: MIT License
  */
 
+// No React types in server routes by design.
+
+import { type NextRequest, type NextResponse } from 'next/server';
+
 import { handleRegisterGuardPost } from './guard.impl';
 
-export async function POST(req: Request): Promise<Response> {
+export async function POST(req: NextRequest): Promise<NextResponse> {
   return handleRegisterGuardPost(req);
 }

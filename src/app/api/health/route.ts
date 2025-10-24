@@ -1,6 +1,8 @@
+// No React types in server routes by design.
+
 import { randomUUID } from 'node:crypto';
 
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 
 import { applicationLogger } from '@/dependencies/logger';
 
@@ -12,7 +14,7 @@ const baseHeaders = {
   'X-Robots-Tag': 'noindex, nofollow',
 } as const;
 
-export function GET(request: Request) {
+export function GET(request: NextRequest) {
   const requestId = request.headers.get('x-request-id') ?? randomUUID();
   const logger = applicationLogger.withContext({
     requestId,
