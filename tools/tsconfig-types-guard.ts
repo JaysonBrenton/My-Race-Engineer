@@ -2,11 +2,12 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const REQUIRED_TYPES = ['node', 'react', 'react-dom', 'react/next', 'react-dom/next'] as const;
+const REQUIRED_TYPES = ['node', 'react', 'react-dom'] as const;
 
 type GuardResult = {
-  missing: string[];
   hasTypesArray: boolean;
+  matchesRequiredOrder: boolean;
+  actual: string[];
 };
 
 async function checkTsconfigTypes(cwd = process.cwd()): Promise<GuardResult> {
@@ -22,43 +23,47 @@ async function checkTsconfigTypes(cwd = process.cwd()): Promise<GuardResult> {
   if (!Array.isArray(typesValue)) {
     return {
       hasTypesArray: false,
-      missing: [...REQUIRED_TYPES],
+      matchesRequiredOrder: false,
+      actual: [],
     };
   }
 
   const types = typesValue.map(String);
-  const missing = REQUIRED_TYPES.filter((type) => !types.includes(type));
+  const matchesRequiredOrder =
+    types.length === REQUIRED_TYPES.length &&
+    REQUIRED_TYPES.every((type, index) => types[index] === type);
 
   return {
     hasTypesArray: true,
-    missing,
+    matchesRequiredOrder,
+    actual: types,
   };
 }
 
 async function main() {
   try {
     const result = await checkTsconfigTypes();
-    if (result.missing.length > 0) {
-      console.error(
-        [
-          'tsconfig guard failed:',
-          '',
-          'The following ambient type packages must be present in compilerOptions.types to satisfy Next.js route handlers and keep React types available:',
-          `  - ${result.missing.join('\n  - ')}`,
-          '',
-          'Add the missing entries back to tsconfig.json and rerun this command.',
-        ].join('\n'),
-      );
-      process.exit(1);
-    }
-
     if (!result.hasTypesArray) {
       console.error(
         [
           'tsconfig guard failed:',
           '',
-          'No compilerOptions.types array was found. Define one that includes:',
-          ...REQUIRED_TYPES.map((type) => `  - ${type}`),
+          'No compilerOptions.types array was found. Define one that exactly equals:',
+          `  [${REQUIRED_TYPES.map((type) => `"${type}"`).join(', ')}]`,
+        ].join('\n'),
+      );
+      process.exit(1);
+    }
+
+    if (!result.matchesRequiredOrder) {
+      console.error(
+        [
+          'tsconfig guard failed:',
+          '',
+          'compilerOptions.types must exactly equal ["node", "react", "react-dom"] to lock in the simplified ambient type set.',
+          `Found: [${result.actual.map((type) => `"${type}"`).join(', ')}]`,
+          '',
+          'Update tsconfig.json and rerun this command.',
         ].join('\n'),
       );
       process.exit(1);
