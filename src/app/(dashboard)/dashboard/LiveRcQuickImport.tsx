@@ -14,14 +14,14 @@ type DiscoveryResponse =
   | { data: { events: DiscoveryEvent[] }; requestId: string }
   | { error: { code: string; message: string; details?: unknown }; requestId?: string };
 
-function parseDdMmYyyy(input: string): string | null {
-  const m = /^\s*(\d{2})-(\d{2})-(\d{4})\s*$/.exec(input);
+function parseYyyyMmDd(input: string): string | null {
+  const m = /^\s*(\d{4})-(\d{2})-(\d{2})\s*$/.exec(input);
   if (!m) return null;
-  const dd = Number(m[1]),
+  const yyyy = Number(m[1]),
     mm = Number(m[2]),
-    yyyy = Number(m[3]);
+    dd = Number(m[3]);
   if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
-  const iso = `${yyyy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+  const iso = `${String(yyyy).padStart(4, '0')}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
   const roundTrip = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
@@ -46,8 +46,8 @@ export default function LiveRcQuickImport() {
 
   const canSubmit = useMemo(() => {
     if (!start || !end || !trackOrClub.trim()) return false;
-    const startIso = parseDdMmYyyy(start);
-    const endIso = parseDdMmYyyy(end);
+    const startIso = parseYyyyMmDd(start);
+    const endIso = parseYyyyMmDd(end);
     if (!startIso || !endIso) return false;
     const days = daysInclusive(startIso, endIso);
     return !!days && days > 0 && days <= 7;
@@ -58,10 +58,10 @@ export default function LiveRcQuickImport() {
     setError(null);
     setEvents(null);
 
-    const startIso = parseDdMmYyyy(start);
-    const endIso = parseDdMmYyyy(end);
+    const startIso = parseYyyyMmDd(start);
+    const endIso = parseYyyyMmDd(end);
     if (!startIso || !endIso) {
-      setError('Dates must be valid and in DD-MM-YYYY format.');
+      setError('Dates must be valid calendar days.');
       return;
     }
     const days = daysInclusive(startIso, endIso);
@@ -105,7 +105,7 @@ export default function LiveRcQuickImport() {
           LiveRC quick import
         </h2>
         <p className={styles.description}>
-          Search by date range (DD-MM-YYYY) and track/club, then pick events to import.
+          Search by date range and track/club, then pick events to import.
         </p>
       </header>
 
@@ -114,10 +114,9 @@ export default function LiveRcQuickImport() {
           <label htmlFor="start">Search start date</label>
           <input
             id="start"
-            inputMode="numeric"
-            pattern="\\d{2}-\\d{2}-\\d{4}"
-            placeholder="DD-MM-YYYY"
+            type="date"
             value={start}
+            max={end || undefined}
             onChange={(e) => setStart(e.target.value)}
             required
           />
@@ -126,10 +125,9 @@ export default function LiveRcQuickImport() {
           <label htmlFor="end">Search end date</label>
           <input
             id="end"
-            inputMode="numeric"
-            pattern="\\d{2}-\\d{2}-\\d{4}"
-            placeholder="DD-MM-YYYY"
+            type="date"
             value={end}
+            min={start || undefined}
             onChange={(e) => setEnd(e.target.value)}
             required
           />
