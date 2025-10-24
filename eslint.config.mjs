@@ -62,4 +62,15 @@ export default [
       'import/order': 'off',
     },
   }),
+  {
+    files: ['src/app/**/route.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: ['react'],
+        },
+      ],
+    },
+  },
 ];
