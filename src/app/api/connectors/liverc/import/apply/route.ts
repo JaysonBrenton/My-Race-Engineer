@@ -1,3 +1,5 @@
+// No React types in server routes by design.
+
 import { createImportApplyRouteHandlers } from './handlers';
 
 const handlers = createImportApplyRouteHandlers();

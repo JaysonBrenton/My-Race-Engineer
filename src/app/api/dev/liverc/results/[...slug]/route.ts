@@ -1,3 +1,5 @@
+// No React types in server routes by design.
+
 import { randomUUID } from 'node:crypto';
 
 import { NextResponse, type NextRequest } from 'next/server';

@@ -6,6 +6,8 @@
  * License: MIT
  */
 
+// No React types in server routes by design.
+
 import { NextResponse } from 'next/server';
 
 import { parseAllowedOrigins } from '@/core/security/origin';

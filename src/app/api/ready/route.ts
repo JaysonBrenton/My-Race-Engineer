@@ -1,8 +1,10 @@
+// No React types in server routes by design.
+
 import { randomUUID } from 'node:crypto';
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 
 import type { Logger } from '@core/app';
 import { applicationLogger } from '@/dependencies/logger';
@@ -48,7 +50,7 @@ type EnvHint = {
   message: string;
 };
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   const requestId = request.headers.get('x-request-id') ?? randomUUID();
   const logger = applicationLogger.withContext({
     requestId,

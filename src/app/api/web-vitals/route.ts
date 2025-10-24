@@ -1,6 +1,8 @@
+// No React types in server routes by design.
+
 import { randomUUID } from 'node:crypto';
 
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 
 import { applicationLogger } from '@/dependencies/logger';
 
@@ -78,7 +80,7 @@ function validatePayload(data: unknown): ValidationResult {
   };
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   const requestId = request.headers.get('x-request-id') ?? randomUUID();
   const logger = applicationLogger.withContext({
     requestId,

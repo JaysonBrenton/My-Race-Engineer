@@ -1,3 +1,5 @@
+// No React types in server routes by design.
+
 import type { NextRequest } from 'next/server';
 
 import type { JobStatusRouteContext } from './handlers';

@@ -1,3 +1,5 @@
+// No React types in server routes by design.
+
 import { NextResponse } from 'next/server';
 
 import { absUrl } from '@/lib/seo';

@@ -4,7 +4,7 @@
  * Author: OpenAI Assistant
  */
 
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 
 import { applicationLogger } from '@/dependencies/logger';
 import {
@@ -21,7 +21,7 @@ import { applyAuthDebugHeaders, createAuthActionDebugRecorder } from '@/server/s
 
 const shouldLogDiagnostics = (): boolean => process.env.NODE_ENV !== 'production';
 
-export const handleLoginGuardPost = async (req: Request): Promise<Response> => {
+export const handleLoginGuardPost = async (req: NextRequest): Promise<NextResponse> => {
   const route = '/auth/login';
   const logger = applicationLogger.withContext({ route });
   const allowedOrigins = parseAllowedOrigins(process.env, { logger });
@@ -73,7 +73,7 @@ export const handleLoginGuardPost = async (req: Request): Promise<Response> => {
   return response;
 };
 
-const buildGuardResponse = (result: LoginActionResult, req: Request): NextResponse => {
+const buildGuardResponse = (result: LoginActionResult, req: NextRequest): NextResponse => {
   if (result.status === 'success') {
     const target = new URL(result.redirectTo, req.url);
     return NextResponse.redirect(target, 303);
@@ -83,7 +83,7 @@ const buildGuardResponse = (result: LoginActionResult, req: Request): NextRespon
   return NextResponse.redirect(url, 303);
 };
 
-const buildLoginRedirectUrl = (result: LoginActionErrorResult, req: Request): URL => {
+const buildLoginRedirectUrl = (result: LoginActionErrorResult, req: NextRequest): URL => {
   const params = new URLSearchParams();
   params.set('error', result.error);
 

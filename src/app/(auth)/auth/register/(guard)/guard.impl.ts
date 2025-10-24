@@ -4,7 +4,7 @@
  * Author: OpenAI Assistant
  */
 
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 
 import type { ResponseCookies } from 'next/dist/server/web/spec-extension/cookies';
 import {
@@ -27,7 +27,7 @@ import { applyAuthDebugHeaders, createAuthActionDebugRecorder } from '@/server/s
 
 const shouldLogDiagnostics = (): boolean => process.env.NODE_ENV !== 'production';
 
-export const handleRegisterGuardPost = async (req: Request): Promise<Response> => {
+export const handleRegisterGuardPost = async (req: NextRequest): Promise<NextResponse> => {
   const route = '/auth/register';
   const logger = applicationLogger.withContext({ route });
   const allowedOrigins = parseAllowedOrigins(process.env, { logger });

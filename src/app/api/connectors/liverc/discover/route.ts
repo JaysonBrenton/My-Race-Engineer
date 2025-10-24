@@ -1,6 +1,10 @@
+// No React types in server routes by design.
+
 import { randomUUID } from 'node:crypto';
 
 import { z } from 'zod';
+
+import { type NextRequest } from 'next/server';
 
 import { liveRcDiscoveryService } from '@/dependencies/liverc';
 import { applicationLogger } from '@/dependencies/logger';
@@ -89,7 +93,7 @@ const normalizeRequestBody = (body: unknown): unknown => {
   return body;
 };
 
-export async function POST(request: Request): Promise<Response> {
+export async function POST(request: NextRequest): Promise<Response> {
   const requestId = request.headers.get('x-request-id') ?? randomUUID();
   const logger = buildRequestLogger(requestId);
 
