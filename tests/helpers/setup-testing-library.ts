@@ -9,10 +9,9 @@ declare global {
   var MutationObserver: typeof globalThis.MutationObserver;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
 const dom = new JSDOM('<!doctype html><html><body></body></html>');
-// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-const jsdomWindow = dom.window as Window & typeof globalThis;
+
+const jsdomWindow = dom.window as unknown as Window & typeof globalThis;
 const navigator = jsdomWindow.navigator;
 
 Object.defineProperty(navigator, 'userAgent', {
