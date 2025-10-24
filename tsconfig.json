@@ -26,7 +26,7 @@
       "@core/domain": ["src/core/domain/index.ts"],
       "@core/infra": ["src/core/infra/index.ts"]
     },
-    "types": ["node", "react", "react-dom", "react/next", "react-dom/next"],
+    "types": ["node", "react", "react-dom"],
     "noEmit": true,
     "plugins": [
       {
