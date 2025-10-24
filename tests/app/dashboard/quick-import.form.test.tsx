@@ -7,11 +7,11 @@ import React from 'react';
 
 import '../../helpers/register-css-module-stub';
 
-declare global {
-  var React: typeof React;
-}
+const ReactForTests = React;
 
-globalThis.React = React;
+Object.assign(globalThis as typeof globalThis & { React: typeof import('react') }, {
+  React: ReactForTests,
+});
 
 // NOTE: If CSS modules break import, add a test-only CSS module stub or export a style-free wrapper.
 import LiveRcQuickImport from '../../../src/app/(dashboard)/dashboard/LiveRcQuickImport';
@@ -60,7 +60,9 @@ void test('valid input triggers POST with ISO dates and `track` key', async () =
   await withPatchedFetch(
     (_input, init) => {
       const rawBody = init?.body;
-      assert.equal(typeof rawBody, 'string');
+      if (typeof rawBody !== 'string') {
+        throw new TypeError('Expected fetch body to be serialised JSON string.');
+      }
       const body = JSON.parse(rawBody) as Record<string, unknown>;
       assert.equal(body.startDate, '2025-10-18');
       assert.equal(body.endDate, '2025-10-21');
