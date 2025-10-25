@@ -64,13 +64,19 @@ export default function LiveRcQuickImport() {
 
   const canSubmit = useMemo(() => {
     const trimmedTrack = trackOrClub.trim();
-    if (!start || !end || !trimmedTrack) return false;
+    if (!start || !end || trimmedTrack.length < 2) return false;
     const startIso = normaliseDateInput(start);
     const endIso = normaliseDateInput(end);
     if (!startIso || !endIso) return false;
     const days = daysInclusive(startIso, endIso);
     return !!days && days > 0 && days <= 7;
   }, [start, end, trackOrClub]);
+
+  const toStateDateValue = (value: string): string => {
+    if (!value) return '';
+    const normalised = normaliseDateInput(value);
+    return normalised ?? value;
+  };
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -87,6 +93,10 @@ export default function LiveRcQuickImport() {
     const days = daysInclusive(startIso, endIso);
     if (!days || days < 1 || days > 7) {
       setError('Date range must be between 1 and 7 days (inclusive).');
+      return;
+    }
+    if (trimmedTrack.length < 2) {
+      setError('Track or club name must be at least 2 characters.');
       return;
     }
 
@@ -134,9 +144,12 @@ export default function LiveRcQuickImport() {
           <label htmlFor="start">Search start date</label>
           <input
             id="start"
-            type="date"
+            type="text"
+            placeholder="DD-MM-YYYY"
+            inputMode="numeric"
+            pattern="(\d{2}-\d{2}-\d{4}|\d{4}-\d{2}-\d{2})"
+            maxLength={10}
             value={start}
-            max={end || undefined}
             onChange={(e) => setStart(e.target.value)}
             required
           />
@@ -145,9 +158,12 @@ export default function LiveRcQuickImport() {
           <label htmlFor="end">Search end date</label>
           <input
             id="end"
-            type="date"
+            type="text"
+            placeholder="DD-MM-YYYY"
+            inputMode="numeric"
+            pattern="(\d{2}-\d{2}-\d{4}|\d{4}-\d{2}-\d{2})"
+            maxLength={10}
             value={end}
-            min={start || undefined}
             onChange={(e) => setEnd(e.target.value)}
             required
           />
