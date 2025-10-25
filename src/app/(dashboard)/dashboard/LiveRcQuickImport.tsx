@@ -72,6 +72,12 @@ export default function LiveRcQuickImport() {
     return !!days && days > 0 && days <= 7;
   }, [start, end, trackOrClub]);
 
+  const toStateDateValue = (value: string): string => {
+    if (!value) return '';
+    const normalised = normaliseDateInput(value);
+    return normalised ?? value;
+  };
+
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
