@@ -1,3 +1,12 @@
+/**
+ * Project: My Race Engineer
+ * File: tests/core/liverc/jobQueue.test.ts
+ * Summary: Tests for the LiveRC job queue orchestration logic.
+ */
+
+/* eslint-disable @typescript-eslint/no-floating-promises -- Node test registration intentionally runs without awaiting. */
+/* eslint-disable @typescript-eslint/require-await -- Repository doubles satisfy async contracts via synchronous operations. */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -34,7 +43,7 @@ test('LiveRC job queue processes event items and updates counts', async () => {
           {
             id: 'item-1',
             targetType: 'EVENT',
-            targetRef: 'https://www.liverc.com/results/sample-event',
+            targetRef: 'https://live.liverc.com/results/sample-event',
             state: 'RUNNING',
             counts: undefined,
           },
@@ -71,7 +80,13 @@ test('LiveRC job queue processes event items and updates counts', async () => {
   const summaryImporter: StubSummaryImporter = {
     async ingestEventSummary() {
       importerCalls += 1;
-      return { sessionsImported: 2, resultRowsImported: 4, lapsImported: 8, driversWithLaps: 4, lapsSkipped: 0 };
+      return {
+        sessionsImported: 2,
+        resultRowsImported: 4,
+        lapsImported: 8,
+        driversWithLaps: 4,
+        lapsSkipped: 0,
+      };
     },
   };
 
@@ -104,7 +119,13 @@ test('LiveRC job queue processes event items and updates counts', async () => {
     itemId: 'item-1',
     state: 'SUCCEEDED',
     message: null,
-    counts: { sessionsImported: 2, resultRowsImported: 4, lapsImported: 8, driversWithLaps: 4, lapsSkipped: 0 },
+    counts: {
+      sessionsImported: 2,
+      resultRowsImported: 4,
+      lapsImported: 8,
+      driversWithLaps: 4,
+      lapsSkipped: 0,
+    },
   });
   assert.ok(progressUpdates.some((entry) => entry.jobId === 'job-1' && entry.progress === 100));
   assert.equal(repositoryState.markedSucceeded, 1);
@@ -133,7 +154,7 @@ test('LiveRC job queue records telemetry when event ingestion fails', async () =
           {
             id: 'item-2',
             targetType: 'EVENT',
-            targetRef: 'https://www.liverc.com/results/failure-event',
+            targetRef: 'https://live.liverc.com/results/failure-event',
             state: 'RUNNING',
             counts: undefined,
           },

@@ -1,3 +1,12 @@
+/**
+ * Project: My Race Engineer
+ * File: tests/core/liverc/summaryImporter.test.ts
+ * Summary: Tests for importing LiveRC event summaries and session data end-to-end.
+ */
+
+/* eslint-disable @typescript-eslint/no-floating-promises -- Node test registration intentionally runs without awaiting. */
+/* eslint-disable @typescript-eslint/require-await -- Repository doubles satisfy async contracts via synchronous operations. */
+
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -21,7 +30,14 @@ import type {
   SessionUpsertInput,
   LiveRcTelemetry,
 } from '../../../src/core/app';
-import type { Driver, Entrant, Event, RaceClass, ResultRow, Session } from '../../../src/core/domain';
+import type {
+  Driver,
+  Entrant,
+  Event,
+  RaceClass,
+  ResultRow,
+  Session,
+} from '../../../src/core/domain';
 import { LiveRcSummaryImporter } from '../../../src/core/app';
 
 const fixturesDir = path.join(__dirname, '..', '..', '..', 'fixtures', 'liverc', 'html');
@@ -177,7 +193,9 @@ class InMemorySessionRepository implements SessionRepository {
   }
 
   async listByRaceClass(raceClassId: string): Promise<Session[]> {
-    return Array.from(this.bySourceId.values()).filter((session) => session.raceClassId === raceClassId);
+    return Array.from(this.bySourceId.values()).filter(
+      (session) => session.raceClassId === raceClassId,
+    );
   }
 
   async upsertBySource(input: SessionUpsertInput): Promise<Session> {
@@ -428,7 +446,10 @@ class InMemoryLapRepository implements LapRepository {
     _sessionId: string,
     laps: ReadonlyArray<LapUpsertInput>,
   ): Promise<void> {
-    this.byEntrant.set(entrantId, laps.map((lap) => ({ ...lap })));
+    this.byEntrant.set(
+      entrantId,
+      laps.map((lap) => ({ ...lap })),
+    );
   }
 
   getLapInputs(entrantId: string): LapUpsertInput[] {
@@ -514,15 +535,15 @@ const createSummaryImporter = async () => {
   const truggySessionHtml = await loadFixture('sample-session-pro-truggy-main.html');
 
   const htmlByUrl = new Map<string, string>([
-    ['https://www.liverc.com/results/sample-event', eventHtml],
-    ['https://www.liverc.com/results/sample-event/', eventHtml],
-    ['https://www.liverc.com/results/sample-event/pro-buggy/main/a-main', buggySessionHtml],
-    ['https://www.liverc.com/results/sample-event/pro-truggy/main/a-main', truggySessionHtml],
+    ['https://live.liverc.com/results/sample-event', eventHtml],
+    ['https://live.liverc.com/results/sample-event/', eventHtml],
+    ['https://live.liverc.com/results/sample-event/pro-buggy/main/a-main', buggySessionHtml],
+    ['https://live.liverc.com/results/sample-event/pro-truggy/main/a-main', truggySessionHtml],
   ]);
 
   const jsonByUrl = new Map<string, unknown>([
     [
-      'https://www.liverc.com/results/sample-event/pro-buggy/main/a-main.json',
+      'https://live.liverc.com/results/sample-event/pro-buggy/main/a-main.json',
       {
         event_id: 'sample-event',
         class_id: 'pro-buggy',
@@ -536,7 +557,7 @@ const createSummaryImporter = async () => {
       },
     ],
     [
-      'https://www.liverc.com/results/sample-event/pro-truggy/main/a-main.json',
+      'https://live.liverc.com/results/sample-event/pro-truggy/main/a-main.json',
       {
         event_id: 'sample-event',
         class_id: 'pro-truggy',
@@ -565,10 +586,10 @@ const createSummaryImporter = async () => {
     },
     resolveJsonUrlFromHtml(html: string) {
       if (html.includes('pro-buggy')) {
-        return 'https://www.liverc.com/results/sample-event/pro-buggy/main/a-main.json';
+        return 'https://live.liverc.com/results/sample-event/pro-buggy/main/a-main.json';
       }
       if (html.includes('pro-truggy')) {
-        return 'https://www.liverc.com/results/sample-event/pro-truggy/main/a-main.json';
+        return 'https://live.liverc.com/results/sample-event/pro-truggy/main/a-main.json';
       }
       return null;
     },
@@ -624,7 +645,9 @@ test('LiveRC summary importer ingests sessions, laps, and result rows idempotent
     lapRepository,
   } = await createSummaryImporter();
 
-  const firstRun = await importer.ingestEventSummary('https://www.liverc.com/results/sample-event');
+  const firstRun = await importer.ingestEventSummary(
+    'https://live.liverc.com/results/sample-event',
+  );
   assert.equal(firstRun.sessionsImported, 2);
   assert.equal(firstRun.resultRowsImported, 4);
   assert.equal(firstRun.lapsImported, 8);
@@ -644,7 +667,9 @@ test('LiveRC summary importer ingests sessions, laps, and result rows idempotent
     assert.equal(lapRepository.getLapInputs(entrantId).length, 2);
   }
 
-  const secondRun = await importer.ingestEventSummary('https://www.liverc.com/results/sample-event');
+  const secondRun = await importer.ingestEventSummary(
+    'https://live.liverc.com/results/sample-event',
+  );
   assert.equal(secondRun.sessionsImported, 2);
   assert.equal(secondRun.resultRowsImported, 4);
   assert.equal(secondRun.lapsImported, 8);
@@ -666,7 +691,7 @@ test('LiveRC summary importer keeps duplicate display names separate', async () 
   <head>
     <meta charset="utf-8" />
     <title>Duplicate Drivers - LiveRC</title>
-    <link rel="canonical" href="https://www.liverc.com/results/duplicate-event" />
+    <link rel="canonical" href="https://live.liverc.com/results/duplicate-event" />
   </head>
   <body>
     <h1>Duplicate Drivers Event</h1>
@@ -687,7 +712,7 @@ test('LiveRC summary importer keeps duplicate display names separate', async () 
           <tbody>
             <tr>
               <td data-label="Race">
-                <a href="https://www.liverc.com/results/duplicate-event/spec-truggy/main/a-main">Spec Truggy A Main</a>
+                <a href="https://live.liverc.com/results/duplicate-event/spec-truggy/main/a-main">Spec Truggy A Main</a>
               </td>
               <td data-label="Class">Spec Truggy</td>
               <td data-label="Heat">A Main</td>
@@ -707,7 +732,7 @@ test('LiveRC summary importer keeps duplicate display names separate', async () 
   <head>
     <meta charset="utf-8" />
     <title>Spec Truggy A Main - LiveRC</title>
-    <link rel="canonical" href="https://www.liverc.com/results/duplicate-event/spec-truggy/main/a-main" />
+    <link rel="canonical" href="https://live.liverc.com/results/duplicate-event/spec-truggy/main/a-main" />
   </head>
   <body>
     <h1>Spec Truggy A Main</h1>
@@ -772,13 +797,13 @@ test('LiveRC summary importer keeps duplicate display names separate', async () 
 </html>`;
 
   const htmlByUrl = new Map<string, string>([
-    ['https://www.liverc.com/results/duplicate-event', eventHtml],
-    ['https://www.liverc.com/results/duplicate-event/spec-truggy/main/a-main', sessionHtml],
+    ['https://live.liverc.com/results/duplicate-event', eventHtml],
+    ['https://live.liverc.com/results/duplicate-event/spec-truggy/main/a-main', sessionHtml],
   ]);
 
   const jsonByUrl = new Map<string, unknown>([
     [
-      'https://www.liverc.com/results/duplicate-event/spec-truggy/main/a-main.json',
+      'https://live.liverc.com/results/duplicate-event/spec-truggy/main/a-main.json',
       {
         event_id: 'duplicate-event',
         class_id: 'spec-truggy',
@@ -810,7 +835,7 @@ test('LiveRC summary importer keeps duplicate display names separate', async () 
     },
     resolveJsonUrlFromHtml(html: string) {
       if (html.includes('Spec Truggy A Main')) {
-        return 'https://www.liverc.com/results/duplicate-event/spec-truggy/main/a-main.json';
+        return 'https://live.liverc.com/results/duplicate-event/spec-truggy/main/a-main.json';
       }
       return null;
     },
@@ -842,7 +867,9 @@ test('LiveRC summary importer keeps duplicate display names separate', async () 
     lapRepository,
   });
 
-  const result = await importer.ingestEventSummary('https://www.liverc.com/results/duplicate-event');
+  const result = await importer.ingestEventSummary(
+    'https://live.liverc.com/results/duplicate-event',
+  );
 
   assert.equal(result.sessionsImported, 1);
   assert.equal(result.resultRowsImported, 2);
@@ -873,15 +900,15 @@ test('LiveRC summary importer emits telemetry for session ingestion', async () =
   const truggySessionHtml = await loadFixture('sample-session-pro-truggy-main.html');
 
   const htmlByUrl = new Map<string, string>([
-    ['https://www.liverc.com/results/sample-event', eventHtml],
-    ['https://www.liverc.com/results/sample-event/', eventHtml],
-    ['https://www.liverc.com/results/sample-event/pro-buggy/main/a-main', buggySessionHtml],
-    ['https://www.liverc.com/results/sample-event/pro-truggy/main/a-main', truggySessionHtml],
+    ['https://live.liverc.com/results/sample-event', eventHtml],
+    ['https://live.liverc.com/results/sample-event/', eventHtml],
+    ['https://live.liverc.com/results/sample-event/pro-buggy/main/a-main', buggySessionHtml],
+    ['https://live.liverc.com/results/sample-event/pro-truggy/main/a-main', truggySessionHtml],
   ]);
 
   const jsonByUrl = new Map<string, unknown>([
     [
-      'https://www.liverc.com/results/sample-event/pro-buggy/main/a-main.json',
+      'https://live.liverc.com/results/sample-event/pro-buggy/main/a-main.json',
       {
         event_id: 'sample-event',
         class_id: 'pro-buggy',
@@ -895,7 +922,7 @@ test('LiveRC summary importer emits telemetry for session ingestion', async () =
       },
     ],
     [
-      'https://www.liverc.com/results/sample-event/pro-truggy/main/a-main.json',
+      'https://live.liverc.com/results/sample-event/pro-truggy/main/a-main.json',
       {
         event_id: 'sample-event',
         class_id: 'pro-truggy',
@@ -927,10 +954,10 @@ test('LiveRC summary importer emits telemetry for session ingestion', async () =
     },
     resolveJsonUrlFromHtml(html: string) {
       if (html.includes('Pro Buggy A Main')) {
-        return 'https://www.liverc.com/results/sample-event/pro-buggy/main/a-main.json';
+        return 'https://live.liverc.com/results/sample-event/pro-buggy/main/a-main.json';
       }
       if (html.includes('Pro Truggy A Main')) {
-        return 'https://www.liverc.com/results/sample-event/pro-truggy/main/a-main.json';
+        return 'https://live.liverc.com/results/sample-event/pro-truggy/main/a-main.json';
       }
       return null;
     },
@@ -973,7 +1000,7 @@ test('LiveRC summary importer emits telemetry for session ingestion', async () =
     telemetry,
   });
 
-  const result = await importer.ingestEventSummary('https://www.liverc.com/results/sample-event');
+  const result = await importer.ingestEventSummary('https://live.liverc.com/results/sample-event');
 
   assert.equal(result.sessionsImported, 2);
   assert.equal(result.resultRowsImported, 4);

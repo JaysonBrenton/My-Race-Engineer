@@ -1,3 +1,9 @@
+/**
+ * Project: My Race Engineer
+ * File: scripts/seed-liverc-catalogue.ts
+ * Summary: Script to seed Prisma with curated LiveRC catalogue data.
+ */
+
 import { PrismaClient, SessionType } from '@prisma/client';
 
 import { applicationLogger } from '../src/dependencies/logger';
@@ -53,7 +59,7 @@ const catalogue: CatalogueClub[] = [
         sourceEventId: '2024-the-dirt-nitro-challenge',
         providerEventId: '2024-the-dirt-nitro-challenge',
         name: '2024 The Dirt Nitro Challenge',
-        sourceUrl: 'https://www.liverc.com/results/2024-the-dirt-nitro-challenge',
+        sourceUrl: 'https://live.liverc.com/results/2024-the-dirt-nitro-challenge',
         startDate: '2024-02-19',
         endDate: '2024-02-25',
         entriesCount: 420,
@@ -63,14 +69,13 @@ const catalogue: CatalogueClub[] = [
             classCode: 'PRO-NITRO-BUGGY',
             name: 'Pro Nitro Buggy',
             sourceUrl:
-              'https://www.liverc.com/results/2024-the-dirt-nitro-challenge/pro-nitro-buggy',
+              'https://live.liverc.com/results/2024-the-dirt-nitro-challenge/pro-nitro-buggy',
             sessions: [
               {
-                sourceSessionId:
-                  '2024-the-dirt-nitro-challenge/pro-nitro-buggy/main-events/a-main',
+                sourceSessionId: '2024-the-dirt-nitro-challenge/pro-nitro-buggy/main-events/a-main',
                 name: 'A-Main',
                 sourceUrl:
-                  'https://www.liverc.com/results/2024-the-dirt-nitro-challenge/pro-nitro-buggy/main-events/a-main',
+                  'https://live.liverc.com/results/2024-the-dirt-nitro-challenge/pro-nitro-buggy/main-events/a-main',
                 type: SessionType.MAIN,
                 scheduledStart: '2024-02-25T18:00:00-08:00',
               },
@@ -79,7 +84,7 @@ const catalogue: CatalogueClub[] = [
                   '2024-the-dirt-nitro-challenge/pro-nitro-buggy/qualifying/round-5-heat-1',
                 name: 'Qualifying Round 5 Heat 1',
                 sourceUrl:
-                  'https://www.liverc.com/results/2024-the-dirt-nitro-challenge/pro-nitro-buggy/qualifying/round-5/heat-1',
+                  'https://live.liverc.com/results/2024-the-dirt-nitro-challenge/pro-nitro-buggy/qualifying/round-5/heat-1',
                 type: SessionType.QUAL,
                 scheduledStart: '2024-02-23T09:00:00-08:00',
               },
@@ -88,15 +93,13 @@ const catalogue: CatalogueClub[] = [
           {
             classCode: 'PRO-TRUGGY',
             name: 'Pro Nitro Truggy',
-            sourceUrl:
-              'https://www.liverc.com/results/2024-the-dirt-nitro-challenge/pro-truggy',
+            sourceUrl: 'https://live.liverc.com/results/2024-the-dirt-nitro-challenge/pro-truggy',
             sessions: [
               {
-                sourceSessionId:
-                  '2024-the-dirt-nitro-challenge/pro-truggy/main-events/a-main',
+                sourceSessionId: '2024-the-dirt-nitro-challenge/pro-truggy/main-events/a-main',
                 name: 'A-Main',
                 sourceUrl:
-                  'https://www.liverc.com/results/2024-the-dirt-nitro-challenge/pro-truggy/main-events/a-main',
+                  'https://live.liverc.com/results/2024-the-dirt-nitro-challenge/pro-truggy/main-events/a-main',
                 type: SessionType.MAIN,
                 scheduledStart: '2024-02-24T18:30:00-08:00',
               },
@@ -117,7 +120,7 @@ const catalogue: CatalogueClub[] = [
         sourceEventId: '2024-silver-state-indoor-championships',
         providerEventId: '2024-silver-state-indoor-championships',
         name: '2024 Silver State Indoor Championships',
-        sourceUrl: 'https://www.liverc.com/results/2024-silver-state-indoor-championships',
+        sourceUrl: 'https://live.liverc.com/results/2024-silver-state-indoor-championships',
         startDate: '2024-05-01',
         endDate: '2024-05-05',
         entriesCount: 510,
@@ -127,14 +130,14 @@ const catalogue: CatalogueClub[] = [
             classCode: 'PRO-EP-BUGGY',
             name: 'Pro Electric Buggy',
             sourceUrl:
-              'https://www.liverc.com/results/2024-silver-state-indoor-championships/pro-ep-buggy',
+              'https://live.liverc.com/results/2024-silver-state-indoor-championships/pro-ep-buggy',
             sessions: [
               {
                 sourceSessionId:
                   '2024-silver-state-indoor-championships/pro-ep-buggy/main-events/a-main',
                 name: 'A-Main',
                 sourceUrl:
-                  'https://www.liverc.com/results/2024-silver-state-indoor-championships/pro-ep-buggy/main-events/a-main',
+                  'https://live.liverc.com/results/2024-silver-state-indoor-championships/pro-ep-buggy/main-events/a-main',
                 type: SessionType.MAIN,
                 scheduledStart: '2024-05-05T17:30:00-07:00',
               },
@@ -143,7 +146,7 @@ const catalogue: CatalogueClub[] = [
                   '2024-silver-state-indoor-championships/pro-ep-buggy/qualifying/round-4-heat-3',
                 name: 'Qualifying Round 4 Heat 3',
                 sourceUrl:
-                  'https://www.liverc.com/results/2024-silver-state-indoor-championships/pro-ep-buggy/qualifying/round-4/heat-3',
+                  'https://live.liverc.com/results/2024-silver-state-indoor-championships/pro-ep-buggy/qualifying/round-4/heat-3',
                 type: SessionType.QUAL,
                 scheduledStart: '2024-05-04T11:00:00-07:00',
               },
@@ -153,14 +156,14 @@ const catalogue: CatalogueClub[] = [
             classCode: 'PRO-40-NITRO',
             name: '40+ Nitro Buggy',
             sourceUrl:
-              'https://www.liverc.com/results/2024-silver-state-indoor-championships/pro-40-nitro-buggy',
+              'https://live.liverc.com/results/2024-silver-state-indoor-championships/pro-40-nitro-buggy',
             sessions: [
               {
                 sourceSessionId:
                   '2024-silver-state-indoor-championships/pro-40-nitro-buggy/main-events/a-main',
                 name: 'A-Main',
                 sourceUrl:
-                  'https://www.liverc.com/results/2024-silver-state-indoor-championships/pro-40-nitro-buggy/main-events/a-main',
+                  'https://live.liverc.com/results/2024-silver-state-indoor-championships/pro-40-nitro-buggy/main-events/a-main',
                 type: SessionType.MAIN,
                 scheduledStart: '2024-05-05T14:30:00-07:00',
               },
