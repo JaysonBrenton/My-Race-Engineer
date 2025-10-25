@@ -43,7 +43,7 @@ void test('button disabled until valid DD-MM-YYYY range and non-empty track/club
   const start = screen.getByLabelText<HTMLInputElement>(/search start date/i);
   const end = screen.getByLabelText<HTMLInputElement>(/search end date/i);
   const track = screen.getByLabelText<HTMLInputElement>(/track or club name/i);
-  const button = screen.getByRole('button', { name: /discover events/i });
+  const button = screen.getByRole('button', { name: /search/i });
 
   assert.equal(button.hasAttribute('disabled'), true);
 
@@ -80,7 +80,7 @@ void test('valid input triggers POST with ISO dates and `track` key', async () =
         screen.getByLabelText<HTMLInputElement>(/track or club name/i),
         'Canberra',
       );
-      await userEvent.click(screen.getByRole('button', { name: /discover events/i }));
+      await userEvent.click(screen.getByRole('button', { name: /search/i }));
     },
   );
 });

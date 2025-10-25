@@ -14,13 +14,31 @@ type DiscoveryResponse =
   | { data: { events: DiscoveryEvent[] }; requestId: string }
   | { error: { code: string; message: string; details?: unknown }; requestId?: string };
 
-function parseYyyyMmDd(input: string): string | null {
-  const m = /^\s*(\d{4})-(\d{2})-(\d{2})\s*$/.exec(input);
-  if (!m) return null;
-  const yyyy = Number(m[1]),
-    mm = Number(m[2]),
-    dd = Number(m[3]);
+function normaliseDateInput(input: string): string | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+
+  const isoMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+  const dmyMatch = /^(\d{2})-(\d{2})-(\d{4})$/.exec(trimmed);
+
+  let yyyy: number;
+  let mm: number;
+  let dd: number;
+
+  if (isoMatch) {
+    yyyy = Number(isoMatch[1]);
+    mm = Number(isoMatch[2]);
+    dd = Number(isoMatch[3]);
+  } else if (dmyMatch) {
+    dd = Number(dmyMatch[1]);
+    mm = Number(dmyMatch[2]);
+    yyyy = Number(dmyMatch[3]);
+  } else {
+    return null;
+  }
+
   if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
+
   const iso = `${String(yyyy).padStart(4, '0')}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
@@ -45,21 +63,29 @@ export default function LiveRcQuickImport() {
   const [events, setEvents] = useState<DiscoveryEvent[] | null>(null);
 
   const canSubmit = useMemo(() => {
-    if (!start || !end || !trackOrClub.trim()) return false;
-    const startIso = parseYyyyMmDd(start);
-    const endIso = parseYyyyMmDd(end);
+    const trimmedTrack = trackOrClub.trim();
+    if (!start || !end || !trimmedTrack) return false;
+    const startIso = normaliseDateInput(start);
+    const endIso = normaliseDateInput(end);
     if (!startIso || !endIso) return false;
     const days = daysInclusive(startIso, endIso);
     return !!days && days > 0 && days <= 7;
   }, [start, end, trackOrClub]);
+
+  const toStateDateValue = (value: string): string => {
+    if (!value) return '';
+    const normalised = normaliseDateInput(value);
+    return normalised ?? value;
+  };
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     setEvents(null);
 
-    const startIso = parseYyyyMmDd(start);
-    const endIso = parseYyyyMmDd(end);
+    const startIso = normaliseDateInput(start);
+    const endIso = normaliseDateInput(end);
+    const trimmedTrack = trackOrClub.trim();
     if (!startIso || !endIso) {
       setError('Dates must be valid calendar days.');
       return;
@@ -78,7 +104,7 @@ export default function LiveRcQuickImport() {
         body: JSON.stringify({
           startDate: startIso,
           endDate: endIso,
-          track: trackOrClub.trim(), // label is “Track or club name”; API key remains `track`
+          track: trimmedTrack, // label is “Track or club name”; API key remains `track`
         }),
       });
       const json = (await res.json()) as DiscoveryResponse;
@@ -117,7 +143,7 @@ export default function LiveRcQuickImport() {
             type="date"
             value={start}
             max={end || undefined}
-            onChange={(e) => setStart(e.target.value)}
+            onChange={(e) => setStart(toStateDateValue(e.target.value))}
             required
           />
         </div>
@@ -128,7 +154,7 @@ export default function LiveRcQuickImport() {
             type="date"
             value={end}
             min={start || undefined}
-            onChange={(e) => setEnd(e.target.value)}
+            onChange={(e) => setEnd(toStateDateValue(e.target.value))}
             required
           />
         </div>
