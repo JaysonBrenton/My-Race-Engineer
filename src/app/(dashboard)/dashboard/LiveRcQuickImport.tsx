@@ -151,6 +151,7 @@ export default function LiveRcQuickImport() {
             maxLength={10}
             value={start}
             onChange={(e) => setStart(e.target.value)}
+            onBlur={(e) => setStart(toStateDateValue(e.target.value))}
             required
           />
         </div>
@@ -165,6 +166,7 @@ export default function LiveRcQuickImport() {
             maxLength={10}
             value={end}
             onChange={(e) => setEnd(e.target.value)}
+            onBlur={(e) => setEnd(toStateDateValue(e.target.value))}
             required
           />
         </div>
