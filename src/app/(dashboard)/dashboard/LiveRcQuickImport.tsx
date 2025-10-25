@@ -53,6 +53,18 @@ function daysInclusive(aIso: string, bIso: string): number | null {
   return Math.floor((b.getTime() - a.getTime()) / 86400000) + 1;
 }
 
+function isWithinSixMonths(startIso: string, endIso: string): boolean {
+  const startDate = new Date(startIso + 'T00:00:00Z');
+  const endDate = new Date(endIso + 'T00:00:00Z');
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return false;
+  if (endDate < startDate) return false;
+
+  const limit = new Date(startDate);
+  limit.setUTCMonth(limit.getUTCMonth() + 6);
+
+  return endDate <= limit;
+}
+
 export default function LiveRcQuickImport() {
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
@@ -69,7 +81,7 @@ export default function LiveRcQuickImport() {
     const endIso = normaliseDateInput(end);
     if (!startIso || !endIso) return false;
     const days = daysInclusive(startIso, endIso);
-    return !!days && days > 0 && days <= 7;
+    return !!days && days > 0 && isWithinSixMonths(startIso, endIso);
   }, [start, end, trackOrClub]);
 
   const toStateDateValue = (value: string): string => {
@@ -91,8 +103,8 @@ export default function LiveRcQuickImport() {
       return;
     }
     const days = daysInclusive(startIso, endIso);
-    if (!days || days < 1 || days > 7) {
-      setError('Date range must be between 1 and 7 days (inclusive).');
+    if (!days || days < 1 || !isWithinSixMonths(startIso, endIso)) {
+      setError('Date range must be between 1 day and 6 months (inclusive).');
       return;
     }
     if (trimmedTrack.length < 2) {
