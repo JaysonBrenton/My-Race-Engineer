@@ -1,3 +1,9 @@
+/**
+ * Project: My Race Engineer
+ * File: src/app/(dashboard)/import/ImportForm.tsx
+ * Summary: Import form component for LiveRC event ingestion workflows.
+ */
+
 'use client';
 
 import {
@@ -432,7 +438,7 @@ const BulkImportTab = ({
         <textarea
           id="bulk-liverc-urls"
           className={styles.bulkTextarea}
-          placeholder="https://www.liverc.com/..."
+          placeholder="https://live.liverc.com/..."
           value={bulkInput}
           onChange={handleBulkInputChange}
           spellCheck={false}

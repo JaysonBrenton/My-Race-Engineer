@@ -1,3 +1,9 @@
+/**
+ * Project: My Race Engineer
+ * File: tests/connectors/liverc/apply.route.test.ts
+ * Summary: Tests for applying LiveRC event plans via the connector route.
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -41,7 +47,7 @@ void test('POST happy path returns 202 with jobId (and optional Location)', asyn
     generatedAt: new Date().toISOString(),
     items: [
       {
-        eventRef: 'https://www.liverc.com/events/event-abc',
+        eventRef: 'https://live.liverc.com/events/event-abc',
         status: 'NEW',
         counts: { sessions: 2, drivers: 24, estimatedLaps: 480 },
       },

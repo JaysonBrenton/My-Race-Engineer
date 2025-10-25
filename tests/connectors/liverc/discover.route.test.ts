@@ -1,3 +1,9 @@
+/**
+ * Project: My Race Engineer
+ * File: tests/connectors/liverc/discover.route.test.ts
+ * Summary: Route-level tests for the LiveRC discover connector API.
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -37,12 +43,12 @@ const htmlForDate = (dateLabel: string) => `<!DOCTYPE html>
 <html><head><title>Events ${dateLabel}</title></head>
 <body>
   <article class="event-card">
-    <h2><a href="https://www.liverc.com/events/event-canberra">Canberra Off-Road Championship</a></h2>
+    <h2><a href="https://live.liverc.com/events/event-canberra">Canberra Off-Road Championship</a></h2>
     <div class="portfolio-meta"><span>${dateLabel} 10:00 AM</span></div>
     <p class="event-location" data-track="Canberra Off-Road">Round 3</p>
   </article>
   <article class="event-card">
-    <h2><a href="https://www.liverc.com/events/event-other">Regional Club Day</a></h2>
+    <h2><a href="https://live.liverc.com/events/event-other">Regional Club Day</a></h2>
     <div class="portfolio-meta"><span>${dateLabel} 12:00 PM</span></div>
     <p class="event-location">Somewhere Else</p>
   </article>
@@ -52,7 +58,7 @@ const stubForEventsOverview = (url: string): Response => {
   // HTML client requests /events?date=YYYY-MM-DD
   const u = new URL(url);
   if (
-    (u.hostname === 'www.liverc.com' || u.hostname === 'liverc.com') &&
+    (u.hostname === 'live.liverc.com' || u.hostname === 'liverc.com') &&
     (u.pathname === '/events' || u.pathname === '/events/') &&
     u.searchParams.has('date')
   ) {

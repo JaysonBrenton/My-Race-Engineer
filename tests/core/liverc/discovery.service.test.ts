@@ -4,6 +4,12 @@
  * Summary: Unit tests covering LiveRcDiscoveryService event aggregation behaviour.
  */
 
+/**
+ * Project: My Race Engineer
+ * File: tests/core/liverc/discovery.service.test.ts
+ * Summary: Tests for the LiveRC discovery service when parsing event listings.
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -26,12 +32,12 @@ class StubHtmlClient {
 const day = (ymd: string, matchText = 'Canberra Off-Road') => `<!DOCTYPE html>
 <html><body>
   <article class="event-card">
-    <h2><a href="https://www.liverc.com/events/event-${ymd}">${matchText} Challenge</a></h2>
+    <h2><a href="https://live.liverc.com/events/event-${ymd}">${matchText} Challenge</a></h2>
     <div class="portfolio-meta"><span>${ymd} 10:00 AM</span></div>
     <p class="event-location" data-track="${matchText}">Round</p>
   </article>
   <article class="event-card">
-    <h2><a href="https://www.liverc.com/events/other-${ymd}">Regional Club Day</a></h2>
+    <h2><a href="https://live.liverc.com/events/other-${ymd}">Regional Club Day</a></h2>
     <div class="portfolio-meta"><span>${ymd} 12:00 PM</span></div>
     <p class="event-location">Somewhere Else</p>
   </article>

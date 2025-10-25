@@ -1,3 +1,9 @@
+/**
+ * Project: My Race Engineer
+ * File: src/core/liverc/urlParser.ts
+ * Summary: Utility helpers to validate and transform LiveRC URLs used across the app.
+ */
+
 export const LiveRcUrlInvalidReasons = {
   INVALID_ABSOLUTE_URL: 'LiveRC import requires an absolute URL.',
   UNTRUSTED_HOST: 'LiveRC URL must use an approved LiveRC hostname.',
@@ -67,7 +73,11 @@ export const parseLiveRcUrl = (input: string): LiveRcUrlParseResult => {
 
   const hostname = parsedUrl.hostname.toLowerCase();
   const isTrustedHost =
-    hostname === 'liverc.com' || hostname === 'www.liverc.com' || hostname.endsWith('.liverc.com');
+    // Accept canonical LiveRC hosts including live.liverc.com as well as legacy ones.
+    hostname === 'liverc.com' ||
+    hostname === 'live.liverc.com' ||
+    hostname === 'www.liverc.com' ||
+    hostname.endsWith('.liverc.com');
 
   if (!isTrustedHost) {
     return { type: 'invalid', reasonIfInvalid: LiveRcUrlInvalidReasons.UNTRUSTED_HOST };

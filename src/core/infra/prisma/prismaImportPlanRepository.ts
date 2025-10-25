@@ -1,3 +1,9 @@
+/**
+ * Project: My Race Engineer
+ * File: src/core/infra/prisma/prismaImportPlanRepository.ts
+ * Summary: Prisma-backed implementation of the import plan repository for LiveRC.
+ */
+
 import type { ImportPlanEventState, ImportPlanRepository } from '@core/app';
 
 import { getPrismaClient } from './prismaClient';
@@ -27,7 +33,7 @@ const buildCandidateUrls = (ref: string): string[] => {
   const candidates = new Set<string>();
   const normalized = trimmed.startsWith('results/') ? trimmed : `results/${trimmed}`;
 
-  const prefixes = ['https://www.liverc.com/', 'https://liverc.com/'];
+  const prefixes = ['https://live.liverc.com/', 'https://liverc.com/'];
 
   for (const prefix of prefixes) {
     candidates.add(`${prefix}${normalized}`);

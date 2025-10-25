@@ -14,8 +14,8 @@ const DEFAULT_MIN_REQUEST_INTERVAL_MS = 1_000;
 
 /**
  * Base origin used for LiveRC HTML pages when callers supply relative paths. The
- * discovery endpoints live on the live.liverc.com host, so we default to that
- * domain for consistency with production traffic.
+ * upstream service now serves canonical content from live.liverc.com, so we
+ * mirror that domain to ensure generated URLs align with production data.
  */
 const DEFAULT_BASE_ORIGIN = 'https://live.liverc.com/';
 

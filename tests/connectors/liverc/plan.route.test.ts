@@ -1,3 +1,9 @@
+/**
+ * Project: My Race Engineer
+ * File: tests/connectors/liverc/plan.route.test.ts
+ * Summary: Tests for the LiveRC planning connector route behaviour.
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -50,7 +56,7 @@ void test('POST happy path returns planId and items', async () => {
     generatedAt: new Date().toISOString(),
     items: [
       {
-        eventRef: 'https://www.liverc.com/events/event-abc',
+        eventRef: 'https://live.liverc.com/events/event-abc',
         status: 'NEW',
         counts: { sessions: 2, drivers: 24, estimatedLaps: 480 },
       },
@@ -71,7 +77,7 @@ void test('POST happy path returns planId and items', async () => {
 
   try {
     const res = await POST(
-      makeRequest({ events: [{ eventRef: 'https://www.liverc.com/events/event-abc' }] }),
+      makeRequest({ events: [{ eventRef: 'https://live.liverc.com/events/event-abc' }] }),
     );
     assert.ok(res.status === 200 || res.status === 201);
     assert.equal(res.headers.get('Cache-Control'), 'no-store');
