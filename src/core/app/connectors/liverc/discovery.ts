@@ -1,3 +1,9 @@
+/**
+ * Project: My Race Engineer
+ * File: src/core/app/connectors/liverc/discovery.ts
+ * Summary: Service that discovers LiveRC events by parsing HTML listings.
+ */
+
 import { HTMLElement as ParsedHTMLElement, parse } from 'node-html-parser';
 
 import type { Logger } from '@core/app/ports/logger';
@@ -43,7 +49,8 @@ type AggregatedDiscoveryEvent = {
 
 const MAX_RANGE_DAYS = 7;
 const DEFAULT_LIMIT = 40;
-const LIVERC_BASE_ORIGIN = 'https://www.liverc.com';
+// Base origin for resolving relative event references returned by LiveRC.
+const LIVERC_BASE_ORIGIN = 'https://live.liverc.com/';
 
 export class LiveRcDiscoveryService {
   constructor(private readonly dependencies: Dependencies) {}

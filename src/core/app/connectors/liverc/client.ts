@@ -1,3 +1,9 @@
+/**
+ * Project: My Race Engineer
+ * File: src/core/app/connectors/liverc/client.ts
+ * Summary: HTTP client responsible for fetching LiveRC HTML and JSON resources.
+ */
+
 const DEFAULT_USER_AGENT = 'MyRaceEngineer.LiveRcClient/0.1 (+https://myraceengineer.example)';
 
 const DEFAULT_MAX_RETRIES = 3;
@@ -6,7 +12,12 @@ const DEFAULT_MAX_RETRY_DELAY_MS = 5_000;
 const DEFAULT_JITTER_RATIO = 0.35;
 const DEFAULT_MIN_REQUEST_INTERVAL_MS = 1_000;
 
-const DEFAULT_BASE_ORIGIN = 'https://www.liverc.com';
+/**
+ * Base origin used for LiveRC HTML pages when callers supply relative paths. The
+ * discovery endpoints live on the live.liverc.com host, so we default to that
+ * domain for consistency with production traffic.
+ */
+const DEFAULT_BASE_ORIGIN = 'https://live.liverc.com/';
 
 const DEFAULT_FALLBACK_PATTERNS: readonly RegExp[] = [
   /<link[^>]+rel=["']canonical["'][^>]*href=["'](?<url>[^"']+)["']/i,
@@ -16,7 +27,7 @@ const DEFAULT_FALLBACK_PATTERNS: readonly RegExp[] = [
 
 export type LiveRcClientConfig = {
   /**
-   * Base origin used when callers provide relative URLs (defaults to https://www.liverc.com).
+   * Base origin used when callers provide relative URLs (defaults to https://live.liverc.com/).
    */
   baseOrigin?: string;
   /**

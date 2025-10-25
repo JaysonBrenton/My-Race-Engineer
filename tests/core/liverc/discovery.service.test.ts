@@ -1,3 +1,9 @@
+/**
+ * Project: My Race Engineer
+ * File: tests/core/liverc/discovery.service.test.ts
+ * Summary: Unit tests covering LiveRcDiscoveryService event aggregation behaviour.
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -7,7 +13,8 @@ import { LiveRcDiscoveryService } from '../../../src/core/app/connectors/liverc/
 class StubHtmlClient {
   constructor(private readonly htmlByDate: Record<string, string>) {}
   getEventOverview(urlOrRef: string): Promise<string> {
-    const url = new URL(urlOrRef, 'https://www.liverc.com');
+    // Discovery requests should hit the live.liverc.com host when resolving relative paths.
+    const url = new URL(urlOrRef, 'https://live.liverc.com/');
     const date = url.searchParams.get('date');
     if (date) {
       return Promise.resolve(this.htmlByDate[date] ?? '<html><body></body></html>');
