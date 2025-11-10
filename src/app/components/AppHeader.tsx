@@ -1,8 +1,7 @@
 /**
- * Author: Jayson Brenton + The Brainy One
- * Date: 2025-10-20
- * Purpose: Ensure header navigation leverages typed routes for settings access.
- * License: MIT
+ * Project: My Race Engineer
+ * File: src/app/components/AppHeader.tsx
+ * Summary: Renders the authenticated app header with primary navigation, including dashboard and settings shortcuts.
  */
 
 'use client';
@@ -18,6 +17,7 @@ import { BrandLink } from './BrandLink';
 
 const HIDDEN_EXACT_PATHS = new Set(['', '/']);
 const HIDDEN_PREFIXES = ['/auth'];
+const DASHBOARD_ROUTE: Route = '/dashboard' as Route; // keep dashboard link typed for safety
 const SETTINGS_ACCOUNT_ROUTE: Route = '/settings/account' as Route; // safe: canonical settings page
 
 export interface AppHeaderProps {
@@ -52,6 +52,10 @@ export function AppHeader({ isAuthenticated }: AppHeaderProps) {
         <BrandLink />
         {isAuthenticated ? (
           <nav className="app-header__actions" aria-label="Account">
+            {/* Provide a fast-path back to the dashboard before account actions. */}
+            <Link className="app-header__action" href={DASHBOARD_ROUTE}>
+              My Dashboard
+            </Link>
             <Link className="app-header__action" href={SETTINGS_ACCOUNT_ROUTE}>
               Settings
             </Link>
