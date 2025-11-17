@@ -8,7 +8,7 @@ import { HTMLElement as ParsedHTMLElement, parse } from 'node-html-parser';
 
 import type { Logger } from '@core/app/ports/logger';
 
-import type { LiveRcClient } from './client';
+import { LiveRcClientError, type LiveRcClient } from './client';
 
 export type LiveRcDiscoveryEvent = {
   eventRef: string;
@@ -82,6 +82,22 @@ export class LiveRcDiscoveryService {
       try {
         html = await this.dependencies.client.getEventOverview(`/events/?date=${dateLabel}`);
       } catch (error) {
+        if (error instanceof LiveRcClientError && error.status === 404) {
+          // LiveRC returns 404 when no events exist for a date; treat this as
+          // an empty listing so discovery can proceed instead of failing the
+          // entire request.
+          this.dependencies.logger?.info?.(
+            'LiveRC reported no events for date; continuing discovery.',
+            {
+              event: 'liverc.discovery.fetch_not_found',
+              outcome: 'success',
+              date: dateLabel,
+              error,
+            },
+          );
+          continue;
+        }
+
         this.dependencies.logger?.error?.('Failed to fetch LiveRC event listing.', {
           event: 'liverc.discovery.fetch_failed',
           outcome: 'failure',
