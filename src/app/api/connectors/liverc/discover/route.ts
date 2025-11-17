@@ -1,3 +1,8 @@
+/**
+ * Project: My Race Engineer
+ * File: src/app/api/connectors/liverc/discover/route.ts
+ * Summary: API route that proxies LiveRC discovery requests and returns normalized responses.
+ */
 // No React types in server routes by design.
 
 import { randomUUID } from 'node:crypto';
@@ -8,6 +13,7 @@ import { type NextRequest } from 'next/server';
 
 import { liveRcDiscoveryService } from '@/dependencies/liverc';
 import { applicationLogger } from '@/dependencies/logger';
+import { LiveRcClientError } from '@core/app/connectors/liverc/client';
 
 const ROUTE_PATH = '/api/connectors/liverc/discover';
 const ALLOW_HEADER = 'OPTIONS, POST';
@@ -56,6 +62,54 @@ const buildJsonResponse = (status: number, payload: unknown, requestId: string):
 
 const buildRequestLogger = (requestId: string) =>
   applicationLogger.withContext({ requestId, route: ROUTE_PATH });
+
+const formatUpstreamPath = (url: string | undefined): string | undefined => {
+  if (!url) {
+    return undefined;
+  }
+
+  try {
+    const parsed = new URL(url);
+    return `${parsed.pathname}${parsed.search}`;
+  } catch {
+    // Preserve the original value when URL parsing fails so we do not hide
+    // potentially useful diagnostics.
+    return url;
+  }
+};
+
+const buildLiveRcErrorResponse = (error: LiveRcClientError, requestId: string) => {
+  const upstreamStatus = error.status;
+  const upstreamPath = formatUpstreamPath(error.url);
+
+  const messageBase = (() => {
+    if (error.code === 'MAX_RETRIES_EXCEEDED' || error.code === 'RETRYABLE_STATUS') {
+      return 'LiveRC did not respond after multiple attempts. Please try again shortly.';
+    }
+
+    if (upstreamStatus) {
+      const pathSuffix = upstreamPath ? ` for ${upstreamPath}` : '';
+      return `LiveRC responded with status ${upstreamStatus}${pathSuffix}.`;
+    }
+
+    return 'Unable to discover LiveRC events for the requested criteria.';
+  })();
+
+  return {
+    status: 502,
+    payload: {
+      error: {
+        code: error.code ?? 'DISCOVERY_FAILED',
+        message: messageBase,
+        details: {
+          upstreamStatus,
+          upstreamPath,
+        },
+      },
+      requestId,
+    },
+  } as const;
+};
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -170,6 +224,21 @@ export async function POST(request: NextRequest): Promise<Response> {
       requestId,
     );
   } catch (error) {
+    if (error instanceof LiveRcClientError) {
+      // Preserve upstream status/path details to help operators distinguish between
+      // LiveRC HTTP errors (e.g. 403/404) and transient availability issues.
+      const { status, payload } = buildLiveRcErrorResponse(error, requestId);
+      logger.error('LiveRC discovery request failed due to upstream error.', {
+        event: 'liverc.discovery.failure',
+        outcome: 'failure',
+        upstreamStatus: error.status,
+        upstreamPath: formatUpstreamPath(error.url),
+        error,
+      });
+
+      return buildJsonResponse(status, payload, requestId);
+    }
+
     logger.error('LiveRC discovery request failed.', {
       event: 'liverc.discovery.failure',
       outcome: 'failure',
