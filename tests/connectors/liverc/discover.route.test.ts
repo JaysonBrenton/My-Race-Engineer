@@ -7,6 +7,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import type { NextRequest } from 'next/server';
+
 import { POST, OPTIONS } from '../../../src/app/api/connectors/liverc/discover/route';
 import { liveRcDependencies } from '../../../src/dependencies/liverc';
 
@@ -71,12 +73,13 @@ const stubForEventsOverview = (url: string): Response => {
   return new Response('not found', { status: 404 });
 };
 
-const makeRequest = (body: unknown) =>
+const makeRequest = (body: unknown): NextRequest =>
+  // Cast because the route handler only consumes the Fetch API surface of NextRequest in tests.
   new Request('http://localhost/api/connectors/liverc/discover', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
-  });
+  }) as unknown as NextRequest;
 
 // --- Tests ---------------------------------------------------------------
 

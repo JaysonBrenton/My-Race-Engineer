@@ -122,18 +122,21 @@ model Lap {
 }
 
 model Club {
-  id              String    @id @default(cuid())
-  slug            String    @unique
-  name            String
-  subdomain       String    @unique
+  id              String   @id @default(cuid())
+  /// Canonical LiveRC subdomain, stored consistently without protocol or path.
+  liveRcSubdomain String   @unique
+  displayName     String
+  country         String?
   region          String?
-  timezone        String?
-  lastRefreshedAt DateTime?
-  lastChangedAt   DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  firstSeenAt     DateTime @default(now())
+  lastSeenAt      DateTime @default(now())
+  isActive        Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   events Event[]
+
+  @@index([displayName])
 }
 
 model Driver {
