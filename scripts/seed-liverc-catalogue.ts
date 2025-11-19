@@ -39,21 +39,19 @@ type CatalogueEvent = {
 };
 
 type CatalogueClub = {
-  slug: string;
-  name: string;
-  subdomain: string;
+  liveRcSubdomain: string;
+  displayName: string;
+  country?: string;
   region?: string;
-  timezone?: string;
   events: CatalogueEvent[];
 };
 
 const catalogue: CatalogueClub[] = [
   {
-    slug: 'the-dirt',
-    name: 'The Dirt Racing',
-    subdomain: 'thedirt',
+    liveRcSubdomain: 'thedirt',
+    displayName: 'The Dirt Racing',
+    country: 'US',
     region: 'US-CA',
-    timezone: 'America/Los_Angeles',
     events: [
       {
         sourceEventId: '2024-the-dirt-nitro-challenge',
@@ -110,11 +108,10 @@ const catalogue: CatalogueClub[] = [
     ],
   },
   {
-    slug: 'silver-state',
-    name: 'Silver State RC Race',
-    subdomain: 'silverstate',
+    liveRcSubdomain: 'silverstate',
+    displayName: 'Silver State RC Race',
+    country: 'US',
     region: 'US-NV',
-    timezone: 'America/Los_Angeles',
     events: [
       {
         sourceEventId: '2024-silver-state-indoor-championships',
@@ -188,20 +185,25 @@ async function seedCatalogue() {
   let sessionsUpdated = 0;
 
   for (const entry of catalogue) {
+    // Use a single timestamp for first/last seen to keep seeded clubs consistent per run.
+    const syncTimestamp = new Date();
     const club = await prisma.club.upsert({
-      where: { slug: entry.slug },
+      where: { liveRcSubdomain: entry.liveRcSubdomain },
       create: {
-        slug: entry.slug,
-        name: entry.name,
-        subdomain: entry.subdomain,
+        liveRcSubdomain: entry.liveRcSubdomain,
+        displayName: entry.displayName,
+        country: entry.country ?? null,
         region: entry.region ?? null,
-        timezone: entry.timezone ?? null,
+        firstSeenAt: syncTimestamp,
+        lastSeenAt: syncTimestamp,
+        isActive: true,
       },
       update: {
-        name: entry.name,
-        subdomain: entry.subdomain,
+        displayName: entry.displayName,
+        country: entry.country ?? null,
         region: entry.region ?? null,
-        timezone: entry.timezone ?? null,
+        lastSeenAt: syncTimestamp,
+        isActive: true,
       },
     });
 
