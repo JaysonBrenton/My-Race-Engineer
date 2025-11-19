@@ -1,9 +1,7 @@
 /**
- * Filename: src/core/app/index.ts
- * Purpose: Barrel exports for application-layer ports, services, and shared utilities.
- * Author: OpenAI ChatGPT (gpt-5-codex)
- * Date: 2025-01-15
- * License: MIT
+ * Project: My Race Engineer
+ * File: src/core/app/index.ts
+ * Summary: Barrel exports for application-layer ports, services, and shared utilities.
  */
 
 export * from './ports/logger';
@@ -18,6 +16,7 @@ export * from './ports/resultRowRepository';
 export * from './ports/importPlanRepository';
 export * from './ports/importJobRepository';
 export * from './ports/telemetry';
+export * from './ports/clubRepository';
 export * from './ports/auth/passwordHasher';
 export * from './ports/auth/userRepository';
 export * from './ports/auth/userSessionRepository';
@@ -34,6 +33,7 @@ export * from './connectors/liverc/plan';
 export * from './connectors/liverc/jobs';
 export * from './connectors/liverc/summary';
 export * from './connectors/liverc/discovery';
+export * from './connectors/liverc/clubs';
 export * from './services/auth/registerUser';
 export * from './services/auth/loginUser';
 export * from './services/auth/verifyEmail';

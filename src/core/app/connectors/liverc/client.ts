@@ -61,6 +61,7 @@ export type LiveRcClientConfig = {
 };
 
 export type LiveRcClient = {
+  getRootTrackList(): Promise<string>;
   getEventOverview(urlOrRef: string): Promise<string>;
   getSessionPage(urlOrRef: string): Promise<string>;
   resolveJsonUrlFromHtml(html: string, fallbackPatterns?: string[]): string | null;
@@ -87,6 +88,22 @@ export class HttpLiveRcClient implements LiveRcClient {
       userAgent: config.userAgent ?? DEFAULT_USER_AGENT,
       fetchImpl: config.fetchImpl ?? fetch,
     };
+  }
+
+  async getRootTrackList(): Promise<string> {
+    // The track directory lives at the root of live.liverc.com, so resolve the
+    // configured base origin and fetch the page verbatim.
+    const url = this.resolveAbsoluteUrl('/');
+    const response = await this.fetchWithRetry(url, {
+      method: 'GET',
+      headers: {
+        Accept: 'text/html,application/xhtml+xml',
+        'User-Agent': this.config.userAgent,
+      },
+      cache: 'no-store',
+    });
+
+    return response.text();
   }
 
   async getEventOverview(urlOrRef: string): Promise<string> {

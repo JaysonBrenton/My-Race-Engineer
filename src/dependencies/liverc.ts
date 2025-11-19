@@ -1,4 +1,11 @@
+/**
+ * Project: My Race Engineer
+ * File: src/dependencies/liverc.ts
+ * Summary: Wiring for LiveRC services, repositories, and background jobs.
+ */
+
 import {
+  LiveRcClubCatalogueService,
   LiveRcImportPlanService,
   LiveRcImportService,
   LiveRcJobQueue,
@@ -8,6 +15,7 @@ import { HttpLiveRcClient } from '@core/app/connectors/liverc/client';
 import { LiveRcDiscoveryService } from '@core/app/connectors/liverc/discovery';
 import {
   LiveRcHttpClient,
+  PrismaClubRepository,
   PrismaEntrantRepository,
   PrismaEventRepository,
   PrismaImportPlanRepository,
@@ -52,6 +60,16 @@ const liveRcSummaryImporter = new LiveRcSummaryImporter({
   telemetry: livercTelemetry,
 });
 
+const clubRepository = new PrismaClubRepository();
+
+// Dedicated service responsible for synchronising the LiveRC club catalogue
+// so downstream features can rely on a consistent list of tracks.
+export const liveRcClubCatalogueService = new LiveRcClubCatalogueService({
+  client: liveRcHtmlClient,
+  repository: clubRepository,
+  logger: applicationLogger,
+});
+
 export const liveRcImportService = new LiveRcImportService({
   liveRcClient: liveRcJsonClient,
   eventRepository,
@@ -89,6 +107,7 @@ export const liveRcDependencies = {
   liveRcJsonClient,
   liveRcHtmlClient,
   liveRcDiscoveryService,
+  liveRcClubCatalogueService,
   eventRepository,
   raceClassRepository,
   sessionRepository,
@@ -98,6 +117,7 @@ export const liveRcDependencies = {
   importJobRepository,
   driverRepository,
   resultRowRepository,
+  clubRepository,
   summaryImporter: liveRcSummaryImporter,
   jobQueue: liveRcImportJobQueue,
   logger: applicationLogger,
