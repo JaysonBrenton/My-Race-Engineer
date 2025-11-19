@@ -1,3 +1,11 @@
+<!--
+/**
+ * Project: My Race Engineer
+ * File: docs/integrations/liverc-data-model.md
+ * Summary: Mapping between LiveRC payloads and MRE domain, including quick import contracts.
+ */
+-->
+
 # LiveRC → My Race Engineer (MRE) Data Contract
 
 This note captures the mapping between LiveRC timing endpoints and the My Race Engineer (MRE)
@@ -6,14 +14,15 @@ new adapters and tests stay aligned.
 
 ## Reference schema
 
-| Layer | Shape |
-| --- | --- |
+| Layer  | Shape                                                                                                                                                                      |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Prisma | `Lap { id: String @id, entrantId: String, sessionId: String, lapNumber: Int, lapTimeMs: Int, createdAt: DateTime, updatedAt: DateTime, @@unique([entrantId, lapNumber]) }` |
-| Domain | `Lap { id: string; entrantId: string; sessionId: string; lapNumber: number; lapTime: { milliseconds: number }; createdAt: Date; updatedAt: Date; }` |
+| Domain | `Lap { id: string; entrantId: string; sessionId: string; lapNumber: number; lapTime: { milliseconds: number }; createdAt: Date; updatedAt: Date; }`                        |
 
 > **Identifiers**
+>
 > - The canonical lap identifier is `sha256(eventId + sessionId + raceId +
->   driverId + lapNumber)` stored in Prisma `Lap.id`.
+driverId + lapNumber)` stored in Prisma `Lap.id`.
 > - Driver metadata (`displayName`, car number, transponder) is normalised and
 >   persisted on the associated `Entrant` record. Each lap references that
 >   entrant via `entrantId`.
@@ -31,9 +40,9 @@ The current ingestion pipeline depends on two LiveRC endpoints. Additional
 endpoints (heat sheets, rankings, multi-main summaries) will be documented once
 they are implemented.
 
-| Endpoint | LiveRC route | Purpose |
-| --- | --- | --- |
-| Entry list | `/results/{eventSlug}/{classSlug}/entry-list.json` | Discover drivers, car numbers, and membership in a class. |
+| Endpoint    | LiveRC route                                                   | Purpose                                                    |
+| ----------- | -------------------------------------------------------------- | ---------------------------------------------------------- |
+| Entry list  | `/results/{eventSlug}/{classSlug}/entry-list.json`             | Discover drivers, car numbers, and membership in a class.  |
 | Race result | `/results/{eventSlug}/{classSlug}/{roundSlug}/{raceSlug}.json` | Fetch lap-by-lap timing, penalties, and metadata per race. |
 
 ### Entry list
@@ -42,12 +51,12 @@ they are implemented.
 
 **Key fields and mapping**
 
-| LiveRC field | Example | Mapping |
-| --- | --- | --- |
-| `entry_id` | `"1738295"` | Stable identifier used in hash key. Store as `driverId`. |
-| `display_name` | `"Ryan Maifield"` | Normalised and persisted as `Entrant.displayName`. |
-| `car_number` | `"5"` | Stored in ingestion metadata only; not part of `Lap`. |
-| `class_id` | `"45932"` | Used to scope downstream requests; stored in ingestion cache. |
+| LiveRC field   | Example           | Mapping                                                       |
+| -------------- | ----------------- | ------------------------------------------------------------- |
+| `entry_id`     | `"1738295"`       | Stable identifier used in hash key. Store as `driverId`.      |
+| `display_name` | `"Ryan Maifield"` | Normalised and persisted as `Entrant.displayName`.            |
+| `car_number`   | `"5"`             | Stored in ingestion metadata only; not part of `Lap`.         |
+| `class_id`     | `"45932"`         | Used to scope downstream requests; stored in ingestion cache. |
 
 **Filtering rules**
 
@@ -62,16 +71,16 @@ they are implemented.
 
 **Key fields and mapping**
 
-| LiveRC field | Example | Mapping |
-| --- | --- | --- |
-| `race_id` | `"793015"` | Combined with other IDs to hash `Lap.id`. |
-| `entry_id` | `"1738295"` | Driver identifier (from entry list). |
-| `driver_name` | `"Ryan Maifield"` | Normalised → `Entrant.displayName` (and referenced by `Lap.entrantId`). |
-| `laps` | Array of lap objects | Each lap transformed to Prisma `Lap`. |
-| `laps[].lap` | `1` | → `lapNumber`. |
-| `laps[].lap_time` | `32.745` seconds | Multiply by `1000` → `lapTimeMs`. |
-| `laps[].is_outlap` | `true`/`false` | Captured in metadata; not persisted yet but used for filtering. |
-| `laps[].penalties` | Array | Used to tag laps in metadata; does not change `lapTimeMs` directly. |
+| LiveRC field       | Example              | Mapping                                                                 |
+| ------------------ | -------------------- | ----------------------------------------------------------------------- |
+| `race_id`          | `"793015"`           | Combined with other IDs to hash `Lap.id`.                               |
+| `entry_id`         | `"1738295"`          | Driver identifier (from entry list).                                    |
+| `driver_name`      | `"Ryan Maifield"`    | Normalised → `Entrant.displayName` (and referenced by `Lap.entrantId`). |
+| `laps`             | Array of lap objects | Each lap transformed to Prisma `Lap`.                                   |
+| `laps[].lap`       | `1`                  | → `lapNumber`.                                                          |
+| `laps[].lap_time`  | `32.745` seconds     | Multiply by `1000` → `lapTimeMs`.                                       |
+| `laps[].is_outlap` | `true`/`false`       | Captured in metadata; not persisted yet but used for filtering.         |
+| `laps[].penalties` | Array                | Used to tag laps in metadata; does not change `lapTimeMs` directly.     |
 
 **Transformation sequence**
 
@@ -86,7 +95,7 @@ they are implemented.
 **Filtering rules**
 
 - Skip laps where `lap_time` is `0` or `null` (incomplete timing pass).
-- Exclude laps flagged `is_outlap` when downstream consumers request *race-only*
+- Exclude laps flagged `is_outlap` when downstream consumers request _race-only_
   segments; keep them otherwise for auditing.
 - When ingestion is scoped by driver, fetch only the race result blocks for the
   target `entry_id`.
@@ -124,6 +133,68 @@ outside the Prisma schema until we widen storage.
   `fixtures/liverc/results/sample-event/sample-class/`:
   - `entry-list.json` — entry list metadata consumed by `mapEntryListResponse`.
   - `race-result.json` — race result payload for the same sample event/class.
+
+## Dashboard LiveRC quick import (GUI/API contract)
+
+The Dashboard quick import experience now centres on club-based discovery. The
+GUI presents three required inputs:
+
+1. **Club selector:** a search/typeahead backed by the internal club catalogue
+   (synced from the LiveRC root track list). The UI renders human-friendly club
+   names, while the backend receives a `clubId` that resolves to the club’s
+   subdomain. Free-form text is no longer accepted.
+2. **Search Start Date:** DD-MM-YYYY text field validated for real calendar
+   dates (including leap years). Values are converted to ISO `YYYY-MM-DD` before
+   API calls.
+3. **Search End Date:** DD-MM-YYYY text field with the same validation rules,
+   constrained to be ≥ the start date and to produce a range of at most 7 days
+   once inclusive bounds are considered.
+
+### Discovery API request
+
+`POST /api/connectors/liverc/discover`
+
+```json
+{
+  "clubId": "clb_123",
+  "startDate": "2025-10-18",
+  "endDate": "2025-10-21",
+  "limit": 40
+}
+```
+
+- `clubId` is mandatory and must correspond to a stored club record.
+- `startDate` and `endDate` follow ISO `YYYY-MM-DD` format, with `startDate ≤
+endDate` and `endDate - startDate + 1 ≤ 7` days.
+- `limit` remains optional and defaults to the server-side cap when omitted.
+
+### Discovery API response
+
+The service returns `200` with:
+
+```json
+{
+  "data": {
+    "events": [
+      {
+        "eventRef": "https://canberra.liverc.com/events/12345",
+        "title": "Canberra Off Road Challenge",
+        "whenIso": "2025-10-20T09:00:00Z",
+        "score": 1.5
+      }
+    ]
+  },
+  "requestId": "..."
+}
+```
+
+- `eventRef` now references a concrete event living under the club’s subdomain
+  (e.g., `https://<club-subdomain>.liverc.com/...`), ensuring follow-up imports
+  land on the correct context.
+- `title`, optional `whenIso`, and `score` semantics are unchanged from the
+  previous range-based API.
+- Errors continue to use `INVALID_JSON`, `INVALID_REQUEST`,
+  `DISCOVERY_UPSTREAM_ERROR`, and `UNEXPECTED_ERROR` envelopes.
 
 Any future schema changes must update this document, regenerate fixtures, and
 communicate the new rules to downstream teams.
