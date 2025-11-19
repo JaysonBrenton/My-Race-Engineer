@@ -1,3 +1,9 @@
+/**
+ * Project: My Race Engineer
+ * File: src/core/infra/index.ts
+ * Summary: Barrel exports for infrastructure adapters.
+ */
+
 export * from './prisma/prismaClient';
 export * from './prisma/prismaEntrantRepository';
 export * from './prisma/prismaEventRepository';
@@ -8,6 +14,7 @@ export * from './prisma/prismaDriverRepository';
 export * from './prisma/prismaResultRowRepository';
 export * from './prisma/prismaImportPlanRepository';
 export * from './prisma/prismaImportJobRepository';
+export * from './prisma/prismaClubRepository';
 export * from './prisma/prismaUserRepository';
 export * from './prisma/prismaUserSessionRepository';
 export * from './prisma/prismaUserEmailVerificationTokenRepository';
