@@ -93,11 +93,9 @@ const parseClubsFromHtml = (html: string): ParsedClub[] => {
       continue;
     }
 
-    // node-html-parser occasionally exposes text content as non-string values and
-    // the typings do not surface the `.text` getter, so coerce via a narrowed
-    // shape with a fallback to the typed `textContent` property before trimming.
-    const linkTextRaw: unknown =
-      (link as ParsedHTMLElement & { text?: unknown }).text ?? link.textContent;
+    // node-html-parser occasionally exposes text content as non-string values, so
+    // coerce the node to a string before trimming.
+    const linkTextRaw: unknown = link.text;
     let linkText = '';
     if (typeof linkTextRaw === 'string') {
       linkText = linkTextRaw;
