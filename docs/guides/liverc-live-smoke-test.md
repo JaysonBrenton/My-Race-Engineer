@@ -16,6 +16,8 @@ License: MIT License
 
 This document explains how to opt in to the LiveRC live smoke test, what to expect when running it, and how to troubleshoot common issues. The smoke test is intentionally isolated and does **not** run in CI by default.
 
+LiveRC discovery is now **club-based**, pulling events from each club’s `/events/` page. This smoke test only checks that the LiveRC homepage is reachable; it does not exercise the retired global discovery surface or any club-specific schedules.
+
 ## When to run this test
 
 Run this smoke test when you need to verify that `https://live.liverc.com/` is reachable from your environment or when debugging integration issues that might be caused by upstream availability. The test only performs a single GET request and has a 10-second network timeout.

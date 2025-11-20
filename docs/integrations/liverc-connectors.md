@@ -39,10 +39,10 @@ full collection of LiveRC-related tests and their intent.
   parsing the table rows for event names, dates, and canonical links. The date
   filter logic happens on our side; LiveRC does not expose a parameterised date
   endpoint for this view.
-- **Removed range + track substring search:** The former discovery flow that hit
-  `https://live.liverc.com/events/?date=` with `{ startDate, endDate, track }`
-  has been retired because LiveRC no longer serves that API. Any references to
-  it should be treated as legacy documentation only.
+- **Removed global date-range discovery:** LiveRC no longer serves the old
+  homepage calendar endpoint that accepted a date range and free-text track
+  substring. Discovery must go through club-specific event listings instead;
+  anything else should be treated as historical only.
 - **Import plan + summary connectors unchanged:** After discovery returns
   candidate events, the existing `plan.ts` and `summary.ts` connectors continue
   to orchestrate import planning and execution exactly as before. Their
