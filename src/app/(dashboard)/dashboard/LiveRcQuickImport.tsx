@@ -1,6 +1,11 @@
+/**
+ * Project: My Race Engineer
+ * File: src/app/(dashboard)/dashboard/LiveRcQuickImport.tsx
+ * Summary: Dashboard widget for discovering LiveRC events by club and date range with inline suggestions.
+ */
 'use client';
 
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import styles from './LiveRcQuickImport.module.css';
 
 type DiscoveryEvent = {
@@ -10,9 +15,22 @@ type DiscoveryEvent = {
   score: number;
 };
 
+type ClubSuggestion = {
+  clubId: string;
+  name: string;
+  location?: string | null;
+};
+
 type DiscoveryResponse =
   | { data: { events: DiscoveryEvent[] }; requestId: string }
   | { error: { code: string; message: string; details?: unknown }; requestId?: string };
+
+type ClubSearchResponse =
+  | { data: { clubs: ClubSuggestion[] }; requestId: string }
+  | { error: { code: string; message: string; details?: unknown }; requestId?: string };
+
+const CLUB_SEARCH_LIMIT = 10;
+const DISCOVERY_LIMIT = 25;
 
 function normaliseDateInput(input: string): string | null {
   const trimmed = input.trim();
@@ -68,27 +86,88 @@ function isWithinSixMonths(startIso: string, endIso: string): boolean {
 export default function LiveRcQuickImport() {
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
-  const [trackOrClub, setTrackOrClub] = useState('');
+  const [clubQuery, setClubQuery] = useState('');
+  const [clubSuggestions, setClubSuggestions] = useState<ClubSuggestion[]>([]);
+  const [selectedClub, setSelectedClub] = useState<ClubSuggestion | null>(null);
+  const [clubSearchError, setClubSearchError] = useState<string | null>(null);
+  const [clubSearchLoading, setClubSearchLoading] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [events, setEvents] = useState<DiscoveryEvent[] | null>(null);
 
   const canSubmit = useMemo(() => {
-    const trimmedTrack = trackOrClub.trim();
-    if (!start || !end || trimmedTrack.length < 2) return false;
+    if (!start || !end || !selectedClub) return false;
     const startIso = normaliseDateInput(start);
     const endIso = normaliseDateInput(end);
     if (!startIso || !endIso) return false;
     const days = daysInclusive(startIso, endIso);
-    return !!days && days > 0 && isWithinSixMonths(startIso, endIso);
-  }, [start, end, trackOrClub]);
+    return !!days && days > 0 && days <= 7 && isWithinSixMonths(startIso, endIso);
+  }, [start, end, selectedClub]);
 
   const toStateDateValue = (value: string): string => {
     if (!value) return '';
     const normalised = normaliseDateInput(value);
     return normalised ?? value;
   };
+
+  useEffect(() => {
+    const trimmedQuery = clubQuery.trim();
+    setClubSearchError(null);
+
+    // Clear suggestions and selection when the query is emptied.
+    if (trimmedQuery.length === 0) {
+      setSelectedClub(null);
+      setClubSuggestions([]);
+      setClubSearchLoading(false);
+      return;
+    }
+
+    if (selectedClub && selectedClub.name === trimmedQuery) {
+      // Preserve the current selection without re-querying when the input matches the chosen club.
+      setClubSuggestions([]);
+      setClubSearchLoading(false);
+      return;
+    }
+
+    if (trimmedQuery.length < 2) {
+      setClubSuggestions([]);
+      setSelectedClub(null);
+      setClubSearchLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const runSearch = async () => {
+      setClubSearchLoading(true);
+      try {
+        const res = await fetch(
+          `/api/connectors/liverc/clubs/search?q=${encodeURIComponent(trimmedQuery)}&limit=${CLUB_SEARCH_LIMIT}`,
+          { signal: controller.signal },
+        );
+        const json = (await res.json()) as ClubSearchResponse;
+        if (!res.ok || 'error' in json) {
+          const message = 'error' in json ? json.error.message : `HTTP ${res.status}`;
+          throw new Error(message);
+        }
+        setClubSuggestions(json.data.clubs);
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        setClubSuggestions([]);
+        setClubSearchError(err instanceof Error ? err.message : 'Club search failed.');
+      } finally {
+        if (!controller.signal.aborted) {
+          setClubSearchLoading(false);
+        }
+      }
+    };
+
+    void runSearch();
+
+    return () => {
+      controller.abort();
+    };
+  }, [clubQuery, selectedClub]);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -97,18 +176,18 @@ export default function LiveRcQuickImport() {
 
     const startIso = normaliseDateInput(start);
     const endIso = normaliseDateInput(end);
-    const trimmedTrack = trackOrClub.trim();
+    const club = selectedClub;
     if (!startIso || !endIso) {
       setError('Dates must be valid calendar days.');
       return;
     }
     const days = daysInclusive(startIso, endIso);
-    if (!days || days < 1 || !isWithinSixMonths(startIso, endIso)) {
-      setError('Date range must be between 1 day and 6 months (inclusive).');
+    if (!days || days < 1 || days > 7 || !isWithinSixMonths(startIso, endIso)) {
+      setError('Date range must be between 1 and 7 days (inclusive).');
       return;
     }
-    if (trimmedTrack.length < 2) {
-      setError('Track or club name must be at least 2 characters.');
+    if (!club) {
+      setError('Select a club to search for events.');
       return;
     }
 
@@ -118,9 +197,10 @@ export default function LiveRcQuickImport() {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
+          clubId: club.clubId,
           startDate: startIso,
           endDate: endIso,
-          track: trimmedTrack, // label is “Track or club name”; API key remains `track`
+          limit: DISCOVERY_LIMIT,
         }),
       });
       const json = (await res.json()) as DiscoveryResponse;
@@ -147,7 +227,7 @@ export default function LiveRcQuickImport() {
           LiveRC quick import
         </h2>
         <p className={styles.description}>
-          Search by date range and track/club, then pick events to import.
+          Search by club and date range, then pick events to import.
         </p>
       </header>
 
@@ -183,15 +263,53 @@ export default function LiveRcQuickImport() {
           />
         </div>
         <div className={styles.row}>
-          <label htmlFor="track">Track or club name</label>
-          <input
-            id="track"
-            type="text"
-            placeholder="e.g., Canberra Off-Road, Keilor, Logan City"
-            value={trackOrClub}
-            onChange={(e) => setTrackOrClub(e.target.value)}
-            required
-          />
+          <label htmlFor="club">Club</label>
+          <div className={styles.autocomplete}>
+            <input
+              id="club"
+              type="text"
+              placeholder="Start typing a club name…"
+              value={clubQuery}
+              onChange={(e) => {
+                setClubQuery(e.target.value);
+                // Clear stale selections when the query changes so we do not submit an outdated clubId.
+                setSelectedClub(null);
+              }}
+              role="combobox"
+              aria-autocomplete="list"
+              aria-haspopup="listbox"
+              aria-expanded={clubSuggestions.length > 0}
+              aria-controls="club-suggestions"
+              required
+            />
+            {clubSearchLoading && <div className={styles.suggestionHint}>Searching…</div>}
+            {clubSearchError && <div className={styles.suggestionError}>{clubSearchError}</div>}
+            {clubSuggestions.length > 0 && (
+              <ul id="club-suggestions" className={styles.suggestions}>
+                {clubSuggestions.map((club) => {
+                  const location = club.location ? ` — ${club.location}` : '';
+                  return (
+                    <li key={club.clubId}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedClub(club);
+                          setClubQuery(club.name);
+                          setClubSuggestions([]);
+                        }}
+                      >
+                        <span className={styles.suggestionName}>{club.name}</span>
+                        {location && <span className={styles.suggestionLocation}>{location}</span>}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            {selectedClub && !clubSuggestions.length && (
+              <div className={styles.selectedClub}>Selected: {selectedClub.name}</div>
+            )}
+          </div>
         </div>
         <div className={styles.actions}>
           <button type="submit" disabled={!canSubmit || submitting}>
@@ -210,7 +328,7 @@ export default function LiveRcQuickImport() {
         <div className={styles.results}>
           <h3>Matches</h3>
           {events.length === 0 ? (
-            <p>No events found for that date range and track/club.</p>
+            <p>No events found for that club and date range.</p>
           ) : (
             <ul className={styles.list}>
               {events.map((ev) => (

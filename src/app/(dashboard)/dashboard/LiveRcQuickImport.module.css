@@ -1,3 +1,9 @@
+/*
+ * Project: My Race Engineer
+ * File: src/app/(dashboard)/dashboard/LiveRcQuickImport.module.css
+ * Summary: Styles for the LiveRC quick import dashboard widget with club autocomplete affordances.
+ */
+
 .quickImport {
   display: flex;
   flex-direction: column;
@@ -72,6 +78,76 @@
   outline: none;
   border-color: var(--color-accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 25%, transparent);
+}
+
+.autocomplete {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.suggestions {
+  margin: 0.1rem 0 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border-radius: 0.75rem;
+  box-shadow: var(--shadow-elevated);
+  max-height: 15rem;
+  overflow-y: auto;
+}
+
+.suggestions li + li {
+  border-top: 1px solid var(--color-border);
+}
+
+.suggestions button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-fg);
+  text-align: left;
+}
+
+.suggestions button:hover,
+.suggestions button:focus-visible {
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  outline: none;
+}
+
+.suggestionName {
+  font-weight: 600;
+}
+
+.suggestionLocation {
+  color: var(--color-fg-muted);
+  font-size: 0.95rem;
+}
+
+.suggestionHint,
+.suggestionError,
+.selectedClub {
+  font-size: 0.95rem;
+}
+
+.suggestionHint {
+  color: var(--color-fg-muted);
+}
+
+.suggestionError {
+  color: var(--color-danger);
+}
+
+.selectedClub {
+  color: var(--color-fg-muted);
 }
 
 .actions {
