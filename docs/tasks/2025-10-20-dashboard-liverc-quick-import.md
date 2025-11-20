@@ -67,7 +67,7 @@ status: draft
   - Inline statuses: Loading…, Error: <message>.
   - Never crash the panel—always render a recoverable state.
 - **Deprecations**
-  - The legacy “Track or club name” free-text field and the `/events/?date=` discovery request are removed. This club-centric search flow replaces them completely.
+  - The legacy “Track or club name” free-text field and the retired global discovery endpoint are removed. This club-centric search flow replaces them completely.
 
 ---
 
@@ -163,5 +163,7 @@ feat(dashboard): implement DD-MM-YYYY range handling in quick import
 test(liverc): add discovery and route tests
 
 docs(tasks): add 2025-10-20-dashboard-liverc-quick-import ---END FILE---
+
+```
 
 ```
