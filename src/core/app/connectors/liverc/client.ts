@@ -62,6 +62,7 @@ export type LiveRcClientConfig = {
 
 export type LiveRcClient = {
   getRootTrackList(): Promise<string>;
+  getClubEventsPage(liveRcSubdomain: string): Promise<string>;
   getEventOverview(urlOrRef: string): Promise<string>;
   getSessionPage(urlOrRef: string): Promise<string>;
   resolveJsonUrlFromHtml(html: string, fallbackPatterns?: string[]): string | null;
@@ -94,6 +95,32 @@ export class HttpLiveRcClient implements LiveRcClient {
     // The track directory lives at the root of live.liverc.com, so resolve the
     // configured base origin and fetch the page verbatim.
     const url = this.resolveAbsoluteUrl('/');
+    const response = await this.fetchWithRetry(url, {
+      method: 'GET',
+      headers: {
+        Accept: 'text/html,application/xhtml+xml',
+        'User-Agent': this.config.userAgent,
+      },
+      cache: 'no-store',
+    });
+
+    return response.text();
+  }
+
+  async getClubEventsPage(liveRcSubdomain: string): Promise<string> {
+    const subdomain = liveRcSubdomain.trim();
+    if (!subdomain) {
+      throw new LiveRcClientError('LiveRC subdomain is required to fetch club events.', {
+        code: 'INVALID_SUBDOMAIN',
+      });
+    }
+
+    const originHost = /\.liverc\.com$/i.test(subdomain) ? subdomain : `${subdomain}.liverc.com`;
+    const origin = `https://${originHost.replace(/\/+$/, '')}`;
+    const url = `${origin}/events/`;
+
+    // Club event listings live under the club subdomain rather than the root
+    // LiveRC domain, so avoid the base origin helper here to preserve the host.
     const response = await this.fetchWithRetry(url, {
       method: 'GET',
       headers: {
