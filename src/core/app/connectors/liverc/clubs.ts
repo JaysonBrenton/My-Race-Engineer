@@ -7,7 +7,7 @@
 import { HTMLElement as ParsedHTMLElement, parse } from 'node-html-parser';
 
 import type { Logger } from '@core/app/ports/logger';
-import type { ClubRepository } from '@core/app/ports/clubRepository';
+import type { ClubRepository, ClubSearchResult } from '@core/app/ports/clubRepository';
 
 import type { LiveRcClient } from './client';
 
@@ -71,6 +71,30 @@ export class LiveRcClubCatalogueService {
     });
 
     return { upserted: seenSubdomains.size, deactivated: deactivatedCount };
+  }
+}
+
+type SearchDependencies = {
+  repository: Pick<ClubRepository, 'searchByDisplayName'>;
+};
+
+export class LiveRcClubSearchService {
+  constructor(private readonly dependencies: SearchDependencies) {}
+
+  async search(query: string, limit = 10): Promise<ClubSearchResult[]> {
+    const normalisedQuery = query.trim();
+    // Return early for blank search terms so the repository is not asked to
+    // issue unbounded queries that would only echo the entire catalogue.
+    if (!normalisedQuery) {
+      return [];
+    }
+
+    // Bound the requested limit to a small, predictable range to prevent
+    // misuse from overwhelming the database while still giving the UI enough
+    // results to power typeahead suggestions.
+    const boundedLimit = Math.max(1, Math.min(limit, 25));
+
+    return this.dependencies.repository.searchByDisplayName(normalisedQuery, boundedLimit);
   }
 }
 
