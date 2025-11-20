@@ -4,7 +4,7 @@
  * Summary: Prisma-backed repository for storing LiveRC club catalogue records.
  */
 
-import type { ClubRepository, ClubUpsertInput } from '@core/app';
+import type { ClubRepository, ClubSearchResult, ClubUpsertInput } from '@core/app';
 
 import { getPrismaClient } from './prismaClient';
 
@@ -58,5 +58,33 @@ export class PrismaClubRepository implements ClubRepository {
     });
 
     return result.count;
+  }
+
+  async searchByDisplayName(query: string, limit: number): Promise<ClubSearchResult[]> {
+    const prisma = getPrismaClient();
+
+    const trimmedQuery = query.trim();
+    if (!trimmedQuery) {
+      return [];
+    }
+
+    const results = await prisma.club.findMany({
+      // Prefer a case-insensitive contains match so the UI can surface results as
+      // users type without forcing exact casing or full-name matches.
+      where: {
+        displayName: { contains: trimmedQuery, mode: 'insensitive' },
+        isActive: true,
+      },
+      orderBy: [{ displayName: 'asc' }],
+      take: limit,
+    });
+
+    return results.map((club) => ({
+      id: club.id,
+      liveRcSubdomain: club.liveRcSubdomain,
+      displayName: club.displayName,
+      country: club.country ?? null,
+      region: club.region ?? null,
+    }));
   }
 }

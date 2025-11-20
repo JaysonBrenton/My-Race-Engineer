@@ -6,6 +6,7 @@
 
 import {
   LiveRcClubCatalogueService,
+  LiveRcClubSearchService,
   LiveRcImportPlanService,
   LiveRcImportService,
   LiveRcJobQueue,
@@ -61,6 +62,11 @@ const liveRcSummaryImporter = new LiveRcSummaryImporter({
 });
 
 const clubRepository = new PrismaClubRepository();
+
+// Lightweight lookup service for powering UI search against the club catalogue.
+export const liveRcClubSearchService = new LiveRcClubSearchService({
+  repository: clubRepository,
+});
 
 // Dedicated service responsible for synchronising the LiveRC club catalogue
 // so downstream features can rely on a consistent list of tracks.
@@ -118,6 +124,7 @@ export const liveRcDependencies = {
   driverRepository,
   resultRowRepository,
   clubRepository,
+  clubSearchService: liveRcClubSearchService,
   summaryImporter: liveRcSummaryImporter,
   jobQueue: liveRcImportJobQueue,
   logger: applicationLogger,
