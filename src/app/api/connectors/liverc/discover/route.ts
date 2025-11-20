@@ -26,29 +26,14 @@ const baseHeaders = {
 
 const Body = z
   .object({
+    clubId: z.string().trim().min(1),
     startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    track: z.string().trim().min(2),
     limit: z.number().int().min(1).max(100).optional(),
   })
   .refine(({ startDate, endDate }) => startDate <= endDate, {
     message: 'startDate must be <= endDate',
-  })
-  .refine(
-    ({ startDate, endDate }) => {
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-        return false;
-      }
-
-      const rangeDays = (end.getTime() - start.getTime()) / 86400000 + 1;
-      return rangeDays <= 7;
-    },
-    {
-      message: 'Date range must be 7 days or fewer',
-    },
-  );
+  });
 
 const buildJsonResponse = (status: number, payload: unknown, requestId: string): Response =>
   new Response(JSON.stringify(payload), {
@@ -75,6 +60,20 @@ const formatUpstreamPath = (url: string | undefined): string | undefined => {
     // Preserve the original value when URL parsing fails so we do not hide
     // potentially useful diagnostics.
     return url;
+  }
+};
+
+const normaliseEventRefWithBase = (eventRef: string, baseOrigin: string): string => {
+  try {
+    const url = new URL(eventRef, baseOrigin.endsWith('/') ? baseOrigin : `${baseOrigin}/`);
+    url.hash = '';
+    url.search = '';
+    const pathname = url.pathname.replace(/\/+$/, '');
+    return `${url.origin}${pathname}`;
+  } catch {
+    // Preserve the original reference when normalisation fails so callers still
+    // receive a usable link instead of an empty string.
+    return eventRef;
   }
 };
 
@@ -122,31 +121,6 @@ export function OPTIONS(): Response {
   });
 }
 
-const isJsonObject = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-
-const normalizeRequestBody = (body: unknown): unknown => {
-  if (!isJsonObject(body)) {
-    return body;
-  }
-
-  if ('track' in body) {
-    return body;
-  }
-
-  if ('trackOrClub' in body) {
-    const { trackOrClub } = body;
-    if (typeof trackOrClub === 'string') {
-      return {
-        ...body,
-        track: trackOrClub,
-      } satisfies Record<string, unknown>;
-    }
-  }
-
-  return body;
-};
-
 export async function POST(request: NextRequest): Promise<Response> {
   const requestId = request.headers.get('x-request-id') ?? randomUUID();
   const logger = buildRequestLogger(requestId);
@@ -154,7 +128,7 @@ export async function POST(request: NextRequest): Promise<Response> {
   let requestBody: unknown;
   try {
     const rawBody: unknown = await request.json();
-    requestBody = normalizeRequestBody(rawBody);
+    requestBody = rawBody;
   } catch (error) {
     logger.warn('LiveRC discovery request payload is not valid JSON.', {
       event: 'liverc.discovery.invalid_json',
@@ -204,21 +178,25 @@ export async function POST(request: NextRequest): Promise<Response> {
   }
 
   try {
-    const result = await liveRcDiscoveryService.discoverByDateRangeAndTrack(parsed.data);
+    const result = await liveRcDiscoveryService.discoverByClubAndDateRange(parsed.data);
+    const events = result.events.map((event) => ({
+      ...event,
+      eventRef: normaliseEventRefWithBase(event.eventRef, result.clubBaseOrigin),
+    }));
 
     logger.info('LiveRC discovery request succeeded.', {
       event: 'liverc.discovery.success',
       outcome: 'success',
+      clubId: parsed.data.clubId,
       startDate: parsed.data.startDate,
       endDate: parsed.data.endDate,
-      track: parsed.data.track,
-      matchCount: result.events.length,
+      matchCount: events.length,
     });
 
     return buildJsonResponse(
       200,
       {
-        data: { events: result.events },
+        data: { events },
         requestId,
       },
       requestId,

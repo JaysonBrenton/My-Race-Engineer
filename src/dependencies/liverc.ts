@@ -34,8 +34,10 @@ import { livercTelemetry } from '@/dependencies/telemetry';
 
 const liveRcJsonClient = new LiveRcHttpClient();
 const liveRcHtmlClient = new HttpLiveRcClient();
+const clubRepository = new PrismaClubRepository();
 export const liveRcDiscoveryService = new LiveRcDiscoveryService({
   client: liveRcHtmlClient,
+  clubRepository,
   logger: applicationLogger,
 });
 const eventRepository = new PrismaEventRepository();
@@ -60,8 +62,6 @@ const liveRcSummaryImporter = new LiveRcSummaryImporter({
   logger: applicationLogger,
   telemetry: livercTelemetry,
 });
-
-const clubRepository = new PrismaClubRepository();
 
 // Lightweight lookup service for powering UI search against the club catalogue.
 export const liveRcClubSearchService = new LiveRcClubSearchService({

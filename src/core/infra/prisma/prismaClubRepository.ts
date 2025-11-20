@@ -5,6 +5,7 @@
  */
 
 import type { ClubRepository, ClubSearchResult, ClubUpsertInput } from '@core/app';
+import type { Club } from '@core/domain/club';
 
 import { getPrismaClient } from './prismaClient';
 
@@ -86,5 +87,27 @@ export class PrismaClubRepository implements ClubRepository {
       country: club.country ?? null,
       region: club.region ?? null,
     }));
+  }
+
+  async findById(clubId: string): Promise<Club | null> {
+    const prisma = getPrismaClient();
+
+    const club = await prisma.club.findUnique({ where: { id: clubId } });
+    if (!club) {
+      return null;
+    }
+
+    return {
+      id: club.id,
+      liveRcSubdomain: club.liveRcSubdomain,
+      displayName: club.displayName,
+      country: club.country,
+      region: club.region,
+      firstSeenAt: club.firstSeenAt,
+      lastSeenAt: club.lastSeenAt,
+      isActive: club.isActive,
+      createdAt: club.createdAt,
+      updatedAt: club.updatedAt,
+    } satisfies Club;
   }
 }
