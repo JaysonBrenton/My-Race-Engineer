@@ -16,9 +16,10 @@ type DiscoveryEvent = {
 };
 
 type ClubSuggestion = {
-  clubId: string;
+  id: string;
   name: string;
   location?: string | null;
+  subdomain?: string | null;
 };
 
 type DiscoveryResponse =
@@ -187,7 +188,7 @@ export default function LiveRcQuickImport() {
       return;
     }
     if (!club) {
-      setError('Select a club to search for events.');
+      setError('Please select a club from the search results.');
       return;
     }
 
@@ -197,7 +198,8 @@ export default function LiveRcQuickImport() {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          clubId: club.clubId,
+          // The discovery API now requires a clubId resolved from the search endpoint.
+          clubId: club.id,
           startDate: startIso,
           endDate: endIso,
           limit: DISCOVERY_LIMIT,
@@ -263,7 +265,7 @@ export default function LiveRcQuickImport() {
           />
         </div>
         <div className={styles.row}>
-          <label htmlFor="club">Club</label>
+          <label htmlFor="club">Search for club</label>
           <div className={styles.autocomplete}>
             <input
               id="club"
@@ -289,7 +291,7 @@ export default function LiveRcQuickImport() {
                 {clubSuggestions.map((club) => {
                   const location = club.location ? ` — ${club.location}` : '';
                   return (
-                    <li key={club.clubId}>
+                    <li key={club.id}>
                       <button
                         type="button"
                         onClick={() => {

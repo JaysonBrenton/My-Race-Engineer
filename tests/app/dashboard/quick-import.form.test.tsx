@@ -56,7 +56,7 @@ void test('button disabled until valid DD-MM-YYYY range and club is selected', a
       if (url.includes('/api/connectors/liverc/clubs/search')) {
         return new Response(
           JSON.stringify({
-            data: { clubs: [{ clubId: 'club-1', name: 'Canberra RC', location: 'ACT' }] },
+            data: { clubs: [{ id: 'club-1', name: 'Canberra RC', location: 'ACT' }] },
             requestId: 'clubs',
           }),
           { status: 200, headers: { 'content-type': 'application/json' } },
@@ -69,7 +69,7 @@ void test('button disabled until valid DD-MM-YYYY range and club is selected', a
 
       const start = screen.getByLabelText<HTMLInputElement>(/search start date/i);
       const end = screen.getByLabelText<HTMLInputElement>(/search end date/i);
-      const club = screen.getByLabelText<HTMLInputElement>(/club/i);
+      const club = screen.getByLabelText<HTMLInputElement>(/search for club/i);
       const button = screen.getByRole('button', { name: /search/i });
 
       assert.equal(button.hasAttribute('disabled'), true);
@@ -96,8 +96,8 @@ void test('valid input triggers POST with clubId and renders results', async () 
           JSON.stringify({
             data: {
               clubs: [
-                { clubId: 'club-1', name: 'Canberra RC', location: 'ACT' },
-                { clubId: 'club-2', name: 'Keilor Track', location: 'VIC' },
+                { id: 'club-1', name: 'Canberra RC', location: 'ACT' },
+                { id: 'club-2', name: 'Keilor Track', location: 'VIC' },
               ],
             },
             requestId: 'clubs',
@@ -115,6 +115,7 @@ void test('valid input triggers POST with clubId and renders results', async () 
         assert.equal(body.startDate, '2025-10-18');
         assert.equal(body.endDate, '2025-10-21');
         assert.equal(body.clubId, 'club-1');
+        assert.equal(Object.prototype.hasOwnProperty.call(body, 'track'), false);
         return new Response(
           JSON.stringify({
             data: {
@@ -142,7 +143,7 @@ void test('valid input triggers POST with clubId and renders results', async () 
       render(<LiveRcQuickImport />);
       setDateField(screen.getByLabelText<HTMLInputElement>(/search start date/i), '18-10-2025');
       setDateField(screen.getByLabelText<HTMLInputElement>(/search end date/i), '21-10-2025');
-      await userEvent.type(screen.getByLabelText<HTMLInputElement>(/club/i), 'Can');
+      await userEvent.type(screen.getByLabelText<HTMLInputElement>(/search for club/i), 'Can');
       const suggestion = await screen.findByRole('button', { name: /Canberra RC/ });
       await userEvent.click(suggestion);
 
