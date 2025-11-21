@@ -5,10 +5,11 @@
  */
 
 /**
- * Guardrail: These tests should track the club-based discovery contract described in
- * ADR-20251120-liverc-club-based-discovery. Assertions must not cement expectations around
- * https://live.liverc.com/events/?date=... or free-text track inputs once the refactor
- * completes; any remaining references are legacy scaffolding to be removed.
+ * Guardrail: Tests should mirror the club-based discovery behaviour from
+ * ADR-20251120-liverc-club-based-discovery. Do not lock in expectations tied to
+ * https://live.liverc.com/events/?date=... or a `track` string input once the
+ * refactor lands; any remaining references to /events/?date or track are legacy
+ * scaffolding to be removed.
  */
 
 import assert from 'node:assert/strict';

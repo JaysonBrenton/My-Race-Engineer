@@ -5,9 +5,9 @@
  */
 
 /**
- * Guardrail: The /api/connectors/liverc/discover contract is moving to { clubId, startDate, endDate, limit? } per
- * ADR-20251120-liverc-club-based-discovery. Tests should avoid locking in a `track` field or
- * https://live.liverc.com/events/?date=... behaviour; any remaining references represent legacy state to be refactored.
+ * Guardrail: The intended /api/connectors/liverc/discover contract is { clubId, startDate, endDate, limit? }
+ * per ADR-20251120-liverc-club-based-discovery. Tests should not assume a `track` field or
+ * https://live.liverc.com/events/?date=... calls once the refactor is done; any such assumptions are legacy to remove.
  */
 
 import assert from 'node:assert/strict';
