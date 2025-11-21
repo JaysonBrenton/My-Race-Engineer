@@ -6,10 +6,10 @@
 
 /**
  * Intended design guardrail:
- * - LiveRcDiscoveryService is club based. Inputs are { clubId, startDate, endDate, limit? }.
- * - The service must resolve clubId to a Club, use its subdomain, and call https://<club-subdomain>.liverc.com/events/.
- * - Any reliance on track strings or https://live.liverc.com/events/?date=... is legacy and must be removed as part of the
- *   club-based refactor. See ADR-20251120-liverc-club-based-discovery for the source of truth.
+ * - LiveRcDiscoveryService is club based (not track based) with inputs { clubId, startDate, endDate, limit? }.
+ * - Resolve clubId to a Club record, use its subdomain, and call https://<club-subdomain>.liverc.com/events/ to discover.
+ * - Relying on a free-text track field or https://live.liverc.com/events/?date=... is legacy behaviour to remove in the
+ *   club-based refactor. See ADR-20251120-liverc-club-based-discovery for the authoritative decision.
  */
 
 import { HTMLElement as ParsedHTMLElement, parse } from 'node-html-parser';
