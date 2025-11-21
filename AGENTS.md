@@ -1,3 +1,9 @@
+<!--
+Project: My Race Engineer
+File: AGENTS.md
+Summary: Contributor guardrails including commenting and documentation standards for automated agents.
+-->
+
 # My Race Engineer (MRE) — Agents Guide (Codex & other AI contributors)
 
 **Repo:** `JaysonBrenton/My-Race-Engineer`
@@ -154,4 +160,5 @@ Every PR must state: **what/why**, design/UX compliance, checks (`typecheck`/`li
    */
   ```
   Replace `<relative path from repo root>` and `Summary` with accurate information. For languages that do not use block comments, adapt the header to the idiomatic comment syntax while preserving the three lines of metadata.
-- **Add explanatory inline comments for any new or modified logic.** Focus on intent, invariants, and non-obvious control flow. Comment blocks must stay current with the code; outdated commentary should be removed or updated as part of the change.
+- **Document intent at the function and module level.** Every new or modified exported function, class, React component, or significant helper must include a short docblock or leading comment that states what it does, the meaning of its inputs/outputs, and any important invariants or side effects.
+- **Add explanatory inline comments for new or modified logic.** Focus on clarifying why a branch or calculation exists, how edge cases are handled, and any assumptions that must stay true. Comments must stay current with the code; outdated commentary should be removed or updated as part of the change.
