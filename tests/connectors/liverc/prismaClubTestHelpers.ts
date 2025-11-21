@@ -10,8 +10,8 @@ export type InMemoryClubRecord = {
   id: string;
   liveRcSubdomain: string;
   displayName: string;
-  country: string | null;
   region: string | null;
+  timezone: string | null;
   isActive: boolean;
 };
 
@@ -21,7 +21,12 @@ export type InMemoryPrismaClient = {
     findMany: (args?: {
       where?: {
         displayName?: { contains?: string | null; mode?: string | null };
+        liveRcSubdomain?: { contains?: string | null; mode?: string | null };
         isActive?: boolean;
+        OR?: Array<{
+          displayName?: { contains?: string | null; mode?: string | null };
+          liveRcSubdomain?: { contains?: string | null; mode?: string | null };
+        }>;
       };
       orderBy?: { displayName?: 'asc' | 'desc' } | Array<{ displayName?: 'asc' | 'desc' }>;
       take?: number;
@@ -50,8 +55,8 @@ export const createInMemoryPrismaClient = (
           id: data.id ?? randomUUID(),
           liveRcSubdomain: data.liveRcSubdomain ?? 'unknown',
           displayName: data.displayName ?? 'Unknown Club',
-          country: data.country ?? null,
           region: data.region ?? null,
+          timezone: data.timezone ?? null,
           isActive: data.isActive ?? true,
         };
 
@@ -61,16 +66,35 @@ export const createInMemoryPrismaClient = (
         return Promise.resolve(record);
       },
       findMany(args) {
-        const contains = args?.where?.displayName?.contains?.toLowerCase();
+        const orConditions = args?.where?.OR ?? [];
         const isActive = args?.where?.isActive;
+
+        const matchesSearch = (record: InMemoryClubRecord): boolean => {
+          if (orConditions.length === 0) {
+            return true;
+          }
+
+          return orConditions.some((condition) => {
+            const nameContains = condition.displayName?.contains?.toLowerCase();
+            const subdomainContains = condition.liveRcSubdomain?.contains?.toLowerCase();
+
+            const matchesName =
+              typeof nameContains === 'string' &&
+              record.displayName.toLowerCase().includes(nameContains);
+            const matchesSubdomain =
+              typeof subdomainContains === 'string' &&
+              record.liveRcSubdomain.toLowerCase().includes(subdomainContains);
+
+            return matchesName || matchesSubdomain;
+          });
+        };
+
         const filtered = records.filter((record) => {
           if (typeof isActive === 'boolean' && record.isActive !== isActive) {
             return false;
           }
-          if (!contains) {
-            return true;
-          }
-          return record.displayName.toLowerCase().includes(contains);
+
+          return matchesSearch(record);
         });
 
         const ordered = (() => {
@@ -111,8 +135,8 @@ export const seedClubs = async (
         id: club.id,
         liveRcSubdomain: club.liveRcSubdomain,
         displayName: club.displayName,
-        country: club.country ?? null,
         region: club.region ?? null,
+        timezone: club.timezone ?? null,
         isActive: club.isActive ?? true,
       },
     });

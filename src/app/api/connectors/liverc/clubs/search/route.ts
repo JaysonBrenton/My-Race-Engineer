@@ -1,7 +1,7 @@
 /**
  * Project: My Race Engineer
  * File: src/app/api/connectors/liverc/clubs/search/route.ts
- * Summary: API route that exposes LiveRC club catalogue search for dashboard clients.
+ * Summary: API route that searches persisted LiveRC clubs for dashboard quick import lookup.
  */
 // No React types in server routes by design.
 
@@ -11,8 +11,8 @@ import { z } from 'zod';
 
 import type { NextRequest } from 'next/server';
 
-import { liveRcClubSearchService } from '@/dependencies/liverc';
 import { applicationLogger } from '@/dependencies/logger';
+import { getPrismaClient } from '@core/infra';
 
 const ROUTE_PATH = '/api/connectors/liverc/clubs/search';
 const ALLOW_HEADER = 'OPTIONS, GET';
@@ -28,7 +28,6 @@ const QuerySchema = z.object({
     .string({ required_error: 'Search query is required.' })
     .trim()
     .min(2, 'Search query must be at least 2 characters long.'),
-  limit: z.coerce.number().int().min(1).max(25).optional(),
 });
 
 const buildJsonResponse = (status: number, payload: unknown, requestId: string) =>
@@ -62,12 +61,8 @@ export async function GET(request: NextRequest): Promise<Response> {
   // Parse query parameters from the request URL so the handler works for both
   // NextRequest instances and the plain Request objects used in tests.
   const searchParams = new URL(request.url).searchParams;
-  const rawLimit = searchParams.get('limit');
   const parsed = QuerySchema.safeParse({
     q: searchParams.get('q'),
-    // Explicitly drop empty values so the optional limit does not coerce null
-    // into zero and fail validation unnecessarily.
-    limit: rawLimit === null || rawLimit === '' ? undefined : rawLimit,
   });
 
   if (!parsed.success) {
@@ -97,15 +92,46 @@ export async function GET(request: NextRequest): Promise<Response> {
     );
   }
 
-  const { q, limit } = parsed.data;
+  const { q } = parsed.data;
 
   try {
-    const clubs = await liveRcClubSearchService.search(q, limit ?? 10);
+    const prisma = getPrismaClient();
+    const searchTerm = q.trim();
+
+    // Use an OR clause to allow matches on either the display name or the
+    // canonical LiveRC subdomain so users can search by track name or domain.
+    const clubs = await prisma.club.findMany({
+      where: {
+        isActive: true,
+        OR: [
+          { displayName: { contains: searchTerm, mode: 'insensitive' } },
+          { liveRcSubdomain: { contains: searchTerm, mode: 'insensitive' } },
+        ],
+      },
+      orderBy: [{ displayName: 'asc' }],
+      take: 10,
+    });
+
+    const payload = clubs.map((club) => ({
+      id: club.id,
+      name: club.displayName,
+      subdomain: club.liveRcSubdomain,
+      region: club.region ?? null,
+      // Timezone is currently optional in the model; preserve any stored value
+      // while defaulting to null for older records that do not include it.
+      timezone: (club as { timezone?: string | null }).timezone ?? null,
+    }));
+
+    logger.info('LiveRC club search completed.', {
+      event: 'liverc.clubs.search.success',
+      outcome: 'success',
+      matchCount: payload.length,
+    });
 
     return buildJsonResponse(
       200,
       {
-        data: { clubs },
+        data: { clubs: payload },
         requestId,
       },
       requestId,
