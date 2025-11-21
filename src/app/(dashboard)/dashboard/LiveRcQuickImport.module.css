@@ -38,12 +38,12 @@
 .form {
   display: grid;
   gap: 1rem;
+  align-items: start;
 }
 
 @media (min-width: 640px) {
   .form {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    align-items: end;
   }
 }
 
