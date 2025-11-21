@@ -84,6 +84,9 @@ function isWithinSixMonths(startIso: string, endIso: string): boolean {
   return endDate <= limit;
 }
 
+/**
+ * Renders the LiveRC quick import form with club search, date validation, and inline discovery results.
+ */
 export default function LiveRcQuickImport() {
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
@@ -96,6 +99,8 @@ export default function LiveRcQuickImport() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [events, setEvents] = useState<DiscoveryEvent[] | null>(null);
+
+  const trimmedClubQuery = clubQuery.trim();
 
   const canSubmit = useMemo(() => {
     if (!start || !end || !selectedClub) return false;
@@ -110,6 +115,17 @@ export default function LiveRcQuickImport() {
     if (!value) return '';
     const normalised = normaliseDateInput(value);
     return normalised ?? value;
+  };
+
+  /**
+   * Clears the currently selected club and any dependent autocomplete state so users can restart their search.
+   */
+  const clearSelectedClub = () => {
+    setSelectedClub(null);
+    setClubQuery('');
+    setClubSuggestions([]);
+    setClubSearchError(null);
+    setClubSearchLoading(false);
   };
 
   useEffect(() => {
@@ -222,6 +238,13 @@ export default function LiveRcQuickImport() {
     }
   }
 
+  const showNoClubResults =
+    trimmedClubQuery.length >= 2 &&
+    !clubSearchLoading &&
+    !selectedClub &&
+    clubSuggestions.length === 0 &&
+    !clubSearchError;
+
   return (
     <section className={styles.quickImport} aria-labelledby="quick-import-heading">
       <header className={styles.header}>
@@ -284,6 +307,7 @@ export default function LiveRcQuickImport() {
               aria-controls="club-suggestions"
               required
             />
+            <p className={styles.helperText}>Type at least 2 characters to search.</p>
             {clubSearchLoading && <div className={styles.suggestionHint}>Searching…</div>}
             {clubSearchError && <div className={styles.suggestionError}>{clubSearchError}</div>}
             {clubSuggestions.length > 0 && (
@@ -293,6 +317,7 @@ export default function LiveRcQuickImport() {
                   return (
                     <li key={club.id}>
                       <button
+                        className={styles.suggestionButton}
                         type="button"
                         onClick={() => {
                           setSelectedClub(club);
@@ -308,8 +333,23 @@ export default function LiveRcQuickImport() {
                 })}
               </ul>
             )}
-            {selectedClub && !clubSuggestions.length && (
-              <div className={styles.selectedClub}>Selected: {selectedClub.name}</div>
+            {showNoClubResults && (
+              <div className={styles.noResults}>No clubs found. Try another search.</div>
+            )}
+            {selectedClub && (
+              <div className={styles.selectedClubPill}>
+                <span className={styles.selectedClubLabel}>
+                  Selected club: <strong>{selectedClub.name}</strong>
+                </span>
+                <button
+                  type="button"
+                  className={styles.clearSelectedClub}
+                  onClick={clearSelectedClub}
+                  aria-label="Clear selected club"
+                >
+                  ×
+                </button>
+              </div>
             )}
           </div>
         </div>

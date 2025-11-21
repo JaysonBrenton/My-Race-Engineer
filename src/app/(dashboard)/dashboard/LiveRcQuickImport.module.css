@@ -87,6 +87,12 @@
   gap: 0.35rem;
 }
 
+.helperText {
+  margin: 0;
+  color: var(--color-fg-muted);
+  font-size: 0.95rem;
+}
+
 .suggestions {
   margin: 0.1rem 0 0;
   padding: 0;
@@ -103,7 +109,7 @@
   border-top: 1px solid var(--color-border);
 }
 
-.suggestions button {
+.suggestionButton {
   width: 100%;
   display: flex;
   align-items: center;
@@ -115,12 +121,17 @@
   cursor: pointer;
   color: var(--color-fg);
   text-align: left;
+  transition: background-color 0.15s ease;
 }
 
-.suggestions button:hover,
-.suggestions button:focus-visible {
-  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+.suggestionButton:hover,
+.suggestionButton:focus-visible {
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
   outline: none;
+}
+
+.suggestionButton:active {
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
 }
 
 .suggestionName {
@@ -134,7 +145,8 @@
 
 .suggestionHint,
 .suggestionError,
-.selectedClub {
+.noResults,
+.selectedClubLabel {
   font-size: 0.95rem;
 }
 
@@ -146,8 +158,44 @@
   color: var(--color-danger);
 }
 
-.selectedClub {
+.noResults {
   color: var(--color-fg-muted);
+}
+
+.selectedClubPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-surface) 80%, var(--color-bg) 20%);
+  color: var(--color-fg);
+  max-width: fit-content;
+}
+
+.selectedClubLabel {
+  color: var(--color-fg);
+}
+
+.clearSelectedClub {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-fg);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.clearSelectedClub:hover,
+.clearSelectedClub:focus-visible {
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  outline: none;
 }
 
 .actions {
