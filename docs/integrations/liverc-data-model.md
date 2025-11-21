@@ -196,5 +196,11 @@ The service returns `200` with:
 - Errors continue to use `INVALID_JSON`, `INVALID_REQUEST`,
   `DISCOVERY_UPSTREAM_ERROR`, and `UNEXPECTED_ERROR` envelopes.
 
+The combination of `clubId` and the date range defines the discovery search
+space. Free-text track filtering is no longer part of the API contract.
+
+For the decision record that governs LiveRC discovery, see
+`docs/adr/ADR-20251120-liverc-club-based-discovery.md`.
+
 Any future schema changes must update this document, regenerate fixtures, and
 communicate the new rules to downstream teams.

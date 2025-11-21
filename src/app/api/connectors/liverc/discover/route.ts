@@ -24,6 +24,9 @@ const baseHeaders = {
   'X-Robots-Tag': 'noindex, nofollow',
 } as const;
 
+// Source-of-truth contract: this route is moving to { clubId, startDate, endDate, limit? } only.
+// A free-text track field is out of scope; if it still appears in the schema, treat it as legacy that must be removed to match
+// ADR-20251120-liverc-club-based-discovery.
 const Body = z
   .object({
     clubId: z.string().trim().min(1),

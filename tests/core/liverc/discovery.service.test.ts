@@ -4,6 +4,13 @@
  * Summary: Tests for the LiveRC discovery service when parsing club event listings.
  */
 
+/**
+ * Guardrail: These tests should track the club-based discovery contract described in
+ * ADR-20251120-liverc-club-based-discovery. Assertions must not cement expectations around
+ * https://live.liverc.com/events/?date=... or free-text track inputs once the refactor
+ * completes; any remaining references are legacy scaffolding to be removed.
+ */
+
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';

@@ -4,6 +4,14 @@
  * Summary: Service that discovers LiveRC club events by parsing club event listings.
  */
 
+/**
+ * Intended design guardrail:
+ * - LiveRcDiscoveryService is club based. Inputs are { clubId, startDate, endDate, limit? }.
+ * - The service must resolve clubId to a Club, use its subdomain, and call https://<club-subdomain>.liverc.com/events/.
+ * - Any reliance on track strings or https://live.liverc.com/events/?date=... is legacy and must be removed as part of the
+ *   club-based refactor. See ADR-20251120-liverc-club-based-discovery for the source of truth.
+ */
+
 import { HTMLElement as ParsedHTMLElement, parse } from 'node-html-parser';
 
 import type { ClubRepository } from '@core/app/ports/clubRepository';
