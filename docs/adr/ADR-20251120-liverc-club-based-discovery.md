@@ -20,6 +20,8 @@
   and preventing discovery from returning real events.
 - The v1 design also accepted a free-text `track` field that was fuzzy matched against event track names, coupling discovery to a
   non-existent upstream surface.
+- The modern LiveRC UI is organised around track or club subdomains, each with
+  its own `/events/` page (e.g., `https://canberraoffroad.liverc.com/events/`).
 
 ## Decision
 

@@ -33,14 +33,19 @@ full collection of LiveRC-related tests and their intent.
 startDate, endDate, limit? }` to the application layer.
 - **Lookup:** The connector resolves `clubId` via the `Club` table to obtain the
   club name and LiveRC subdomain (e.g., `canberraoffroad.liverc.com`).
-- **Fetch:** With that subdomain, the connector fetches the club events page at
-  `https://<club-subdomain>.liverc.com/events/` and parses each event row for
-  titles, dates, and canonical links.
+- **Fetch:** With that subdomain, the connector constructs
+  `https://<subdomain>.liverc.com/events/`, downloads the HTML, and parses each
+  event row for the event title, date, and canonical link.
 - **Filter:** Events are filtered so only those whose dates fall within the
   inclusive `[startDate, endDate]` range are returned; `limit` caps the result
   set after sorting.
+- **Return shape:** The connector returns a list of events that include at
+  minimum `eventRef` (the fully qualified URL), `title`, and an ISO date string
+  such as `whenIso`.
 - **Guardrail:** The connector must **not** call `https://live.liverc.com/events/?date=...`
-  because that endpoint does not exist on the current LiveRC site.
+  because that endpoint does not exist on the current LiveRC site. Any older
+  design that looped over a global `/events/?date` page is superseded by the
+  club-based approach.
 - **Downstream connectors:** Import plan and summary connectors continue to work
   unchanged with the `eventRef` URLs emitted by the discovery connector.
 

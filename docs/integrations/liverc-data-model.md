@@ -137,12 +137,17 @@ outside the Prisma schema until we widen storage.
 ## Dashboard LiveRC quick import (GUI/API contract)
 
 The Dashboard quick import experience now centres on club-based discovery. The
-GUI presents three required inputs:
+GUI presents three required inputs and defines the discovery request body as:
+
+```json
+{ "clubId": "<club-id>", "startDate": "YYYY-MM-DD", "endDate": "YYYY-MM-DD", "limit": <optional number> }
+```
 
 1. **Club selector:** a search/typeahead backed by the internal club catalogue
    (synced from the LiveRC root track list). The UI renders human-friendly club
    names, while the backend receives a `clubId` that resolves to the club’s
-   subdomain. Free-form text is no longer accepted.
+   subdomain. `clubId` references the Club table and is not a free-text `track`
+   string. Free-form text is no longer accepted.
 2. **Search Start Date:** DD-MM-YYYY text field validated for real calendar
    dates (including leap years). Values are converted to ISO `YYYY-MM-DD` before
    API calls.
@@ -191,8 +196,9 @@ The service returns `200` with:
 - `eventRef` now references a concrete event living under the club’s subdomain
   (e.g., `https://<club-subdomain>.liverc.com/...`), ensuring follow-up imports
   land on the correct context.
-- `title`, optional `whenIso`, and `score` semantics are unchanged from the
-  previous range-based API.
+- Each event includes `title` and an ISO date (`whenIso`). `score` remains
+  optional for ranking, but rankings are now scoped to the selected club and
+  date range rather than fuzzy text matching.
 - Errors continue to use `INVALID_JSON`, `INVALID_REQUEST`,
   `DISCOVERY_UPSTREAM_ERROR`, and `UNEXPECTED_ERROR` envelopes.
 
