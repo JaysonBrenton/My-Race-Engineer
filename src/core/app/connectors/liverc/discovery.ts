@@ -22,6 +22,7 @@ import { LiveRcClientError, type LiveRcClient } from './client';
 export type LiveRcDiscoveryEvent = {
   eventRef: string;
   title: string;
+  // YYYY-MM-DD date string for stable comparisons and filtering.
   whenIso: string;
 };
 
@@ -257,7 +258,7 @@ const parseEventDate = (raw: string): string | undefined => {
   const isoOnly = /^\d{4}-\d{2}-\d{2}$/.exec(cleaned);
   if (isoOnly) {
     const parsed = parseDateOnly(cleaned);
-    return parsed?.toISOString();
+    return parsed ? formatDateOnly(parsed) : undefined;
   }
 
   const timestamp = Date.parse(cleaned);
@@ -265,7 +266,7 @@ const parseEventDate = (raw: string): string | undefined => {
     return undefined;
   }
 
-  return new Date(timestamp).toISOString();
+  return formatDateOnly(new Date(timestamp));
 };
 
 const parseDateOnly = (value: string): Date | null => {
@@ -288,6 +289,8 @@ const parseDateOnly = (value: string): Date | null => {
 
   return date;
 };
+
+const formatDateOnly = (date: Date): string => date.toISOString().slice(0, 10);
 
 const parseIsoToMillis = (iso: string | undefined): number | null => {
   if (!iso) {
