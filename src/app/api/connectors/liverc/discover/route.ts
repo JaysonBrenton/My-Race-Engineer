@@ -27,6 +27,9 @@ const baseHeaders = {
 // Canonical API contract: accept { clubId, startDate, endDate, limit? } per
 // ADR-20251120-liverc-club-based-discovery to stay aligned with the club-based design.
 // Any free-text track field support is legacy and should be removed in favour of clubId.
+const MAX_RANGE_DAYS = 7;
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
+
 const Body = z
   .object({
     clubId: z.string().trim().min(1),
@@ -34,9 +37,60 @@ const Body = z
     endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     limit: z.number().int().min(1).max(100).optional(),
   })
-  .refine(({ startDate, endDate }) => startDate <= endDate, {
-    message: 'startDate must be <= endDate',
+  .superRefine((value, ctx) => {
+    const start = parseDateOnly(value.startDate);
+    const end = parseDateOnly(value.endDate);
+
+    if (!start || !end) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'startDate and endDate must be valid YYYY-MM-DD dates',
+      });
+      return;
+    }
+
+    if (start.getTime() > end.getTime()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'startDate must be <= endDate',
+        path: ['startDate'],
+      });
+    }
+
+    // Keep the inclusive range within the existing seven-day window guardrail so
+    // LiveRC scraping remains bounded and predictable.
+    const inclusiveDays = Math.floor((end.getTime() - start.getTime()) / DAY_IN_MS) + 1;
+    if (inclusiveDays > MAX_RANGE_DAYS) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Date range must not exceed ${MAX_RANGE_DAYS} days`,
+        path: ['endDate'],
+      });
+    }
   });
+
+// Parse YYYY-MM-DD into a UTC Date object; return null for invalid values so
+// validation can emit a clear error.
+function parseDateOnly(value: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!match) {
+    return null;
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+    return null;
+  }
+
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date;
+}
 
 const buildJsonResponse = (status: number, payload: unknown, requestId: string): Response =>
   new Response(JSON.stringify(payload), {

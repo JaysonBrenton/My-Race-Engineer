@@ -100,6 +100,11 @@ void test('POST rejects invalid payloads for club discovery', async () => {
   );
   assert.equal(resBadRange.status, 400);
 
+  const resTooWide = await POST(
+    makeRequest({ clubId: 'club-1', startDate: '2025-10-01', endDate: '2025-10-15' }),
+  );
+  assert.equal(resTooWide.status, 400);
+
   const resInvalidDate = await POST(
     makeRequest({ clubId: 'club-1', startDate: '10/01/2025', endDate: '2025-10-11' }),
   );
@@ -141,8 +146,8 @@ void test('POST happy path returns discovered events for a club', async () => {
         const res = await POST(
           makeRequest({
             clubId: 'club-1',
-            startDate: '2025-09-01',
-            endDate: '2025-10-31',
+            startDate: '2025-10-10',
+            endDate: '2025-10-16',
             limit: 2,
           }),
         );
@@ -154,13 +159,10 @@ void test('POST happy path returns discovered events for a club', async () => {
 
         const payload = (await res.json()) as DiscoveryPayload;
         const events = payload.data?.events ?? [];
-        assert.equal(events.length, 2);
+        assert.equal(events.length, 1);
         assert.deepEqual(
-          events.map((event) => event.eventRef),
-          [
-            'https://canberraoffroad.liverc.com/events/september-practice-day',
-            'https://canberraoffroad.liverc.com/events/canberra-club-round',
-          ],
+          events[0]?.eventRef,
+          'https://canberraoffroad.liverc.com/events/canberra-club-round',
         );
       } finally {
         htmlClient.config.fetchImpl = originalFetchImpl;
@@ -193,8 +195,8 @@ void test('POST treats a 404 club events page as no results', async () => {
         const res = await POST(
           makeRequest({
             clubId: 'club-1',
-            startDate: '2025-09-01',
-            endDate: '2025-10-31',
+            startDate: '2025-10-10',
+            endDate: '2025-10-16',
           }),
         );
 

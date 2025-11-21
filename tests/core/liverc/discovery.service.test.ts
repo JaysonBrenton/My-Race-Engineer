@@ -80,20 +80,23 @@ void test('filters club events by date range and sorts chronologically', async (
 
   assert.equal(clubBaseOrigin, 'https://canberraoffroad.liverc.com');
   assert.equal(events.length, 3);
-  assert.deepEqual(
-    events.map((event) => ({ ref: event.eventRef, when: event.whenIso.slice(0, 10) })),
-    [
-      {
-        ref: 'https://canberraoffroad.liverc.com/events/september-practice-day',
-        when: '2025-09-28',
-      },
-      { ref: 'https://canberraoffroad.liverc.com/events/canberra-club-round', when: '2025-10-12' },
-      {
-        ref: 'https://canberraoffroad.liverc.com/events/canberra-spring-shootout',
-        when: '2025-10-19',
-      },
-    ],
-  );
+  assert.deepEqual(events, [
+    {
+      eventRef: 'https://canberraoffroad.liverc.com/events/september-practice-day',
+      title: 'Spring Practice Day',
+      whenIso: '2025-09-28',
+    },
+    {
+      eventRef: 'https://canberraoffroad.liverc.com/events/canberra-club-round',
+      title: 'Club Points Round',
+      whenIso: '2025-10-12',
+    },
+    {
+      eventRef: 'https://canberraoffroad.liverc.com/events/canberra-spring-shootout',
+      title: 'Spring Shootout',
+      whenIso: '2025-10-19',
+    },
+  ]);
 });
 
 void test('treats a 404 club events page as an empty result set', async () => {
