@@ -79,6 +79,11 @@ void test('button disabled until valid DD-MM-YYYY range and club is selected', a
       await userEvent.type(club, 'Canberra');
       const suggestion = await screen.findByRole('button', { name: /Canberra RC/ });
       await userEvent.click(suggestion);
+      const selectedPills = await screen.findAllByText(
+        (content, element) =>
+          element?.textContent?.toLowerCase().includes('selected club: canberra rc') ?? false,
+      );
+      assert.ok(selectedPills.length > 0);
       assert.equal(button.hasAttribute('disabled'), true); // still invalid (>7)
 
       setDateField(end, '2025-10-21');
@@ -146,12 +151,71 @@ void test('valid input triggers POST with clubId and renders results', async () 
       await userEvent.type(screen.getByLabelText<HTMLInputElement>(/search for club/i), 'Can');
       const suggestion = await screen.findByRole('button', { name: /Canberra RC/ });
       await userEvent.click(suggestion);
+      const selectedPills = await screen.findAllByText(
+        (content, element) =>
+          element?.textContent?.toLowerCase().includes('selected club: canberra rc') ?? false,
+      );
+      assert.ok(selectedPills.length > 0);
 
       await userEvent.click(screen.getByRole('button', { name: /search/i }));
 
       await screen.findByText(/round 1/i);
       const link = screen.getByRole('link', { name: /view on liverc/i });
       assert.equal(link.getAttribute('href'), 'https://liverc.com/e1');
+    },
+  );
+});
+
+void test('shows no results state and allows clearing the selected club', async () => {
+  await withPatchedFetch(
+    (input) => {
+      const url = toRequestUrl(input);
+      if (url.includes('/api/connectors/liverc/clubs/search')) {
+        const parsed = new URL(url, 'http://localhost');
+        const query = parsed.searchParams.get('q');
+        if (query === 'zz') {
+          return new Response(JSON.stringify({ data: { clubs: [] }, requestId: 'clubs-empty' }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+
+        return new Response(
+          JSON.stringify({
+            data: { clubs: [{ id: 'club-1', name: 'Canberra RC', location: 'ACT' }] },
+            requestId: 'clubs',
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      }
+
+      throw new Error(`Unexpected fetch to ${url}`);
+    },
+    async () => {
+      render(<LiveRcQuickImport />);
+
+      const club = screen.getByLabelText<HTMLInputElement>(/search for club/i);
+
+      await userEvent.type(club, 'zz');
+      await screen.findByText(/no clubs found/i);
+
+      await userEvent.clear(club);
+      await userEvent.type(club, 'Can');
+      const suggestion = await screen.findByRole('button', { name: /Canberra RC/ });
+      await userEvent.click(suggestion);
+      const selectedPills = await screen.findAllByText(
+        (content, element) =>
+          element?.textContent?.toLowerCase().includes('selected club: canberra rc') ?? false,
+      );
+      assert.ok(selectedPills.length > 0);
+
+      const clearButton = screen.getByRole('button', { name: /clear selected club/i });
+      await userEvent.click(clearButton);
+
+      assert.equal(club.value, '');
+
+      await userEvent.type(club, 'Can');
+      await screen.findByRole('button', { name: /Canberra RC/ });
     },
   );
 });
