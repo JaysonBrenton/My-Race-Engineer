@@ -124,9 +124,11 @@ Response (200)
 { "data": { "events": [
 { "eventRef": "https://canberra.liverc.com/events/2025-10-20-canberra-offroad-challenge",
 "title": "Canberra Off Road Challenge",
-"whenIso": "2025-10-20T09:00:00Z" }
+"whenIso": "2025-10-20" }
 ] },
 "requestId": "..." }
+
+`whenIso` is a date-only ISO string (`YYYY-MM-DD`) derived from the club events page; it omits time components to keep range filtering stable.
 Errors
 
 INVALID_JSON, INVALID_REQUEST, DISCOVERY_UPSTREAM_ERROR, UNEXPECTED_ERROR

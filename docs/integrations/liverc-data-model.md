@@ -186,7 +186,7 @@ The service returns `200` with:
       {
         "eventRef": "https://canberra.liverc.com/events/12345",
         "title": "Canberra Off Road Challenge",
-        "whenIso": "2025-10-20T09:00:00Z"
+        "whenIso": "2025-10-20"
       }
     ]
   },
@@ -197,9 +197,10 @@ The service returns `200` with:
 - `eventRef` now references a concrete event living under the club’s subdomain
   (e.g., `https://<club-subdomain>.liverc.com/...`), ensuring follow-up imports
   land on the correct context.
-- Each event includes `eventRef`, `title`, and an ISO date (`whenIso`); if
-  ranking is added in future, it must remain scoped to the selected club and
-  date range rather than fuzzy text matching.
+- Each event includes `eventRef`, `title`, and a date-only ISO string
+  (`whenIso`) formatted as `YYYY-MM-DD`; if ranking is added in future, it must
+  remain scoped to the selected club and date range rather than fuzzy text
+  matching.
 - Errors continue to use `INVALID_JSON`, `INVALID_REQUEST`,
   `DISCOVERY_UPSTREAM_ERROR`, and `UNEXPECTED_ERROR` envelopes.
 

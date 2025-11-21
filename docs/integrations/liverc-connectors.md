@@ -40,8 +40,8 @@ startDate, endDate, limit? }` to the application layer.
   inclusive `[startDate, endDate]` range are returned; `limit` caps the result
   set after sorting.
 - **Return shape:** The connector returns a list of events that include at
-  minimum `eventRef` (the fully qualified URL), `title`, and an ISO date string
-  such as `whenIso`.
+  minimum `eventRef` (the fully qualified URL), `title`, and a date-only ISO
+  string such as `whenIso` formatted `YYYY-MM-DD`.
 - **Guardrail:** The connector must **not** call `https://live.liverc.com/events/?date=...`
   because that endpoint does not exist on the current LiveRC site. Any older
   design that looped over a global `/events/?date` page is superseded by the

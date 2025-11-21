@@ -48,6 +48,7 @@ const withPatchedFetch = async (
 };
 
 type StoredClub = {
+  id: string;
   liveRcSubdomain: string;
   displayName: string;
   country: string | null;
@@ -55,6 +56,8 @@ type StoredClub = {
   firstSeenAt: Date;
   lastSeenAt: Date;
   isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
 };
 
 // Lightweight in-memory repository that mirrors the persistence semantics so
@@ -77,10 +80,12 @@ class InMemoryClubRepository implements ClubRepository {
       existing.region = input.region ?? null;
       existing.lastSeenAt = input.seenAt;
       existing.isActive = true;
+      existing.updatedAt = input.seenAt;
       return Promise.resolve();
     }
 
     this.records.set(subdomain, {
+      id: subdomain,
       liveRcSubdomain: subdomain,
       displayName: input.displayName,
       country: input.country ?? null,
@@ -88,6 +93,8 @@ class InMemoryClubRepository implements ClubRepository {
       firstSeenAt: input.seenAt,
       lastSeenAt: input.seenAt,
       isActive: true,
+      createdAt: input.seenAt,
+      updatedAt: input.seenAt,
     });
 
     return Promise.resolve();
@@ -104,9 +111,58 @@ class InMemoryClubRepository implements ClubRepository {
         continue;
       }
       record.isActive = false;
+      record.updatedAt = record.lastSeenAt;
       updated += 1;
     }
     return Promise.resolve(updated);
+  }
+
+  // Simple active-only substring search to mirror the dashboard typeahead
+  // behaviour without pulling in a full text search dependency.
+  searchByDisplayName(
+    query: string,
+    limit: number,
+  ): ReturnType<ClubRepository['searchByDisplayName']> {
+    const normalised = query.trim().toLowerCase();
+    if (!normalised || limit <= 0) {
+      return Promise.resolve([]);
+    }
+
+    const results: Awaited<ReturnType<ClubRepository['searchByDisplayName']>> = [];
+    for (const record of this.records.values()) {
+      if (!record.isActive) {
+        continue;
+      }
+      if (!record.displayName.toLowerCase().includes(normalised)) {
+        continue;
+      }
+
+      results.push({
+        id: record.id,
+        liveRcSubdomain: record.liveRcSubdomain,
+        displayName: record.displayName,
+        country: record.country,
+        region: record.region,
+      });
+
+      if (results.length >= limit) {
+        break;
+      }
+    }
+
+    return Promise.resolve(results);
+  }
+
+  // Provide stable club lookup by id using the stored records.
+  findById(clubId: string): ReturnType<ClubRepository['findById']> {
+    for (const record of this.records.values()) {
+      if (record.id === clubId) {
+        // Return a copy so tests cannot mutate the repository internals.
+        return Promise.resolve({ ...record });
+      }
+    }
+
+    return Promise.resolve(null);
   }
 }
 
@@ -162,6 +218,7 @@ void test('syncCatalogue updates existing clubs and deactivates missing ones', a
       const oldSeen = newDate('2024-12-01T00:00:00.000Z');
       const repository = new InMemoryClubRepository([
         {
+          id: 'canberra',
           liveRcSubdomain: 'canberra',
           displayName: 'Old Canberra Name',
           country: 'Australia',
@@ -169,8 +226,11 @@ void test('syncCatalogue updates existing clubs and deactivates missing ones', a
           firstSeenAt: oldSeen,
           lastSeenAt: oldSeen,
           isActive: true,
+          createdAt: oldSeen,
+          updatedAt: oldSeen,
         },
         {
+          id: 'retiredclub',
           liveRcSubdomain: 'retiredclub',
           displayName: 'Retired RC Club',
           country: 'Australia',
@@ -178,6 +238,8 @@ void test('syncCatalogue updates existing clubs and deactivates missing ones', a
           firstSeenAt: oldSeen,
           lastSeenAt: oldSeen,
           isActive: true,
+          createdAt: oldSeen,
+          updatedAt: oldSeen,
         },
       ]);
 
