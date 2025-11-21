@@ -1,3 +1,9 @@
+/**
+ * Project: My Race Engineer
+ * File: tests/core/liverc/importPlanService.test.ts
+ * Summary: Tests for the LiveRC import plan service heuristics and state handling.
+ */
+
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -13,36 +19,46 @@ const loadSampleEventHtml = async () => readFile(sampleEventHtmlPath, 'utf8');
 
 type RepositoryState = ImportPlanEventState | null;
 
-const createService = (options: {
-  client?: Record<string, unknown>;
-  repositoryState?: RepositoryState;
-  includeExistingEvents?: boolean;
-} = {}) => {
+const createService = (
+  options: {
+    client?: Record<string, unknown>;
+    repositoryState?: RepositoryState;
+    includeExistingEvents?: boolean;
+  } = {},
+) => {
   type ServiceDependencies = ConstructorParameters<typeof LiveRcImportPlanService>[0];
 
   const defaultClient = {
-    async getEventOverview() {
+    getRootTrackList() {
+      // The import plan service does not call this in these tests but the LiveRcClient type requires it.
+      return Promise.resolve('<html></html>');
+    },
+    getClubEventsPage() {
+      // Discovery is out of scope for import plan tests; keep the stub explicit.
+      return Promise.reject(new Error('Not implemented'));
+    },
+    getEventOverview() {
       return loadSampleEventHtml();
     },
-    async getSessionPage() {
-      throw new Error('Not implemented');
+    getSessionPage() {
+      return Promise.reject(new Error('Not implemented'));
     },
     resolveJsonUrlFromHtml() {
       return null;
     },
-    async fetchJson() {
-      throw new Error('Not implemented');
+    fetchJson() {
+      return Promise.reject(new Error('Not implemented'));
     },
   } satisfies Record<string, unknown>;
 
   const defaultRepository: ImportPlanRepository = {
-    async getEventStateByRef() {
-      return options.repositoryState ?? null;
+    getEventStateByRef() {
+      return Promise.resolve(options.repositoryState ?? null);
     },
   };
 
   const client = { ...defaultClient, ...(options.client ?? {}) } as ServiceDependencies['client'];
-  const repository = defaultRepository as ServiceDependencies['repository'];
+  const repository = defaultRepository;
 
   return new LiveRcImportPlanService(
     { client, repository },
@@ -50,7 +66,7 @@ const createService = (options: {
   );
 };
 
-test('LiveRC import plan service marks new events and estimates counts via heuristics', async () => {
+void test('LiveRC import plan service marks new events and estimates counts via heuristics', async () => {
   const service = createService();
 
   const plan = await service.createPlan({ events: [{ eventRef: 'sample-event' }] });
@@ -62,10 +78,13 @@ test('LiveRC import plan service marks new events and estimates counts via heuri
   assert.equal(item.status, 'NEW');
   assert.equal(item.counts.sessions, 5);
   assert.ok(item.counts.drivers >= 1, 'expected driver estimate to be positive');
-  assert.ok(item.counts.estimatedLaps >= item.counts.drivers, 'expected lap estimate to exceed drivers');
+  assert.ok(
+    item.counts.estimatedLaps >= item.counts.drivers,
+    'expected lap estimate to exceed drivers',
+  );
 });
 
-test('LiveRC import plan service reports existing when sessions and laps are present', async () => {
+void test('LiveRC import plan service reports existing when sessions and laps are present', async () => {
   const repositoryState: ImportPlanEventState = {
     event: {
       id: 'evt-1',
@@ -89,7 +108,7 @@ test('LiveRC import plan service reports existing when sessions and laps are pre
   assert.ok(item.counts.estimatedLaps >= 480, 'expected lap estimate to respect stored lap count');
 });
 
-test('LiveRC import plan service excludes existing events by default', async () => {
+void test('LiveRC import plan service excludes existing events by default', async () => {
   const repositoryState: ImportPlanEventState = {
     event: {
       id: 'evt-3',
@@ -109,7 +128,7 @@ test('LiveRC import plan service excludes existing events by default', async () 
   assert.equal(plan.items.length, 0);
 });
 
-test('LiveRC import plan service reports partial coverage when some sessions lack laps', async () => {
+void test('LiveRC import plan service reports partial coverage when some sessions lack laps', async () => {
   const repositoryState: ImportPlanEventState = {
     event: {
       id: 'evt-2',

@@ -8,8 +8,8 @@
  * Intended design guardrail:
  * - LiveRcDiscoveryService is club based (not track based) with inputs { clubId, startDate, endDate, limit? }.
  * - Resolve clubId to a Club record, use its subdomain, and call https://<club-subdomain>.liverc.com/events/ to discover.
- * - Relying on a free-text track field or https://live.liverc.com/events/?date=... is legacy behaviour to remove in the
- *   club-based refactor. See ADR-20251120-liverc-club-based-discovery for the authoritative decision.
+ * - Free-text track fields and https://live.liverc.com/events/?date=... are legacy patterns that must not reappear now
+ *   that the club-based refactor is complete. See ADR-20251120-liverc-club-based-discovery for the authoritative decision.
  */
 
 import { HTMLElement as ParsedHTMLElement, parse } from 'node-html-parser';

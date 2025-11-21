@@ -26,7 +26,7 @@ const baseHeaders = {
 
 // Canonical API contract: accept { clubId, startDate, endDate, limit? } per
 // ADR-20251120-liverc-club-based-discovery to stay aligned with the club-based design.
-// Any free-text track field support is legacy and should be removed in favour of clubId.
+// Free-text track fields and the retired /events/?date pattern are not supported.
 const MAX_RANGE_DAYS = 7;
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
