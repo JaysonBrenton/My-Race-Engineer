@@ -53,7 +53,7 @@ For the decision record that governs LiveRC discovery, see `docs/adr/ADR-2025112
   - **Club** (search input)
     - Uses the new club search API backed by the synced LiveRC club catalogue.
     - Placeholder: `Search clubs…` and renders results with `clubName – location`.
-    - Selecting a club stores the `clubId`; free-text values are not permitted.
+    - Selecting a club stores the clubId; arbitrary free-text values are never treated as a valid club.
   - **Search Start Date** (text input)
     - Placeholder: `DD-MM-YYYY`.
     - Required; accepts only two digits, dash, two digits, dash, four digits; rejects impossible dates (incl. leap years).
