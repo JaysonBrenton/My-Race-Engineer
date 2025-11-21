@@ -27,6 +27,31 @@ type ParsedClub = {
   region?: string | null;
 };
 
+/**
+ * Derives an optional per-sync club upsert limit from the environment so development
+ * runs can cap the amount of work performed without altering discovery behaviour.
+ * Returns null when the value is absent or invalid, preserving the default full sync.
+ */
+const getSyncLimitFromEnv = (
+  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+): number | null => {
+  const rawLimit = process.env.LIVERC_SYNC_CLUB_LIMIT;
+  if (!rawLimit) {
+    return null;
+  }
+
+  const parsedLimit = Number.parseInt(rawLimit, 10);
+  if (Number.isNaN(parsedLimit) || parsedLimit <= 0) {
+    logger?.warn?.('Ignoring invalid LIVERC_SYNC_CLUB_LIMIT. Expected a positive integer.', {
+      event: 'liverc.clubs.sync.limit_invalid',
+      rawLimit,
+    });
+    return null;
+  }
+
+  return parsedLimit;
+};
+
 export class LiveRcClubCatalogueService {
   constructor(private readonly dependencies: Dependencies) {}
 
@@ -38,6 +63,9 @@ export class LiveRcClubCatalogueService {
       startedAt,
     });
 
+    const limit = getSyncLimitFromEnv(this.dependencies.logger);
+    let processedCount = 0;
+
     const html = await this.dependencies.client.getRootTrackList();
     // Parse the HTML directory into structured club records that we can
     // reconcile against the database.
@@ -48,7 +76,16 @@ export class LiveRcClubCatalogueService {
     const seenSubdomains = new Set<string>();
 
     for (const club of parsedClubs) {
-      seenSubdomains.add(club.liveRcSubdomain);
+      if (limit !== null && processedCount >= limit) {
+        this.dependencies.logger?.info?.('LiveRC club sync limit reached, stopping early.', {
+          event: 'liverc.clubs.sync.limit_reached',
+          outcome: 'partial',
+          limit,
+          processedCount,
+        });
+        break;
+      }
+
       await this.dependencies.repository.upsertByLiveRcSubdomain({
         liveRcSubdomain: club.liveRcSubdomain,
         displayName: club.displayName,
@@ -56,21 +93,38 @@ export class LiveRcClubCatalogueService {
         region: club.region ?? null,
         seenAt,
       });
+      seenSubdomains.add(club.liveRcSubdomain);
+      processedCount += 1;
     }
 
-    const deactivatedCount = await this.dependencies.repository.markInactiveClubsNotInSubdomains(
-      Array.from(seenSubdomains),
-    );
+    let deactivatedCount = 0;
+    if (limit === null) {
+      deactivatedCount = await this.dependencies.repository.markInactiveClubsNotInSubdomains(
+        Array.from(seenSubdomains),
+      );
+    } else {
+      this.dependencies.logger?.info?.(
+        'Skipping deactivation of clubs because a sync limit is in effect.',
+        {
+          event: 'liverc.clubs.sync.deactivate_skipped',
+          outcome: 'partial',
+          limit,
+          processedCount,
+        },
+      );
+    }
 
     this.dependencies.logger?.info?.('Completed LiveRC club catalogue sync.', {
       event: 'liverc.clubs.sync.complete',
       outcome: 'success',
       seenCount: seenSubdomains.size,
+      upserted: processedCount,
       deactivatedCount,
+      limit,
       durationMs: Date.now() - startedAt.getTime(),
     });
 
-    return { upserted: seenSubdomains.size, deactivated: deactivatedCount };
+    return { upserted: processedCount, deactivated: deactivatedCount };
   }
 }
 
