@@ -10,7 +10,7 @@
 
 title: Dashboard LiveRC quick import
 created: 2025-10-20
-status: published
+status: accepted
 
 ---
 
