@@ -46,6 +46,18 @@ type CatalogueClub = {
   events: CatalogueEvent[];
 };
 
+type SeedStats = {
+  clubsProcessed: number;
+  clubsInserted: number;
+  clubsUpdated: number;
+  eventsInserted: number;
+  eventsUpdated: number;
+  classesInserted: number;
+  classesUpdated: number;
+  sessionsInserted: number;
+  sessionsUpdated: number;
+};
+
 const catalogue: CatalogueClub[] = [
   {
     liveRcSubdomain: 'thedirt',
@@ -172,9 +184,15 @@ const catalogue: CatalogueClub[] = [
   },
 ];
 
+/**
+ * Converts an optional date string into a Date object when provided.
+ */
 const toDate = (value: string | undefined) => (value ? new Date(value) : undefined);
 
-async function seedCatalogue() {
+/**
+ * Seeds the curated LiveRC catalogue into the configured database and returns upsert statistics.
+ */
+async function seedCatalogue(): Promise<SeedStats> {
   let clubsInserted = 0;
   let clubsUpdated = 0;
   let eventsInserted = 0;
@@ -307,23 +325,52 @@ async function seedCatalogue() {
     }
   }
 
+  return {
+    clubsProcessed: catalogue.length,
+    clubsInserted,
+    clubsUpdated,
+    eventsInserted,
+    eventsUpdated,
+    classesInserted,
+    classesUpdated,
+    sessionsInserted,
+    sessionsUpdated,
+  };
+}
+
+/**
+ * Entrypoint wrapper that guards production environments and reports seed summary statistics.
+ */
+async function main() {
+  if (process.env.NODE_ENV === 'production') {
+    logger.error(
+      'LiveRC catalogue seeding is intended for development or testing only. Aborting because NODE_ENV=production.',
+      {
+        event: 'seed.livercCatalogue.aborted',
+        outcome: 'aborted',
+      },
+    );
+    process.exitCode = 1;
+    return;
+  }
+
+  const stats = await seedCatalogue();
+  const summary = [
+    `Processed ${stats.clubsProcessed} clubs (${stats.clubsInserted} inserted, ${stats.clubsUpdated} updated)`,
+    `events inserted/updated: ${stats.eventsInserted}/${stats.eventsUpdated}`,
+    `race classes inserted/updated: ${stats.classesInserted}/${stats.classesUpdated}`,
+    `sessions inserted/updated: ${stats.sessionsInserted}/${stats.sessionsUpdated}`,
+  ].join('; ');
+
   logger.info('LiveRC catalogue seed completed.', {
     event: 'seed.livercCatalogue.completed',
     outcome: 'success',
-    stats: {
-      clubsInserted,
-      clubsUpdated,
-      eventsInserted,
-      eventsUpdated,
-      classesInserted,
-      classesUpdated,
-      sessionsInserted,
-      sessionsUpdated,
-    },
+    stats,
+    summary,
   });
 }
 
-seedCatalogue()
+main()
   .catch((error) => {
     logger.error('LiveRC catalogue seed failed.', {
       event: 'seed.livercCatalogue.failed',
