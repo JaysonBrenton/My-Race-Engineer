@@ -17,23 +17,22 @@ status: draft
 ## Current LiveRC quick import model (source of truth)
 
 - LiveRC discovery is **club based**, not global.
-- Discovery inputs are a **club selected from the Club table** plus a **start/end date range**.
-- API contract for discovery requests:
-  - Request body: `{ clubId: string, startDate: string (ISO YYYY-MM-DD), endDate: string (ISO YYYY-MM-DD), limit?: number }`.
-  - The service resolves `clubId` via the Club table to obtain the LiveRC subdomain and calls `https://<club-subdomain>.liverc.com/events/`.
-  - The root URL `https://live.liverc.com/events/?date=<dateLabel>` **does not exist** on the current LiveRC site and must never be used by our code.
+- The quick import flow must let the user search for and select a **club** from our **Club table (Prisma-backed)** and pick a **start and end date**.
+- The feature calls the discovery API with those inputs; the request body is `{ clubId: string, startDate: string (ISO YYYY-MM-DD), endDate: string (ISO YYYY-MM-DD), limit?: number }`.
+- Discovery resolves `clubId` to a Club record (which stores the LiveRC subdomain), calls `https://<club-subdomain>.liverc.com/events/`, parses the events table, and filters events so only dates **between startDate and endDate (inclusive)** are returned.
+- The URL `https://live.liverc.com/events/?date=<dateLabel>` does **not** exist on the current LiveRC site and must **never** be used by our code.
 
 For the decision record that governs LiveRC discovery, see `docs/adr/ADR-20251120-liverc-club-based-discovery.md`.
 
 ### Constraints for Codex / implementation rules
 
-- **Must not** introduce or use a `track` string field in LiveRC discovery inputs, UI, or schemas.
+- **Must not** introduce or use a `track` string field in LiveRC discovery inputs, UI, or schemas—discovery is keyed by `clubId`.
 - **Must not** construct or call `https://live.liverc.com/events/?date=...` anywhere in code or tests.
-- **Must** always resolve a `clubId` to a Club row and use its subdomain to build `https://<club-subdomain>.liverc.com/events/`.
+- **Must** always resolve a `clubId` to a Club record and use its `subdomain` to build `https://<club-subdomain>.liverc.com/events/`.
 - The dashboard quick import feature **must**:
-  - Allow the user to search for and select a club from our Club catalogue (backed by the Club table).
+  - Use a club search UI backed by our Club table (via an API) and never accept free text.
   - Send `{ clubId, startDate, endDate, limit? }` to `/api/connectors/liverc/discover`.
-  - Display events for that club and date range using `eventRef` URLs that point at the club subdomain.
+  - Display discovered events as a list, where each event carries an `eventRef` URL on the club subdomain.
 
 ## UX (specific for implementation)
 
