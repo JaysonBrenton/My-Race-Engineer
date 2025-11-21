@@ -14,6 +14,27 @@ status: draft
 
 ---
 
+## Current LiveRC quick import model (source of truth)
+
+- LiveRC discovery is **club based**, not global.
+- Discovery inputs are a **club selected from the Club table** plus a **start/end date range**.
+- API contract for discovery requests:
+  - Request body: `{ clubId: string, startDate: string (ISO YYYY-MM-DD), endDate: string (ISO YYYY-MM-DD), limit?: number }`.
+  - The service resolves `clubId` via the Club table to obtain the LiveRC subdomain and calls `https://<club-subdomain>.liverc.com/events/`.
+  - The root URL `https://live.liverc.com/events/?date=<dateLabel>` **does not exist** on the current LiveRC site and must never be used by our code.
+
+For the decision record that governs LiveRC discovery, see `docs/adr/ADR-20251120-liverc-club-based-discovery.md`.
+
+### Constraints for Codex / implementation rules
+
+- **Must not** introduce or use a `track` string field in LiveRC discovery inputs, UI, or schemas.
+- **Must not** construct or call `https://live.liverc.com/events/?date=...` anywhere in code or tests.
+- **Must** always resolve a `clubId` to a Club row and use its subdomain to build `https://<club-subdomain>.liverc.com/events/`.
+- The dashboard quick import feature **must**:
+  - Allow the user to search for and select a club from our Club catalogue (backed by the Club table).
+  - Send `{ clubId, startDate, endDate, limit? }` to `/api/connectors/liverc/discover`.
+  - Display events for that club and date range using `eventRef` URLs that point at the club subdomain.
+
 ## UX (specific for implementation)
 
 ### Dashboard shell (keep)
@@ -147,6 +168,21 @@ Selecting events and Create plan returns a planId and item counts.
 Apply plan returns 202 and shows the jobId.
 
 Errors are visible, human‑readable, and recoverable without reload.
+
+## Historical design (superseded, do not implement)
+
+This section describes the original v1 design and is kept for historical context only. Do not implement or reintroduce this pattern. The source of truth is the club based model described above.
+
+- Inputs were **Track or club name** (free text), **Search Start Date**, **Search End Date**, and optional `limit`.
+- Validation included “Track or club name must be at least 2 characters” alongside date checks.
+- Example discovery payloads looked like:
+
+  ```json
+  { "startDate": "2025-10-18", "endDate": "2025-10-21", "track": "canberra", "limit": 40 }
+  ```
+
+- The intended upstream endpoint was described as `https://live.liverc.com/events/?date=<dateLabel>` built from the date range + track text; this endpoint no longer exists and must not be used.
+- Commit guidance at the time referenced “date range + track” discovery and a free-text input; those references are historical only.
 
 Commit guidance
 

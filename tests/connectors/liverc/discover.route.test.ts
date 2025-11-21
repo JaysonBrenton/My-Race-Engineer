@@ -4,6 +4,12 @@
  * Summary: Route-level tests for the LiveRC discover connector API.
  */
 
+/**
+ * Guardrail: The /api/connectors/liverc/discover contract is moving to { clubId, startDate, endDate, limit? } per
+ * ADR-20251120-liverc-club-based-discovery. Tests should avoid locking in a `track` field or
+ * https://live.liverc.com/events/?date=... behaviour; any remaining references represent legacy state to be refactored.
+ */
+
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';

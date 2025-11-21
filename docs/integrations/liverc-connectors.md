@@ -27,24 +27,22 @@ importer expectations stay aligned with representative LiveRC HTML/JSON outputs.
 The test suite catalog (`docs/guides/test-suite-catalog.md`) lists the
 full collection of LiveRC-related tests and their intent.
 
-## Discovery model
+## Discovery connector
 
-- **Club catalogue (new baseline):** A background sync enumerates the LiveRC
-  track list surfaced on https://live.liverc.com/ and persists each club (name,
-  slug, and LiveRC subdomain) so the Dashboard can expose a first-class club
-  selector. The discovery backend now consumes a `clubId` resolved from this
-  catalogue rather than arbitrary text.
-- **Per-club event discovery:** Events are fetched by requesting the club’s
-  public schedule page at `https://<club-subdomain>.liverc.com/events/` and
-  parsing the table rows for event names, dates, and canonical links. The date
-  filter logic happens on our side; LiveRC does not expose a parameterised date
-  endpoint for this view.
-- **Removed global date-range discovery:** LiveRC no longer serves the old
-  homepage calendar endpoint that accepted a date range and free-text track
-  substring. Discovery must go through club-specific event listings instead;
-  anything else should be treated as historical only.
-- **Import plan + summary connectors unchanged:** After discovery returns
-  candidate events, the existing `plan.ts` and `summary.ts` connectors continue
-  to orchestrate import planning and execution exactly as before. Their
-  contracts remain valid, and no call sites should change beyond passing in the
-  new `eventRef` URLs that point at club-specific subdomains.
+- **Scope:** Discovery is per club, not global. Callers supply `{ clubId,
+startDate, endDate, limit? }` to the application layer.
+- **Lookup:** The connector resolves `clubId` via the `Club` table to obtain the
+  club name and LiveRC subdomain (e.g., `canberraoffroad.liverc.com`).
+- **Fetch:** With that subdomain, the connector fetches the club events page at
+  `https://<club-subdomain>.liverc.com/events/` and parses each event row for
+  titles, dates, and canonical links.
+- **Filter:** Events are filtered so only those whose dates fall within the
+  inclusive `[startDate, endDate]` range are returned; `limit` caps the result
+  set after sorting.
+- **Guardrail:** The connector must **not** call `https://live.liverc.com/events/?date=...`
+  because that endpoint does not exist on the current LiveRC site.
+- **Downstream connectors:** Import plan and summary connectors continue to work
+  unchanged with the `eventRef` URLs emitted by the discovery connector.
+
+For the decision record that governs LiveRC discovery, see
+`docs/adr/ADR-20251120-liverc-club-based-discovery.md`.
