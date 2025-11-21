@@ -147,7 +147,9 @@ GUI presents three required inputs and defines the discovery request body as:
    (synced from the LiveRC root track list). The UI renders human-friendly club
    names, while the backend receives a `clubId` that resolves to the club’s
    subdomain. `clubId` references the Club table and is not a free-text `track`
-   string. Free-form text is no longer accepted.
+   string. Users may type search text, but only clubs selected from the search
+   results (by id) are treated as valid input; arbitrary free-form text is never
+   treated as a `clubId`.
 2. **Search Start Date:** DD-MM-YYYY text field validated for real calendar
    dates (including leap years). Values are converted to ISO `YYYY-MM-DD` before
    API calls.
@@ -184,8 +186,7 @@ The service returns `200` with:
       {
         "eventRef": "https://canberra.liverc.com/events/12345",
         "title": "Canberra Off Road Challenge",
-        "whenIso": "2025-10-20T09:00:00Z",
-        "score": 1.5
+        "whenIso": "2025-10-20T09:00:00Z"
       }
     ]
   },
@@ -196,8 +197,8 @@ The service returns `200` with:
 - `eventRef` now references a concrete event living under the club’s subdomain
   (e.g., `https://<club-subdomain>.liverc.com/...`), ensuring follow-up imports
   land on the correct context.
-- Each event includes `title` and an ISO date (`whenIso`). `score` remains
-  optional for ranking, but rankings are now scoped to the selected club and
+- Each event includes `eventRef`, `title`, and an ISO date (`whenIso`); if
+  ranking is added in future, it must remain scoped to the selected club and
   date range rather than fuzzy text matching.
 - Errors continue to use `INVALID_JSON`, `INVALID_REQUEST`,
   `DISCOVERY_UPSTREAM_ERROR`, and `UNEXPECTED_ERROR` envelopes.
