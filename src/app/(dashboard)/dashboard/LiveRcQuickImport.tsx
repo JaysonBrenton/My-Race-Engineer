@@ -32,6 +32,7 @@ type ClubSearchResponse =
 
 const CLUB_SEARCH_LIMIT = 10;
 const DISCOVERY_LIMIT = 25;
+const CLUB_SEARCH_TOOLTIP = 'Type at least 2 characters to search.';
 
 function normaliseDateInput(input: string): string | null {
   const trimmed = input.trim();
@@ -305,9 +306,13 @@ export default function LiveRcQuickImport() {
               aria-haspopup="listbox"
               aria-expanded={clubSuggestions.length > 0}
               aria-controls="club-suggestions"
+              aria-describedby="club-search-guidance"
+              title={CLUB_SEARCH_TOOLTIP}
               required
             />
-            <p className={styles.helperText}>Type at least 2 characters to search.</p>
+            <span id="club-search-guidance" className={styles.visuallyHidden}>
+              {CLUB_SEARCH_TOOLTIP}
+            </span>
             {clubSearchLoading && <div className={styles.suggestionHint}>Searching…</div>}
             {clubSearchError && <div className={styles.suggestionError}>{clubSearchError}</div>}
             {clubSuggestions.length > 0 && (
