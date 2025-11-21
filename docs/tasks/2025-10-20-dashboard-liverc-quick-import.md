@@ -30,7 +30,7 @@ For the decision record that governs LiveRC discovery, see `docs/adr/ADR-2025112
 - **Must not** construct or call `https://live.liverc.com/events/?date=...` anywhere in code or tests.
 - **Must** always resolve a `clubId` to a Club record and use its `subdomain` to build `https://<club-subdomain>.liverc.com/events/`.
 - The dashboard quick import feature **must**:
-  - Use a club search UI backed by our Club table (via an API) and never accept free text.
+  - Use a club search UI backed by our Club table (via an API); users may type search text, but only clubs selected from the search results (by id) are treated as valid input.
   - Send `{ clubId, startDate, endDate, limit? }` to `/api/connectors/liverc/discover`.
   - Display discovered events as a list, where each event carries an `eventRef` URL on the club subdomain.
 
@@ -75,9 +75,9 @@ For the decision record that governs LiveRC discovery, see `docs/adr/ADR-2025112
     - Calls `POST /api/connectors/liverc/import/apply` with `{ planId }`.
 - **Results list (after Search)**
   - Columns: **Select** (checkbox), **Event Title**, **Date/Time (local)**, **Link** (canonical LiveRC URL).
-  - Events originate from parsing the selected club’s `/events/` page and are filtered client-side to the requested date range.
-  - Sort: by **match score desc**, then **date/time asc**.
-  - De‑duplicate by `eventRef` across days.
+  - Events originate from parsing the selected club’s `/events/` page in the discovery service and are already filtered to the requested date range; the UI just renders the returned list (with any light client-side checks).
+  - Sort: by **date/time asc** (using the event’s whenIso).
+  - De‑duplicate by `eventRef` so the same event is not shown twice.
   - Already‑imported events: **shown but unchecked** by default.
   - Empty state: “No events found for that date range and club.”
 - **Plan summary (after Create plan)**
@@ -124,8 +124,7 @@ Response (200)
 { "data": { "events": [
 { "eventRef": "https://canberra.liverc.com/events/2025-10-20-canberra-offroad-challenge",
 "title": "Canberra Off Road Challenge",
-"whenIso": "2025-10-20T09:00:00Z",
-"score": 1.5 }
+"whenIso": "2025-10-20T09:00:00Z" }
 ] },
 "requestId": "..." }
 Errors
