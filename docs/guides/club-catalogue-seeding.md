@@ -18,6 +18,13 @@ The `Club` model maps to LiveRC clubs/tracks. Populating these rows powers the d
 - **What it does:** Fetches the root track list HTML from LiveRC, parses clubs, and upserts `Club` rows (including `isActive`, region, and country details).
 - **Notes:** This command hits the real LiveRC site and depends on network access.
 
+#### Limiting the number of clubs during sync
+
+- By default the sync reconciles every club in the LiveRC directory and deactivates clubs missing from the latest scrape.
+- Set `LIVERC_SYNC_CLUB_LIMIT` to a positive integer to cap how many clubs are upserted in a single run. When a limit is set, the sync skips deactivating missing clubs so you can run partial refreshes safely in development.
+  - Unlimited (default): `npm run liverc:sync-clubs`
+  - Limit to 50 clubs: `LIVERC_SYNC_CLUB_LIMIT=50 npm run liverc:sync-clubs`
+
 ### 2) Seed the curated catalogue
 
 - **Command:** `npm run seed:liverc-catalogue`

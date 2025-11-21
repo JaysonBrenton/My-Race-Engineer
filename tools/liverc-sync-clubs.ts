@@ -12,6 +12,19 @@ const main = async () => {
     event: 'tools.liverc.sync_clubs.start',
   });
 
+  const parsedLimit = Number.parseInt(process.env.LIVERC_SYNC_CLUB_LIMIT ?? '', 10);
+  if (!Number.isNaN(parsedLimit) && parsedLimit > 0) {
+    applicationLogger.info('LiveRC club sync will apply a limit on upserted clubs.', {
+      event: 'tools.liverc.sync_clubs.limit',
+      limit: parsedLimit,
+    });
+  } else {
+    applicationLogger.info('LiveRC club sync running with no explicit club limit.', {
+      event: 'tools.liverc.sync_clubs.limit',
+      limit: null,
+    });
+  }
+
   try {
     const result = await liveRcClubCatalogueService.syncCatalogue();
     applicationLogger.info('LiveRC club sync completed successfully.', {

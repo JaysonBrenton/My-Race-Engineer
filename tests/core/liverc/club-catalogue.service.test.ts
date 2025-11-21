@@ -166,6 +166,25 @@ class InMemoryClubRepository implements ClubRepository {
   }
 }
 
+/**
+ * Decorates the in-memory repository to capture persistence method invocations for
+ * assertions about how many clubs were processed during a sync run.
+ */
+class TrackingClubRepository extends InMemoryClubRepository {
+  readonly upsertCalls: ClubUpsertInput[] = [];
+  readonly markInactiveCalls: string[][] = [];
+
+  override upsertByLiveRcSubdomain(input: ClubUpsertInput): Promise<void> {
+    this.upsertCalls.push(input);
+    return super.upsertByLiveRcSubdomain(input);
+  }
+
+  override markInactiveClubsNotInSubdomains(subdomains: readonly string[]): Promise<number> {
+    this.markInactiveCalls.push([...subdomains]);
+    return super.markInactiveClubsNotInSubdomains(subdomains);
+  }
+}
+
 const stubForRootTrackList = async (url: string): Promise<Response> => {
   const normalized = url.replace(/\/+$/, '/');
   if (normalized === 'https://live.liverc.com/') {
@@ -268,4 +287,42 @@ void test('syncCatalogue updates existing clubs and deactivates missing ones', a
       assert.equal(retired.isActive, false);
     },
   );
+});
+
+void test('syncCatalogue honours sync limit and skips deactivation when capped', async () => {
+  const originalLimit = process.env.LIVERC_SYNC_CLUB_LIMIT;
+  process.env.LIVERC_SYNC_CLUB_LIMIT = '2';
+
+  try {
+    await withPatchedFetch(
+      (url) => stubForRootTrackList(url),
+      async () => {
+        const repository = new TrackingClubRepository();
+        const syncTime = newDate('2025-03-03T00:00:00.000Z');
+        const service = new LiveRcClubCatalogueService({
+          client: new HttpLiveRcClient({ fetchImpl: globalThis.fetch }),
+          repository,
+          logger: noopLogger,
+          clock: () => syncTime,
+        });
+
+        const result = await service.syncCatalogue();
+
+        assert.equal(result.upserted, 2);
+        assert.equal(result.deactivated, 0);
+        assert.equal(repository.upsertCalls.length, 2);
+        assert.equal(repository.markInactiveCalls.length, 0);
+        assert.equal(repository.records.size, 2);
+
+        const seenSubdomains = Array.from(repository.records.keys()).sort();
+        assert.deepEqual(seenSubdomains, ['canberra', 'goldcoast']);
+      },
+    );
+  } finally {
+    if (originalLimit === undefined) {
+      delete process.env.LIVERC_SYNC_CLUB_LIMIT;
+    } else {
+      process.env.LIVERC_SYNC_CLUB_LIMIT = originalLimit;
+    }
+  }
 });
