@@ -10,51 +10,58 @@
     <title>LiveRC Tracks Directory</title>
   </head>
   <body>
-    <section id="track-directory">
-      <h1>Featured Tracks</h1>
-      <table class="track-table">
-        <thead>
-          <tr>
-            <th>Club</th>
-            <th>Location</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr data-track-row data-country="Australia" data-region="ACT">
-            <td class="track-name">
-              <a data-track-link href="https://canberra.liverc.com/">Canberra RC Collective</a>
-              <div class="track-location" data-track-location data-country="Australia" data-region="Australian Capital Territory">
-                <span class="region">Australian Capital Territory</span>
-                <span class="country">Australia</span>
-              </div>
-            </td>
-            <td class="track-metadata">
-              <small>Canberra, ACT</small>
-            </td>
-          </tr>
-          <tr data-track-row data-country="United States" data-region="California">
-            <td class="track-name">
-              <a class="track-link" href="https://goldcoast.liverc.com">Gold Coast Carpet Racers</a>
-              <div class="track-location" data-track-location data-country="United States" data-region="California">
-                <span class="region">California</span>
-                <span class="country">USA</span>
-              </div>
-            </td>
-            <td class="track-metadata">
-              <small>Los Angeles, CA</small>
-            </td>
-          </tr>
-          <tr data-track-row>
-            <td class="track-name">
-              <a href="https://silverridge.liverc.com/">Silver Ridge RC</a>
-              <p class="track-note">Outdoor clay layout</p>
-            </td>
-            <td class="track-metadata">
-              <small>Location TBA</small>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </section>
+    <div class="row">
+      <div class="col-lg-6">
+        <div class="panel panel-default">
+          <div class="panel-heading"><i class="fa fa-road fa-fw"></i> Tracks</div>
+          <div class="panel-body no_padding">
+            <div class="table-responsive">
+              <table class="table table-striped track_list" cellspacing="0" width="100%">
+                <thead>
+                  <tr>
+                    <th class="col_min">Status</th>
+                    <th>Track Name</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr class="clickable-row" data-href="//canberra.liverc.com/live/" data-track-row data-country="Australia" data-region="ACT">
+                    <td class="text-nowrap">
+                      <i class="fa fa-video-camera fa-fw status_video_1"></i>
+                      <i class="fa fa-flag-checkered fa-fw status_2"></i>
+                    </td>
+                    <td>
+                      <span class="hidden">seRC</span>
+                      <a href="//canberra.liverc.com/"><strong>Canberra RC Collective</strong></a>
+                      <div class="indent"><small>Test Event</small></div>
+                    </td>
+                  </tr>
+                  <tr class="clickable-row" data-href="//goldcoast.liverc.com/live/" data-track-row data-country="United States" data-region="California">
+                    <td class="text-nowrap">
+                      <i class="fa fa-video-camera fa-fw status_video_1"></i>
+                      <i class="fa fa-flag-checkered fa-fw status_2"></i>
+                    </td>
+                    <td>
+                      <span class="hidden">seRC</span>
+                      <a href="//goldcoast.liverc.com/"><strong>Gold Coast Carpet Racers</strong></a>
+                      <div class="indent"><small>Friday Night Racing</small></div>
+                    </td>
+                  </tr>
+                  <tr class="clickable-row" data-href="//silverridge.liverc.com/live/" data-track-row>
+                    <td class="text-nowrap">
+                      <i class="fa fa-power-off fa-fw"></i>
+                    </td>
+                    <td>
+                      <span class="hidden">seRC</span>
+                      <a href="//silverridge.liverc.com/"><strong>Silver Ridge RC</strong></a>
+                      <div class="indent"><small>Outdoor clay layout</small></div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </body>
 </html>
