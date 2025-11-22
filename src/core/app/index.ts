@@ -34,6 +34,7 @@ export * from './connectors/liverc/jobs';
 export * from './connectors/liverc/summary';
 export * from './connectors/liverc/discovery';
 export * from './connectors/liverc/clubs';
+export * from './connectors/liverc/events';
 export * from './services/auth/registerUser';
 export * from './services/auth/loginUser';
 export * from './services/auth/verifyEmail';

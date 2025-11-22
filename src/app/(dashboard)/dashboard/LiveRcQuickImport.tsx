@@ -22,6 +22,14 @@ type ClubSuggestion = {
   subdomain?: string | null;
 };
 
+type EventSuggestion = {
+  eventRef: string;
+  title: string;
+  whenIso: string;
+  clubId: string;
+  clubSubdomain: string;
+};
+
 type DiscoveryResponse =
   | { data: { events: DiscoveryEvent[] }; requestId: string }
   | { error: { code: string; message: string; details?: unknown }; requestId?: string };
@@ -30,9 +38,15 @@ type ClubSearchResponse =
   | { data: { clubs: ClubSuggestion[] }; requestId: string }
   | { error: { code: string; message: string; details?: unknown }; requestId?: string };
 
+type EventSearchResponse =
+  | { data: { events: EventSuggestion[] }; requestId: string }
+  | { error: { code: string; message: string; details?: unknown }; requestId?: string };
+
 const CLUB_SEARCH_LIMIT = 10;
+const EVENT_SEARCH_LIMIT = 10;
 const DISCOVERY_LIMIT = 25;
 const CLUB_SEARCH_TOOLTIP = 'Type at least 2 characters to search.';
+const EVENT_SEARCH_TOOLTIP = 'Type at least 2 characters to search for events.';
 
 function normaliseDateInput(input: string): string | null {
   const trimmed = input.trim();
@@ -97,11 +111,18 @@ export default function LiveRcQuickImport() {
   const [clubSearchError, setClubSearchError] = useState<string | null>(null);
   const [clubSearchLoading, setClubSearchLoading] = useState(false);
 
+  const [eventQuery, setEventQuery] = useState('');
+  const [eventSuggestions, setEventSuggestions] = useState<EventSuggestion[]>([]);
+  const [selectedEvent, setSelectedEvent] = useState<EventSuggestion | null>(null);
+  const [eventSearchError, setEventSearchError] = useState<string | null>(null);
+  const [eventSearchLoading, setEventSearchLoading] = useState(false);
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [events, setEvents] = useState<DiscoveryEvent[] | null>(null);
 
   const trimmedClubQuery = clubQuery.trim();
+  const trimmedEventQuery = eventQuery.trim();
 
   const canSubmit = useMemo(() => {
     if (!start || !end || !selectedClub) return false;
@@ -127,6 +148,19 @@ export default function LiveRcQuickImport() {
     setClubSuggestions([]);
     setClubSearchError(null);
     setClubSearchLoading(false);
+    // Clear event search when club is cleared
+    clearSelectedEvent();
+  };
+
+  /**
+   * Clears the currently selected event and any dependent autocomplete state.
+   */
+  const clearSelectedEvent = () => {
+    setSelectedEvent(null);
+    setEventQuery('');
+    setEventSuggestions([]);
+    setEventSearchError(null);
+    setEventSearchLoading(false);
   };
 
   useEffect(() => {
@@ -186,6 +220,84 @@ export default function LiveRcQuickImport() {
       controller.abort();
     };
   }, [clubQuery, selectedClub]);
+
+  // Event search effect - triggers when event query changes and a club is selected
+  useEffect(() => {
+    const trimmedQuery = eventQuery.trim();
+    setEventSearchError(null);
+
+    // Only search if a club is selected
+    if (!selectedClub) {
+      clearSelectedEvent();
+      return;
+    }
+
+    // Clear suggestions and selection when the query is emptied.
+    if (trimmedQuery.length === 0) {
+      setSelectedEvent(null);
+      setEventSuggestions([]);
+      setEventSearchLoading(false);
+      return;
+    }
+
+    if (selectedEvent && selectedEvent.title === trimmedQuery) {
+      // Preserve the current selection without re-querying when the input matches the chosen event.
+      setEventSuggestions([]);
+      setEventSearchLoading(false);
+      return;
+    }
+
+    if (trimmedQuery.length < 2) {
+      setEventSuggestions([]);
+      setSelectedEvent(null);
+      setEventSearchLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const runSearch = async () => {
+      setEventSearchLoading(true);
+      try {
+        const startIso = normaliseDateInput(start);
+        const endIso = normaliseDateInput(end);
+        const params = new URLSearchParams({
+          clubId: selectedClub.id,
+          q: trimmedQuery,
+          limit: String(EVENT_SEARCH_LIMIT),
+        });
+        // Include date range if provided
+        if (startIso && endIso) {
+          params.append('startDate', startIso);
+          params.append('endDate', endIso);
+        }
+
+        const res = await fetch(
+          `/api/connectors/liverc/events/search?${params.toString()}`,
+          { signal: controller.signal },
+        );
+        const json = (await res.json()) as EventSearchResponse;
+        if (!res.ok || 'error' in json) {
+          const message = 'error' in json ? json.error.message : `HTTP ${res.status}`;
+          throw new Error(message);
+        }
+        setEventSuggestions(json.data.events);
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        setEventSuggestions([]);
+        setEventSearchError(err instanceof Error ? err.message : 'Event search failed.');
+      } finally {
+        if (!controller.signal.aborted) {
+          setEventSearchLoading(false);
+        }
+      }
+    };
+
+    void runSearch();
+
+    return () => {
+      controller.abort();
+    };
+  }, [eventQuery, selectedClub, selectedEvent, start, end]);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -358,6 +470,83 @@ export default function LiveRcQuickImport() {
             )}
           </div>
         </div>
+        {selectedClub && (
+          <div className={styles.row}>
+            <label htmlFor="event">Search for event (optional)</label>
+            <div className={styles.autocomplete}>
+              <input
+                id="event"
+                type="text"
+                placeholder="Start typing an event name…"
+                value={eventQuery}
+                onChange={(e) => {
+                  setEventQuery(e.target.value);
+                  // Clear stale selections when the query changes
+                  setSelectedEvent(null);
+                }}
+                role="combobox"
+                aria-autocomplete="list"
+                aria-haspopup="listbox"
+                aria-expanded={eventSuggestions.length > 0}
+                aria-controls="event-suggestions"
+                aria-describedby="event-search-guidance"
+                title={EVENT_SEARCH_TOOLTIP}
+              />
+              <span id="event-search-guidance" className={styles.visuallyHidden}>
+                {EVENT_SEARCH_TOOLTIP}
+              </span>
+              {eventSearchLoading && <div className={styles.suggestionHint}>Searching…</div>}
+              {eventSearchError && <div className={styles.suggestionError}>{eventSearchError}</div>}
+              {eventSuggestions.length > 0 && (
+                <ul id="event-suggestions" className={styles.suggestions}>
+                  {eventSuggestions.map((event) => {
+                    const dateStr = event.whenIso
+                      ? new Date(event.whenIso + 'T00:00:00Z').toLocaleDateString()
+                      : '';
+                    return (
+                      <li key={event.eventRef}>
+                        <button
+                          className={styles.suggestionButton}
+                          type="button"
+                          onClick={() => {
+                            setSelectedEvent(event);
+                            setEventQuery(event.title);
+                            setEventSuggestions([]);
+                          }}
+                        >
+                          <span className={styles.suggestionName}>{event.title}</span>
+                          {dateStr && <span className={styles.suggestionLocation}>{dateStr}</span>}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              {trimmedEventQuery.length >= 2 &&
+                !eventSearchLoading &&
+                !selectedEvent &&
+                eventSuggestions.length === 0 &&
+                !eventSearchError && (
+                  <div className={styles.noResults}>No events found. Try another search.</div>
+                )}
+              {selectedEvent && (
+                <div className={styles.selectedClubPill}>
+                  <span className={styles.selectedClubLabel}>
+                    Selected event: <strong>{selectedEvent.title}</strong>
+                  </span>
+                  <button
+                    type="button"
+                    className={styles.clearSelectedClub}
+                    onClick={clearSelectedEvent}
+                    aria-label="Clear selected event"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         <div className={styles.actions}>
           <button type="submit" disabled={!canSubmit || submitting}>
             {submitting ? 'Searching…' : 'Search'}

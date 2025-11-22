@@ -7,6 +7,7 @@
 import {
   LiveRcClubCatalogueService,
   LiveRcClubSearchService,
+  LiveRcEventSearchService,
   LiveRcImportPlanService,
   LiveRcImportService,
   LiveRcJobQueue,
@@ -66,6 +67,13 @@ const liveRcSummaryImporter = new LiveRcSummaryImporter({
 // Lightweight lookup service for powering UI search against the club catalogue.
 export const liveRcClubSearchService = new LiveRcClubSearchService({
   repository: clubRepository,
+});
+
+// Service for searching LiveRC club events by query term, similar to club search.
+export const liveRcEventSearchService = new LiveRcEventSearchService({
+  discoveryService: liveRcDiscoveryService,
+  clubRepository,
+  logger: applicationLogger,
 });
 
 // Dedicated service responsible for synchronising the LiveRC club catalogue
