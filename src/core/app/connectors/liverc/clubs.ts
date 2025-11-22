@@ -6,6 +6,11 @@
 
 import { HTMLElement as ParsedHTMLElement, parse } from 'node-html-parser';
 
+// Ensure Node.js process.env is available for TypeScript
+declare const process: {
+  env: Record<string, string | undefined>;
+};
+
 import type { Logger } from '@core/app/ports/logger';
 import type { ClubRepository, ClubSearchResult } from '@core/app/ports/clubRepository';
 
