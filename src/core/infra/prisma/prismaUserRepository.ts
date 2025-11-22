@@ -1,3 +1,8 @@
+/**
+ * Project: My Race Engineer
+ * File: src/core/infra/prisma/prismaUserRepository.ts
+ * Summary: Prisma implementation of the UserRepository port providing persistence operations for user entities.
+ */
 import type { UserRepository } from '@core/app';
 import { DuplicateUserDriverNameError, DuplicateUserEmailError } from '@core/app';
 import { normaliseDriverName, type CreateUserInput, type User } from '@core/domain';
