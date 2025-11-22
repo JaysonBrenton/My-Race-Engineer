@@ -154,7 +154,12 @@ export class LiveRcClubSearchService {
 
 const parseClubsFromHtml = (html: string): ParsedClub[] => {
   const document = parse(html);
-  const rows = document.querySelectorAll('[data-track-row]');
+  // The live site uses <tr class="clickable-row"> rows in a table with class "track_list".
+  // Fall back to the old selector for backward compatibility with fixtures.
+  const rows =
+    document.querySelectorAll('table.track_list tbody tr.clickable-row').length > 0
+      ? document.querySelectorAll('table.track_list tbody tr.clickable-row')
+      : document.querySelectorAll('tr.clickable-row, [data-track-row]');
   // Use a map keyed by subdomain so duplicate rows (if any) collapse into a
   // single entry while preserving the latest parsed values.
   const clubs = new Map<string, ParsedClub>();
@@ -171,23 +176,36 @@ const parseClubsFromHtml = (html: string): ParsedClub[] => {
       continue;
     }
 
-    // node-html-parser occasionally exposes text content as non-string values, so
-    // coerce the node to a string before trimming.
-    // Prefer the DOM-like textContent property to stay within the HTMLElement
-    // type surface supported by node-html-parser while still handling unexpected
-    // primitive values.
-    const linkTextRaw: unknown = link.textContent;
-    let linkText = '';
-    if (typeof linkTextRaw === 'string') {
-      linkText = linkTextRaw;
-    } else if (typeof linkTextRaw === 'number' || typeof linkTextRaw === 'boolean') {
-      linkText = String(linkTextRaw);
+    // Prefer the <strong> tag text if present (the new structure places club names there),
+    // otherwise fall back to the link's textContent.
+    const strongTag = link.querySelector('strong');
+    let displayNameText = '';
+    if (strongTag) {
+      const strongTextRaw: unknown = strongTag.textContent;
+      if (typeof strongTextRaw === 'string') {
+        displayNameText = strongTextRaw;
+      } else if (typeof strongTextRaw === 'number' || typeof strongTextRaw === 'boolean') {
+        displayNameText = String(strongTextRaw);
+      }
     }
-    const displayName = normaliseText(linkText);
+
+    // If no <strong> text was found, fall back to the link's textContent.
+    if (!displayNameText) {
+      const linkTextRaw: unknown = link.textContent;
+      if (typeof linkTextRaw === 'string') {
+        displayNameText = linkTextRaw;
+      } else if (typeof linkTextRaw === 'number' || typeof linkTextRaw === 'boolean') {
+        displayNameText = String(linkTextRaw);
+      }
+    }
+
+    const displayName = normaliseText(displayNameText);
     if (!displayName) {
       continue;
     }
 
+    // The new HTML structure doesn't include location data in attributes.
+    // Try the old structure for backward compatibility, but expect null values.
     const country = extractLocationAttribute(row, 'data-country');
     const region = extractLocationAttribute(row, 'data-region');
 
@@ -203,11 +221,28 @@ const parseClubsFromHtml = (html: string): ParsedClub[] => {
 };
 
 const findTrackLink = (row: ParsedHTMLElement): ParsedHTMLElement | null => {
-  return (
-    row.querySelector('a[data-track-link]') ??
-    row.querySelector('a.track-link') ??
-    row.querySelector('a')
-  );
+  // Prefer links with data-track-link attribute (old structure) or track-link class.
+  const withDataAttr = row.querySelector('a[data-track-link]');
+  if (withDataAttr) {
+    return withDataAttr;
+  }
+
+  const withTrackLinkClass = row.querySelector('a.track-link');
+  if (withTrackLinkClass) {
+    return withTrackLinkClass;
+  }
+
+  // For the new structure, prefer links whose href points to a .liverc.com subdomain.
+  const allLinks = row.querySelectorAll('a[href]');
+  for (const link of allLinks) {
+    const href = link.getAttribute('href');
+    if (href && extractSubdomainFromHref(href)) {
+      return link;
+    }
+  }
+
+  // Fall back to any anchor tag.
+  return row.querySelector('a') ?? null;
 };
 
 const extractSubdomainFromHref = (href: string | null | undefined): string | null => {
