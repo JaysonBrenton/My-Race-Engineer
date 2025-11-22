@@ -6,6 +6,11 @@
 
 import { HTMLElement as ParsedHTMLElement, parse } from 'node-html-parser';
 
+// Ensure Node.js process.env is available for TypeScript
+declare const process: {
+  env: Record<string, string | undefined>;
+};
+
 import type { Logger } from '@core/app/ports/logger';
 import type { ClubRepository, ClubSearchResult } from '@core/app/ports/clubRepository';
 
@@ -156,9 +161,10 @@ const parseClubsFromHtml = (html: string): ParsedClub[] => {
   const document = parse(html);
   // The live site uses <tr class="clickable-row"> rows in a table with class "track_list".
   // Fall back to the old selector for backward compatibility with fixtures.
+  const primaryRows = document.querySelectorAll('table.track_list tbody tr.clickable-row');
   const rows =
-    document.querySelectorAll('table.track_list tbody tr.clickable-row').length > 0
-      ? document.querySelectorAll('table.track_list tbody tr.clickable-row')
+    primaryRows.length > 0
+      ? primaryRows
       : document.querySelectorAll('tr.clickable-row, [data-track-row]');
   // Use a map keyed by subdomain so duplicate rows (if any) collapse into a
   // single entry while preserving the latest parsed values.
