@@ -1,3 +1,8 @@
+/**
+ * Project: My Race Engineer
+ * File: src/app/global-error.tsx
+ * Summary: Next.js global error boundary component that catches unhandled errors and renders a fallback UI.
+ */
 'use client';
 
 import { useEffect } from 'react';
